@@ -21,6 +21,11 @@ export const metadata: Metadata = {
     template: "%s | TravellersIn",
   },
   description: "Social travel marketplace for collaborative plans and agency packages.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
+  },
   openGraph: {
     title: "TravellersIn",
     description: "Social travel marketplace for collaborative plans and agency packages.",
