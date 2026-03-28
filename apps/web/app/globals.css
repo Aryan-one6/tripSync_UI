@@ -1,0 +1,407 @@
+@import "tailwindcss";
+
+/* ─── Claymorphism Design System ─── */
+
+:root {
+  /* Surface palette — warm creams with depth */
+  --color-surface: #f0ebe3;
+  --color-surface-2: #faf6f0;
+  --color-surface-3: #fff9f2;
+  --color-surface-raised: #ffffff;
+
+  /* Ink — text hierarchy */
+  --color-ink-950: #1a1a2e;
+  --color-ink-900: #22223b;
+  --color-ink-700: #4a4e69;
+  --color-ink-600: #6b6f8a;
+  --color-ink-500: #9a9cb8;
+  --color-ink-400: #b8b9d0;
+  --color-ink-300: #d5d6e6;
+
+  /* Sea — primary brand (teal) */
+  --color-sea-50: #e8fbf5;
+  --color-sea-100: #c5f5e5;
+  --color-sea-200: #97edd0;
+  --color-sea-300: #5edbb5;
+  --color-sea-400: #30c99d;
+  --color-sea-500: #14b88a;
+  --color-sea-600: #0d9670;
+  --color-sea-700: #0a7a5c;
+  --color-sea-800: #086049;
+
+  /* Sunset — secondary (warm coral/orange) */
+  --color-sunset-50: #fff3ed;
+  --color-sunset-100: #ffe1d0;
+  --color-sunset-200: #ffc8a8;
+  --color-sunset-300: #ffa574;
+  --color-sunset-400: #ff8247;
+  --color-sunset-500: #f06830;
+  --color-sunset-600: #e04f1a;
+  --color-sunset-700: #b83a12;
+
+  /* Sand — warm neutral */
+  --color-sand-50: #fdf8f0;
+  --color-sand-100: #f6ead7;
+  --color-sand-200: #f0dcc0;
+  --color-sand-300: #e5caa3;
+
+  /* Lavender — accent */
+  --color-lavender-50: #f3f0ff;
+  --color-lavender-100: #e5deff;
+  --color-lavender-200: #cfc3ff;
+  --color-lavender-300: #b09dff;
+  --color-lavender-400: #9678ff;
+  --color-lavender-500: #7c5cfc;
+
+  /* Rose — accent */
+  --color-rose-50: #fff0f3;
+  --color-rose-100: #ffe0e6;
+  --color-rose-200: #ffc7d3;
+  --color-rose-300: #ffa0b4;
+  --color-rose-400: #ff6d8a;
+
+  /* Structural */
+  --color-line: rgba(26, 26, 46, 0.08);
+  --color-line-strong: rgba(26, 26, 46, 0.14);
+
+  /* Clay shadows — the key to claymorphism */
+  --shadow-clay-sm:
+    6px 6px 12px rgba(166, 160, 148, 0.35),
+    -4px -4px 10px rgba(255, 255, 255, 0.8),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.6),
+    inset -1px -1px 2px rgba(166, 160, 148, 0.15);
+
+  --shadow-clay:
+    8px 8px 18px rgba(166, 160, 148, 0.4),
+    -6px -6px 14px rgba(255, 255, 255, 0.85),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.7),
+    inset -2px -2px 4px rgba(166, 160, 148, 0.15);
+
+  --shadow-clay-lg:
+    12px 12px 24px rgba(166, 160, 148, 0.45),
+    -8px -8px 20px rgba(255, 255, 255, 0.9),
+    inset 2px 2px 6px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 6px rgba(166, 160, 148, 0.12);
+
+  --shadow-clay-inset:
+    inset 4px 4px 8px rgba(166, 160, 148, 0.3),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.7);
+
+  --shadow-clay-pressed:
+    inset 6px 6px 12px rgba(166, 160, 148, 0.4),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.6);
+
+  /* Button clay shadows */
+  --shadow-clay-btn:
+    6px 6px 14px rgba(166, 160, 148, 0.4),
+    -4px -4px 10px rgba(255, 255, 255, 0.85),
+    inset 2px 2px 3px rgba(255, 255, 255, 0.5),
+    inset -1px -1px 3px rgba(0, 0, 0, 0.06);
+
+  --shadow-clay-btn-hover:
+    8px 8px 18px rgba(166, 160, 148, 0.5),
+    -6px -6px 14px rgba(255, 255, 255, 0.9),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.6),
+    inset -1px -1px 4px rgba(0, 0, 0, 0.06);
+
+  --shadow-clay-btn-active:
+    inset 4px 4px 8px rgba(166, 160, 148, 0.4),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.5);
+
+  /* Color clay shadows (for colored buttons) */
+  --shadow-clay-sea:
+    6px 6px 14px rgba(10, 122, 92, 0.35),
+    -4px -4px 10px rgba(200, 245, 229, 0.5),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
+    inset -1px -1px 3px rgba(0, 0, 0, 0.1);
+
+  --shadow-clay-sunset:
+    6px 6px 14px rgba(224, 79, 26, 0.3),
+    -4px -4px 10px rgba(255, 225, 208, 0.5),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
+    inset -1px -1px 3px rgba(0, 0, 0, 0.1);
+
+  /* Border radius scale */
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
+  --radius-2xl: 44px;
+  --radius-full: 9999px;
+}
+
+@theme inline {
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-ink-900);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-surface);
+  background-image:
+    radial-gradient(ellipse at 10% 0%, rgba(94, 219, 181, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 5%, rgba(240, 104, 48, 0.1) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 100%, rgba(124, 92, 252, 0.06) 0%, transparent 50%);
+  color: var(--color-ink-900);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(20, 184, 138, 0.2);
+}
+
+/* ─── Utility Classes ─── */
+
+.page-shell {
+  margin-inline: auto;
+  width: min(1440px, calc(100% - 1.5rem));
+  padding-inline: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .page-shell {
+    width: min(1440px, calc(100% - 3rem));
+    padding-inline: 0;
+  }
+}
+
+/* Clay card base */
+.clay-card {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-clay);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clay-card:hover {
+  box-shadow: var(--shadow-clay-lg);
+  transform: translateY(-2px);
+}
+
+/* Clay input base */
+.clay-input {
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-clay-inset);
+  transition: all 0.25s ease;
+}
+
+.clay-input:focus {
+  box-shadow:
+    var(--shadow-clay-inset),
+    0 0 0 3px rgba(20, 184, 138, 0.2);
+  border-color: var(--color-sea-300);
+}
+
+/* Clay raised surface */
+.clay-raised {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-clay);
+}
+
+/* Clay pressed / inset surface */
+.clay-inset {
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow-clay-inset);
+}
+
+/* Clay button base */
+.clay-btn {
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-clay-btn);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.clay-btn:hover {
+  box-shadow: var(--shadow-clay-btn-hover);
+  transform: translateY(-1px);
+}
+
+.clay-btn:active {
+  box-shadow: var(--shadow-clay-btn-active);
+  transform: translateY(0);
+}
+
+/* Clay blob decorations */
+.clay-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Mobile bottom nav styles */
+.mobile-nav-active {
+  background: var(--color-sea-50);
+  color: var(--color-sea-700);
+  box-shadow: var(--shadow-clay-sm);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-500);
+}
+
+/* ─── Animations ─── */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(10px, -10px) scale(1.05); }
+  66% { transform: translate(-5px, 5px) scale(0.95); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-rise-in {
+  animation: rise-in 0.5s ease-out both;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-blob {
+  animation: blob-drift 8s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.5s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Staggered animation delays */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* ─── Mobile-first responsive helpers ─── */
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Safe area padding for notched devices */
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.safe-top {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}

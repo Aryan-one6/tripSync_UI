@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum VerificationTier {
+  BASIC
+  VERIFIED
+  TRUSTED
+}
+
+enum PlanStatus {
+  DRAFT
+  OPEN
+  CONFIRMING
+  CONFIRMED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum OfferStatus {
+  PENDING
+  COUNTERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum MemberStatus {
+  INTERESTED
+  APPROVED
+  COMMITTED
+  LEFT
+  REMOVED
+}
+
+enum MemberRole {
+  CREATOR
+  MEMBER
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  REFUNDED
+  FAILED
+}
+
+enum EscrowStatus {
+  HELD
+  PARTIAL_RELEASE
+  RELEASED
+  REFUNDED
+}
+
+// ─── User & Agency ──────────────────────────────────────
+
+model User {
+  id              String           @id @default(uuid())
+  phone           String           @unique
+  username        String?          @unique
+  email           String?          @unique
+  passwordHash    String?
+  fullName        String
+  avatarUrl       String?
+  dateOfBirth     DateTime?
+  gender          String?          // male | female | other
+  city            String?
+  bio             String?
+  verification    VerificationTier @default(BASIC)
+  aadhaarHash     String?          // SHA-256, never raw
+  completedTrips  Int              @default(0)
+  avgRating       Float            @default(0)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  agency          Agency?
+  createdPlans    Plan[]
+  groupMembers    GroupMember[]
+  payments        Payment[]
+  reviewsGiven    Review[]         @relation("ReviewerRel")
+  reviewsReceived Review[]         @relation("TargetUserRel")
+  chatMessages    ChatMessage[]
+
+  @@map("users")
+}
+
+model Agency {
+  id              String   @id @default(uuid())
+  ownerId         String   @unique
+  owner           User     @relation(fields: [ownerId], references: [id])
+  name            String
+  slug            String   @unique
+  logoUrl         String?
+  description     String?
+  gstin           String?
+  pan             String?
+  tourismLicense  String?
+  address         String?
+  city            String?
+  state           String?
+  phone           String?
+  email           String?
+  specializations Json?    // ["adventure", "honeymoon"]
+  destinations    Json?    // ["himachal", "uttarakhand"]
+  verification    String   @default("pending")
+  avgRating       Float    @default(0)
+  totalReviews    Int      @default(0)
+  totalTrips      Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  packages        Package[]
+  offers          Offer[]
+  reviewsReceived Review[] @relation("TargetAgencyRel")
+
+  @@map("agencies")
+}
+
+// ─── Plan & Package ─────────────────────────────────────
+
+model Plan {
+  id               String      @id @default(uuid())
+  creatorId        String
+  creator          User        @relation(fields: [creatorId], references: [id])
+  title            String
+  slug             String      @unique
+  destination      String
+  destinationState String?
+  startDate        DateTime?
+  endDate          DateTime?
+  isDateFlexible   Boolean     @default(false)
+  budgetMin        Int?        // per person INR
+  budgetMax        Int?
+  groupSizeMin     Int         @default(4)
+  groupSizeMax     Int         @default(15)
+  vibes            Json?       // ["adventure", "chill"]
+  accommodation    String?     // hostel|budget|premium|camping
+  groupType        String?     // friends|couples|solo|family|female_only
+  genderPref       String?     // open|female_only|balanced
+  ageRangeMin      Int?
+  ageRangeMax      Int?
+  activities       Json?       // ["trekking", "paragliding"]
+  description      String?
+  itinerary        Json?       // [{day,title,description,highlights,meals,accommodation,transport}]
+  galleryUrls      Json?       // ["url1","url2"]
+  coverImageUrl    String?
+  autoApprove      Boolean     @default(true)
+  status           PlanStatus  @default(DRAFT)
+  expiresAt        DateTime?
+  confirmedAt      DateTime?
+  selectedOfferId  String?     @unique
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  group            Group?
+  offers           Offer[]
+  selectedOffer    Offer?      @relation("SelectedOfferRel", fields: [selectedOfferId], references: [id])
+
+  @@index([status])
+  @@index([destination])
+  @@index([startDate, endDate])
+  @@map("plans")
+}
+
+model Package {
+  id                 String     @id @default(uuid())
+  agencyId           String
+  agency             Agency     @relation(fields: [agencyId], references: [id])
+  title              String
+  slug               String     @unique
+  destination        String
+  destinationState   String?
+  itinerary          Json?      // [{day,title,description}]
+  startDate          DateTime?
+  endDate            DateTime?
+  departureDates     Json?      // multiple date slots
+  basePrice          Int        // per person INR
+  pricingTiers       Json?      // [{minPax,price}]
+  groupSizeMin       Int        @default(4)
+  groupSizeMax       Int        @default(20)
+  inclusions         Json?      // {transport,meals,activities}
+  exclusions         String?
+  accommodation      String?
+  vibes              Json?
+  activities         Json?
+  galleryUrls        Json?      // ["url1","url2"]
+  cancellationPolicy String?
+  status             PlanStatus @default(DRAFT)
+  expiresAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  group              Group?
+
+  @@index([status])
+  @@index([destination])
+  @@index([basePrice])
+  @@map("packages")
+}
+
+// ─── Group, Offer & Negotiation ─────────────────────────
+
+model Group {
+  id          String        @id @default(uuid())
+  planId      String?       @unique
+  packageId   String?       @unique
+  plan        Plan?         @relation(fields: [planId], references: [id])
+  package     Package?      @relation(fields: [packageId], references: [id])
+  currentSize Int           @default(0)
+  maleCount   Int           @default(0)
+  femaleCount Int           @default(0)
+  otherCount  Int           @default(0)
+  isLocked    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  members     GroupMember[]
+  payments    Payment[]
+  reviews     Review[]
+  messages    ChatMessage[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id          String       @id @default(uuid())
+  groupId     String
+  userId      String
+  group       Group        @relation(fields: [groupId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+  role        MemberRole   @default(MEMBER)
+  status      MemberStatus @default(INTERESTED)
+  joinedAt    DateTime     @default(now())
+  committedAt DateTime?
+  leftAt      DateTime?
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model Offer {
+  id                 String      @id @default(uuid())
+  planId             String
+  agencyId           String
+  plan               Plan        @relation(fields: [planId], references: [id])
+  agency             Agency      @relation(fields: [agencyId], references: [id])
+  pricePerPerson     Int
+  pricingTiers       Json?
+  inclusions         Json?
+  itinerary          Json?
+  cancellationPolicy String?
+  validUntil         DateTime?
+  status             OfferStatus @default(PENDING)
+  isReferred         Boolean     @default(false)
+  referredAt         DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  selectedByPlan     Plan?       @relation("SelectedOfferRel")
+  negotiations       OfferNegotiation[]
+
+  @@unique([planId, agencyId])
+  @@index([planId, status])
+  @@index([agencyId, isReferred, referredAt])
+  @@map("offers")
+}
+
+model OfferNegotiation {
+  id              String   @id @default(uuid())
+  offerId         String
+  offer           Offer    @relation(fields: [offerId], references: [id])
+  round           Int      // 1, 2, 3 (max 3)
+  senderType      String   // user | agency
+  price           Int?
+  inclusionsDelta Json?
+  message         String?
+  createdAt       DateTime @default(now())
+
+  @@map("offer_negotiations")
+}
+
+// ─── Payment, Review & Chat ─────────────────────────────
+
+model Payment {
+  id                 String        @id @default(uuid())
+  userId             String
+  groupId            String
+  user               User          @relation(fields: [userId], references: [id])
+  group              Group         @relation(fields: [groupId], references: [id])
+  amount             Int           // in paise (100 paise = 1 INR)
+  currency           String        @default("INR")
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  status             PaymentStatus @default(PENDING)
+  escrowStatus       EscrowStatus  @default(HELD)
+  tranche1Released   Boolean       @default(false)
+  tranche2Released   Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  reviewerId      String
+  reviewer        User     @relation("ReviewerRel", fields: [reviewerId], references: [id])
+  reviewType      String   // agency | co_traveler
+  targetAgencyId  String?
+  targetUserId    String?
+  targetAgency    Agency?  @relation("TargetAgencyRel", fields: [targetAgencyId], references: [id])
+  targetUser      User?    @relation("TargetUserRel", fields: [targetUserId], references: [id])
+  groupId         String
+  group           Group    @relation(fields: [groupId], references: [id])
+  overallRating   Int      // 1-5
+  safetyRating    Int      // 1-5
+  valueRating     Int      // 1-5
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  @@unique([reviewerId, groupId, targetAgencyId])
+  @@unique([reviewerId, groupId, targetUserId])
+  @@map("reviews")
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  groupId     String
+  senderId    String?  // null = system message
+  group       Group    @relation(fields: [groupId], references: [id])
+  sender      User?    @relation(fields: [senderId], references: [id])
+  messageType String   // text | system | poll | document
+  content     String
+  metadata    Json?    // poll options, doc url, etc.
+  createdAt   DateTime @default(now())
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("chat_messages")
+}
