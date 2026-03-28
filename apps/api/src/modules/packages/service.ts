@@ -69,7 +69,20 @@ export async function getById(id: string) {
       group: {
         include: {
           members: {
-            include: { user: { select: { id: true, fullName: true, avatarUrl: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  fullName: true,
+                  avatarUrl: true,
+                  city: true,
+                  verification: true,
+                  avgRating: true,
+                  completedTrips: true,
+                },
+              },
+            },
             where: { status: { in: ['INTERESTED', 'APPROVED', 'COMMITTED'] } },
           },
         },
@@ -99,7 +112,20 @@ export async function getBySlug(slug: string) {
       group: {
         include: {
           members: {
-            include: { user: { select: { id: true, fullName: true, avatarUrl: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  fullName: true,
+                  avatarUrl: true,
+                  city: true,
+                  verification: true,
+                  avgRating: true,
+                  completedTrips: true,
+                },
+              },
+            },
             where: { status: { in: ['INTERESTED', 'APPROVED', 'COMMITTED'] } },
           },
         },

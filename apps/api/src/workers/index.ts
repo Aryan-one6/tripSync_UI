@@ -229,7 +229,7 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-console.log('TripSync workers started: plan-expiry-check, offer-expiry');
+console.log('TravellersIn workers started: plan-expiry-check, offer-expiry');
 void runHousekeeping();
 housekeepingTimer = setInterval(() => {
   void runHousekeeping().catch((error) => {

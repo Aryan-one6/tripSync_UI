@@ -143,7 +143,7 @@ export async function submitVerification(
     title: `${updated.name} verification ${verification.replace('_', ' ')}`,
     body:
       verification === 'verified'
-        ? 'Your agency is now marked as verified on TripSync.'
+        ? 'Your agency is now marked as verified on TravellersIn.'
         : 'Your agency documents were received and the onboarding status has been updated.',
     userIds: [userId],
     phoneNumbers: [owner.phone],

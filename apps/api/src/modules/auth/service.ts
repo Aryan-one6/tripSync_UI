@@ -559,7 +559,7 @@ export async function verifyAadhaarForUser(
     throw new BadRequestError('Invalid date of birth');
   }
   if (!isAdult(dateOfBirth)) {
-    throw new BadRequestError('TripSync verification requires an adult traveler profile');
+    throw new BadRequestError('TravellersIn verification requires an adult traveler profile');
   }
 
   const result = await performAadhaarKyc({
@@ -591,8 +591,8 @@ export async function verifyAadhaarForUser(
 
   await queueNotification({
     type: 'aadhaar_verified',
-    title: 'TripSync verification completed',
-    body: `Your profile is now ${String(tier ?? updated.verification).toLowerCase()} on TripSync.`,
+    title: 'TravellersIn verification completed',
+    body: `Your profile is now ${String(tier ?? updated.verification).toLowerCase()} on TravellersIn.`,
     userIds: [userId],
     phoneNumbers: [user.phone],
     ctaUrl: `${env.FRONTEND_URL}/dashboard/settings`,

@@ -6,7 +6,7 @@ const httpServer = createServer(app);
 initSocket(httpServer);
 
 httpServer.listen(env.PORT, () => {
-  console.log(`TripSync API running on port ${env.PORT}`);
+  console.log(`TravellersIn API running on port ${env.PORT}`);
   console.log(`Environment: ${env.NODE_ENV}`);
 });
 

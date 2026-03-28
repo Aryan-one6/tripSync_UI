@@ -87,7 +87,18 @@ export async function getById(id: string) {
   const plan = await prisma.plan.findUnique({
     where: { id },
     include: {
-      creator: { select: { id: true, fullName: true, avatarUrl: true, verification: true } },
+      creator: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+          city: true,
+          verification: true,
+          avgRating: true,
+          completedTrips: true,
+        },
+      },
       group: {
         include: {
           members: {
@@ -95,10 +106,14 @@ export async function getById(id: string) {
               user: {
                 select: {
                   id: true,
+                  username: true,
                   fullName: true,
                   avatarUrl: true,
                   gender: true,
+                  city: true,
                   verification: true,
+                  avgRating: true,
+                  completedTrips: true,
                 },
               },
             },
@@ -146,7 +161,18 @@ export async function getBySlug(slug: string) {
   const plan = await prisma.plan.findUnique({
     where: { slug },
     include: {
-      creator: { select: { id: true, fullName: true, avatarUrl: true, verification: true } },
+      creator: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+          city: true,
+          verification: true,
+          avgRating: true,
+          completedTrips: true,
+        },
+      },
       group: {
         include: {
           members: {
@@ -154,10 +180,14 @@ export async function getBySlug(slug: string) {
               user: {
                 select: {
                   id: true,
+                  username: true,
                   fullName: true,
                   avatarUrl: true,
                   gender: true,
+                  city: true,
                   verification: true,
+                  avgRating: true,
+                  completedTrips: true,
                 },
               },
             },

@@ -1,8 +1,14 @@
 import sanitizeHtml from 'sanitize-html';
-import type { CreatePollInput, SendChatMessageInput, VotePollInput } from '@tripsync/shared';
+import type {
+  CreateDirectConversationInput,
+  CreatePollInput,
+  SendChatMessageInput,
+  SendDirectMessageInput,
+  VotePollInput,
+} from '@tripsync/shared';
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
-import { emitGroupEvent } from '../../lib/socket.js';
+import { emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
 
@@ -15,6 +21,60 @@ type PollMetadata = {
     votes: string[];
   }>;
 };
+
+function buildDirectConversationKey(leftUserId: string, rightUserId: string) {
+  return [leftUserId, rightUserId].sort().join(':');
+}
+
+async function assertTravelerEligibleForDirectMessages(userId: string) {
+  const membership = await prisma.groupMember.findFirst({
+    where: {
+      userId,
+      status: { in: ['INTERESTED', 'APPROVED', 'COMMITTED'] },
+    },
+    select: { id: true },
+  });
+
+  if (!membership) {
+    throw new ForbiddenError('Traveler must have active trip participation to use direct messages');
+  }
+}
+
+async function assertDirectConversationAccess(conversationId: string, userId: string) {
+  const participant = await prisma.directConversationParticipant.findUnique({
+    where: {
+      conversationId_userId: { conversationId, userId },
+    },
+    include: {
+      conversation: {
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  fullName: true,
+                  avatarUrl: true,
+                  city: true,
+                  verification: true,
+                  avgRating: true,
+                  completedTrips: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!participant) {
+    throw new ForbiddenError('You cannot access this conversation');
+  }
+
+  return participant;
+}
 
 async function assertChatAccess(groupId: string, userId: string) {
   const membership = await prisma.groupMember.findUnique({
@@ -238,4 +298,299 @@ export async function createSystemMessage(
 
   emitGroupEvent(groupId, 'chat:message_created', message);
   return message;
+}
+
+export async function createDirectConversation(
+  userId: string,
+  data: CreateDirectConversationInput,
+) {
+  if (data.targetUserId === userId) {
+    throw new BadRequestError('Cannot message yourself');
+  }
+
+  const [targetUser] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: data.targetUserId },
+      select: { id: true },
+    }),
+    assertTravelerEligibleForDirectMessages(userId),
+    assertTravelerEligibleForDirectMessages(data.targetUserId),
+  ]);
+
+  if (!targetUser) throw new NotFoundError('User');
+
+  const key = buildDirectConversationKey(userId, data.targetUserId);
+  const conversation = await prisma.directConversation.upsert({
+    where: { key },
+    create: {
+      key,
+      participants: {
+        create: [{ userId }, { userId: data.targetUserId }],
+      },
+    },
+    update: {},
+    include: {
+      participants: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return serializeDirectConversation(conversation, userId);
+}
+
+function serializeDirectConversation(
+  conversation: {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    participants: Array<{
+      lastReadAt: Date | null;
+      user: {
+        id: string;
+        username: string | null;
+        fullName: string;
+        avatarUrl: string | null;
+        city: string | null;
+        verification: string;
+        avgRating: number;
+        completedTrips: number;
+      };
+    }>;
+    messages?: Array<{
+      id: string;
+      content: string;
+      createdAt: Date;
+      senderId?: string;
+      sender?: {
+        id: string;
+        username: string | null;
+        fullName: string;
+        avatarUrl: string | null;
+        city: string | null;
+        verification: string;
+        avgRating: number;
+        completedTrips: number;
+      } | null;
+    }>;
+  },
+  viewerUserId: string,
+) {
+  const counterpart = conversation.participants.find((participant) => participant.user.id !== viewerUserId)?.user;
+  const viewerParticipant = conversation.participants.find((participant) => participant.user.id === viewerUserId);
+  const lastMessage = conversation.messages?.[0] ?? null;
+  const unreadCount = conversation.messages
+    ? conversation.messages.filter(
+        (message) =>
+          message.senderId !== viewerUserId &&
+          (!viewerParticipant?.lastReadAt || message.createdAt > viewerParticipant.lastReadAt),
+      ).length
+    : 0;
+
+  return {
+    id: conversation.id,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    counterpart,
+    unreadCount,
+    lastReadAt: viewerParticipant?.lastReadAt ?? null,
+    lastMessage,
+  };
+}
+
+export async function listDirectConversations(userId: string) {
+  await assertTravelerEligibleForDirectMessages(userId);
+
+  const conversations = await prisma.directConversation.findMany({
+    where: {
+      participants: {
+        some: { userId },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    include: {
+      participants: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return conversations.map((conversation) => serializeDirectConversation(conversation, userId));
+}
+
+export async function listDirectMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
+  await assertTravelerEligibleForDirectMessages(userId);
+  await assertDirectConversationAccess(conversationId, userId);
+
+  const messages = await prisma.directMessage.findMany({
+    where: { conversationId },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+          city: true,
+          verification: true,
+          avgRating: true,
+          completedTrips: true,
+        },
+      },
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: limit,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
+
+  const ordered = [...messages].reverse();
+
+  return {
+    messages: ordered,
+    cursor: messages.length === limit ? messages[messages.length - 1]?.id ?? null : null,
+  };
+}
+
+export async function sendDirectMessage(
+  conversationId: string,
+  userId: string,
+  data: SendDirectMessageInput,
+) {
+  await assertTravelerEligibleForDirectMessages(userId);
+  const participant = await assertDirectConversationAccess(conversationId, userId);
+  const content = normalizeContent(data.content);
+
+  if (!content) {
+    throw new BadRequestError('Message cannot be empty');
+  }
+
+  const message = await prisma.$transaction(async (tx) => {
+    const created = await tx.directMessage.create({
+      data: {
+        conversationId,
+        senderId: userId,
+        content,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatarUrl: true,
+            city: true,
+            verification: true,
+            avgRating: true,
+            completedTrips: true,
+          },
+        },
+      },
+    });
+
+    await tx.directConversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    await tx.directConversationParticipant.update({
+      where: { id: participant.id },
+      data: { lastReadAt: created.createdAt },
+    });
+
+    return created;
+  });
+
+  const recipientIds = participant.conversation.participants
+    .map((entry) => entry.user.id)
+    .filter((id) => id !== userId);
+
+  emitUserEvent(userId, 'direct:message_created', { conversationId, message });
+  for (const recipientId of recipientIds) {
+    emitUserEvent(recipientId, 'direct:message_created', { conversationId, message });
+  }
+
+  if (recipientIds.length > 0) {
+    await queueNotification({
+      type: 'direct_message',
+      title: `${message.sender?.fullName ?? 'A traveler'} sent you a message`,
+      body: content.slice(0, 160),
+      userIds: recipientIds,
+      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages?conversation=${conversationId}`,
+      metadata: { conversationId, messageId: message.id },
+    });
+  }
+
+  return message;
+}
+
+export async function markDirectConversationRead(conversationId: string, userId: string) {
+  await assertTravelerEligibleForDirectMessages(userId);
+  const participant = await assertDirectConversationAccess(conversationId, userId);
+
+  return prisma.directConversationParticipant.update({
+    where: { id: participant.id },
+    data: { lastReadAt: new Date() },
+  });
 }
