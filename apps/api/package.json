@@ -12,6 +12,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
     "generate": "prisma generate",
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts"
