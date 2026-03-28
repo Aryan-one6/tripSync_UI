@@ -37,6 +37,7 @@ import { EnrolledMembers } from "@/components/trip/enrolled-members";
 import { BookingSidebar } from "@/components/trip/booking-sidebar";
 import { CancellationPolicy } from "@/components/trip/cancellation-policy";
 import { MobileBottomBar } from "@/components/trip/mobile-bottom-bar";
+import { GroupRealtimeRefresh } from "@/components/trip/group-realtime-refresh";
 import { UserVerificationBadge, AgencyVerificationBadge } from "@/components/ui/verification-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export async function generateMetadata({
   if (!plan) {
     return {
       title: "Plan not found",
-      description: "This TripSync plan is unavailable.",
+      description: "This TravellersIn plan is unavailable.",
     };
   }
 
@@ -110,12 +111,12 @@ const PLAN_FAQS: FaqItem[] = [
   {
     question: "Who decides which agency offer to accept?",
     answer:
-      "The plan creator has the final say, but the group can discuss offers in the group chat. TripSync enables up to 3 rounds of negotiation with each agency to get the best deal.",
+      "The plan creator has the final say, but the group can discuss offers in the group chat. TravellersIn enables up to 3 rounds of negotiation with each agency to get the best deal.",
   },
   {
     question: "Is it safe to travel with strangers?",
     answer:
-      "TripSync uses a 3-tier verification system (Basic → Verified → Trusted) with Aadhaar eKYC and trip-based ratings. You can check every member's profile, completed trips, and safety rating before joining.",
+      "TravellersIn uses a 3-tier verification system (Basic → Verified → Trusted) with Aadhaar eKYC and trip-based ratings. You can check every member's profile, completed trips, and safety rating before joining.",
   },
   {
     question: "What if I change my mind after joining?",
@@ -242,7 +243,7 @@ export default async function PlanDetailPage({
   }
 
   const shareUrl = buildWhatsAppShareHref(
-    `Check out this TripSync plan: ${plan.title}`,
+    `Check out this TravellersIn plan: ${plan.title}`,
     `/plans/${plan.slug}`,
   );
 
@@ -283,6 +284,7 @@ export default async function PlanDetailPage({
 
   return (
     <div className="page-shell space-y-4 pt-3 pb-24 sm:space-y-8 sm:pt-8 lg:pb-8">
+      <GroupRealtimeRefresh groupId={plan.group?.id} />
       {/* ═══ Image Gallery ═══ */}
       <ImageGallery images={galleryImages} title={plan.title} />
 
@@ -367,6 +369,7 @@ export default async function PlanDetailPage({
             shareUrl={shareUrl}
             requiresFemaleProfile={plan.genderPref === "female_only"}
             label={hasSelectedOffer ? "Join this trip" : "Join this plan"}
+            members={plan.group?.members ?? []}
           />
         </div>
       </div>
@@ -771,7 +774,13 @@ export default async function PlanDetailPage({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-sm text-[var(--color-ink-950)] sm:text-base">{plan.creator.fullName}</p>
+                {plan.creator.username ? (
+                  <Link href={`/travelers/${plan.creator.username}`} className="truncate font-display text-sm text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] sm:text-base">
+                    {plan.creator.fullName}
+                  </Link>
+                ) : (
+                  <p className="truncate font-display text-sm text-[var(--color-ink-950)] sm:text-base">{plan.creator.fullName}</p>
+                )}
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--color-ink-600)] sm:text-xs">
                   {plan.creator.city && (
                     <span className="inline-flex items-center gap-1">
@@ -793,6 +802,11 @@ export default async function PlanDetailPage({
                   <UserVerificationBadge tier={plan.creator.verification ?? "BASIC"} />
                 </div>
               </div>
+              <Link href={`/dashboard/messages?target=${plan.creator.id}`} className="shrink-0">
+                <Button size="sm" variant="ghost" className="px-3 py-1.5 text-[10px]">
+                  Message
+                </Button>
+              </Link>
             </div>
           </Card>
 
@@ -887,6 +901,7 @@ export default async function PlanDetailPage({
         shareUrl={shareUrl}
         requiresFemaleProfile={plan.genderPref === "female_only"}
         label={hasSelectedOffer ? "Join this trip" : "Join this plan"}
+        members={plan.group?.members ?? []}
       />
     </div>
   );

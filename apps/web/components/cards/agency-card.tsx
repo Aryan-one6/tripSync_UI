@@ -10,7 +10,7 @@ import { buildWhatsAppShareHref } from "@/lib/share";
 
 export function AgencyCard({ agency }: { agency: AgencySummary }) {
   const href = `/agencies/${agency.slug}`;
-  const shareHref = buildWhatsAppShareHref(`Explore this TripSync agency: ${agency.name}`, href);
+  const shareHref = buildWhatsAppShareHref(`Explore this TravellersIn agency: ${agency.name}`, href);
 
   return (
     <Card className="group h-full p-0 overflow-hidden hover:shadow-[var(--shadow-clay-lg)] hover:-translate-y-1">

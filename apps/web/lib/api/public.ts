@@ -1,6 +1,12 @@
 import { apiFetch, safeApiFetch } from "@/lib/api/client";
 import type { QueryParams } from "@/lib/api/client";
-import type { AgencySummary, DiscoverItem, PackageDetails, PlanDetails } from "@/lib/api/types";
+import type {
+  AgencySummary,
+  DiscoverItem,
+  PackageDetails,
+  PlanDetails,
+  PublicTravelerProfile,
+} from "@/lib/api/types";
 
 interface DiscoverQuery extends QueryParams {
   destination?: string;
@@ -71,6 +77,12 @@ export async function getAgencyBySlug(slug: string) {
       }>;
     }
   >(`/agencies/${slug}`, {
+    cache: "no-store",
+  }).catch(() => null);
+}
+
+export async function getTravelerByUsername(username: string) {
+  return apiFetch<PublicTravelerProfile>(`/users/profile/${username}`, {
     cache: "no-store",
   }).catch(() => null);
 }

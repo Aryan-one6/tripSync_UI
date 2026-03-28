@@ -17,19 +17,19 @@ const displayFont = Syne({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "TripSync",
-    template: "%s | TripSync",
+    default: "TravellersIn",
+    template: "%s | TravellersIn",
   },
   description: "Social travel marketplace for collaborative plans and agency packages.",
   openGraph: {
-    title: "TripSync",
+    title: "TravellersIn",
     description: "Social travel marketplace for collaborative plans and agency packages.",
-    siteName: "TripSync",
+    siteName: "TravellersIn",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TripSync",
+    title: "TravellersIn",
     description: "Social travel marketplace for collaborative plans and agency packages.",
   },
 };

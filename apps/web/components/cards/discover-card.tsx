@@ -12,7 +12,7 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const href =
     item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
   const shareHref = buildWhatsAppShareHref(
-    `Check this TripSync ${item.originType}: ${item.title}`,
+    `Check this TravellersIn ${item.originType}: ${item.title}`,
     href,
   );
   const fillPercent = Math.round((item.joinedCount / Math.max(item.groupSizeMax, 1)) * 100);

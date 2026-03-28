@@ -19,6 +19,7 @@ const userNav = [
   { href: "/dashboard/plans", label: "My Plans", icon: Route },
   { href: "/dashboard/plans/new", label: "New Plan", icon: FilePlus2 },
   { href: "/dashboard/trips", label: "My Trips", icon: Ticket },
+  { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

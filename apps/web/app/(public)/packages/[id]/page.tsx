@@ -90,7 +90,7 @@ const DEFAULT_FAQS: FaqItem[] = [
   {
     question: "How is the group formed?",
     answer:
-      "TripSync uses a social-first approach — travelers join based on shared interests, vibes, and schedules. You can see who else has enrolled before committing, so you travel with people you feel comfortable with.",
+      "TravellersIn uses a social-first approach — travelers join based on shared interests, vibes, and schedules. You can see who else has enrolled before committing, so you travel with people you feel comfortable with.",
   },
   {
     question: "Is the price per person or for the whole group?",
@@ -110,7 +110,7 @@ const DEFAULT_FAQS: FaqItem[] = [
   {
     question: "How do I verify other travelers?",
     answer:
-      "TripSync has a 3-tier verification system: Basic (phone verified), Verified (Aadhaar eKYC), and Trusted (completed trips + high ratings). You can see each traveler's verification badge on their profile.",
+      "TravellersIn has a 3-tier verification system: Basic (phone verified), Verified (Aadhaar eKYC), and Trusted (completed trips + high ratings). You can see each traveler's verification badge on their profile.",
   },
   {
     question: "What if the minimum group size isn't met?",
@@ -148,7 +148,7 @@ export default async function PackageDetailPage({
   const agencyReviews = agencyFull?.reviewsReceived ?? [];
 
   const shareUrl = buildWhatsAppShareHref(
-    `Check this TripSync package: ${pkg.title}`,
+    `Check this TravellersIn package: ${pkg.title}`,
     `/packages/${pkg.slug}`,
   );
 
@@ -468,10 +468,10 @@ export default async function PackageDetailPage({
             />
           </Card>
 
-          {/* TripSync USP callout */}
+          {/* TravellersIn USP callout */}
           <CardInset className="space-y-3 p-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-              Why TripSync
+              Why TravellersIn
             </p>
             {[
               {

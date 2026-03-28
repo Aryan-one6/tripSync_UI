@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { JoinTripButton } from "@/components/forms/join-trip-button";
 import { WhatsAppShareButton } from "@/components/ui/whatsapp-share-button";
 import { formatCurrency, formatDateRange } from "@/lib/format";
+import type { GroupMember } from "@/lib/api/types";
 
 interface BookingSidebarProps {
   groupId?: string;
@@ -18,6 +19,7 @@ interface BookingSidebarProps {
   requiresFemaleProfile?: boolean;
   departureDates?: string[] | null;
   label?: string;
+  members?: GroupMember[];
 }
 
 export function BookingSidebar({
@@ -32,6 +34,7 @@ export function BookingSidebar({
   requiresFemaleProfile = false,
   departureDates,
   label = "Join this trip",
+  members = [],
 }: BookingSidebarProps) {
   return (
     <div className="space-y-2.5 sm:space-y-3">
@@ -93,6 +96,7 @@ export function BookingSidebar({
             groupId={groupId}
             label={label}
             requiresFemaleProfile={requiresFemaleProfile}
+            members={members}
           />
           <WhatsAppShareButton href={shareUrl} className="block" />
         </div>
@@ -107,7 +111,7 @@ export function BookingSidebar({
           onClick={() => {
             if (navigator.share) {
               navigator.share({
-                title: "Check out this trip on TripSync",
+                title: "Check out this trip on TravellersIn",
                 url: window.location.href,
               });
             } else {

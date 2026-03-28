@@ -1,5 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
 import { ShieldCheck, BadgeCheck, Star, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { GroupMember } from "@/lib/api/types";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,8 @@ function VerificationIcon({ tier }: { tier?: string | null }) {
 
 function MemberCard({ member }: { member: GroupMember }) {
   const user = member.user;
+  const profileHref = user.username ? `/travelers/${user.username}` : null;
+  const messageHref = `/dashboard/messages?target=${user.id}`;
   return (
     <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-white/40 bg-[var(--color-surface-2)] px-3 py-2.5 shadow-[var(--shadow-clay-inset)] transition hover:shadow-[var(--shadow-clay-sm)] sm:items-center">
       {/* Avatar */}
@@ -47,9 +51,15 @@ function MemberCard({ member }: { member: GroupMember }) {
       {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-            {user.fullName}
-          </p>
+          {profileHref ? (
+            <Link href={profileHref} className="truncate text-sm font-semibold text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+              {user.fullName}
+            </Link>
+          ) : (
+            <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+              {user.fullName}
+            </p>
+          )}
           <VerificationIcon tier={user.verification} />
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--color-ink-500)]">
@@ -89,6 +99,11 @@ function MemberCard({ member }: { member: GroupMember }) {
             ? "Approved"
             : "Interested"}
       </span>
+      <Link href={messageHref}>
+        <Button size="sm" variant="ghost" className="shrink-0 px-3 py-1.5 text-[10px]">
+          Message
+        </Button>
+      </Link>
     </div>
   );
 }

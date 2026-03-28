@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { MessageSquareMore, PlusCircle, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -279,7 +280,13 @@ export function GroupChat({ groupId }: { groupId: string }) {
                   {initials(member.user.fullName)}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">{member.user.fullName}</p>
+                  {member.user.username ? (
+                    <Link href={`/travelers/${member.user.username}`} className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+                      {member.user.fullName}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">{member.user.fullName}</p>
+                  )}
                   <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">{member.status}</p>
                 </div>
               </div>

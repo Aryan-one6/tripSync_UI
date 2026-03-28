@@ -110,7 +110,7 @@ export default function UserPlansPage() {
                     <ArrowRight className="size-3.5" />
                   </Link>
                   <WhatsAppShareButton
-                    href={buildWhatsAppShareHref(`Check my TripSync plan: ${plan.title}`, `/plans/${plan.slug}`)}
+                    href={buildWhatsAppShareHref(`Check my TravellersIn plan: ${plan.title}`, `/plans/${plan.slug}`)}
                     label="Share"
                     size="sm"
                   />

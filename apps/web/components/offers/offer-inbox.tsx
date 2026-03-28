@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { MessageSquareMore, ShieldCheck, Star, Wallet, ArrowDownUp, CheckCircle2, XCircle, Handshake } from "lucide-react";
+import { MessageSquareMore, ShieldCheck, Star, Wallet, ArrowDownUp, CheckCircle2, XCircle, Handshake, MailPlus } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -11,15 +12,19 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatCurrency } from "@/lib/format";
-import type { Offer } from "@/lib/api/types";
+import type { AgencySummary, Offer } from "@/lib/api/types";
 
 export function OfferInbox({ planId }: { planId: string }) {
   const { apiFetchWithAuth } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [agencies, setAgencies] = useState<AgencySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"price" | "rating" | "inclusive">("price");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [counteringOffer, setCounteringOffer] = useState<Offer | null>(null);
+  const [referralOpen, setReferralOpen] = useState(false);
+  const [selectedAgencyIds, setSelectedAgencyIds] = useState<string[]>([]);
+  const [agencySearch, setAgencySearch] = useState("");
   const [counterPrice, setCounterPrice] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -40,6 +45,19 @@ export function OfferInbox({ planId }: { planId: string }) {
     void loadOffers();
   }, [loadOffers]);
 
+  useEffect(() => {
+    if (!referralOpen || agencies.length > 0) return;
+
+    void (async () => {
+      try {
+        const data = await apiFetchWithAuth<AgencySummary[]>("/agencies/browse");
+        setAgencies(data);
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Unable to load agencies.");
+      }
+    })();
+  }, [agencies.length, apiFetchWithAuth, referralOpen]);
+
   const sortedOffers = useMemo(() => {
     return [...offers].sort((left, right) => {
       if (sortBy === "rating") return right.agency.avgRating - left.agency.avgRating;
@@ -49,6 +67,20 @@ export function OfferInbox({ planId }: { planId: string }) {
       return left.pricePerPerson - right.pricePerPerson;
     });
   }, [offers, sortBy]);
+
+  const filteredAgencies = useMemo(() => {
+    const query = agencySearch.trim().toLowerCase();
+    const referredIds = new Set(offers.filter((offer) => offer.isReferred).map((offer) => offer.agency.id));
+    return agencies.filter((agency) => {
+      if (referredIds.has(agency.id)) return false;
+      if (!query) return true;
+      return (
+        agency.name.toLowerCase().includes(query) ||
+        agency.city?.toLowerCase().includes(query) ||
+        agency.destinations?.some((destination) => destination.toLowerCase().includes(query))
+      );
+    });
+  }, [agencySearch, agencies, offers]);
 
   function submitAction(action: "accept" | "reject", offerId: string) {
     startTransition(async () => {
@@ -84,6 +116,34 @@ export function OfferInbox({ planId }: { planId: string }) {
     });
   }
 
+  function toggleAgency(agencyId: string) {
+    setSelectedAgencyIds((current) =>
+      current.includes(agencyId)
+        ? current.filter((id) => id !== agencyId)
+        : [...current, agencyId],
+    );
+  }
+
+  function submitReferral() {
+    if (selectedAgencyIds.length === 0) return;
+
+    startTransition(async () => {
+      try {
+        await apiFetchWithAuth(`/plans/${planId}/refer`, {
+          method: "POST",
+          body: JSON.stringify({ agencyIds: selectedAgencyIds }),
+        });
+        setReferralOpen(false);
+        setSelectedAgencyIds([]);
+        setAgencySearch("");
+        await loadOffers();
+        setFeedback("Plan referred to selected agencies.");
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Unable to refer this plan.");
+      }
+    });
+  }
+
   if (loading) {
     return (
       <Card className="flex items-center justify-center p-12 text-[var(--color-ink-500)]">
@@ -110,6 +170,10 @@ export function OfferInbox({ planId }: { planId: string }) {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="soft" size="sm" onClick={() => setReferralOpen(true)}>
+              <MailPlus className="size-3.5" />
+              Refer plan
+            </Button>
             <ArrowDownUp className="size-4 text-[var(--color-ink-500)]" />
             <Select
               value={sortBy}
@@ -152,12 +216,19 @@ export function OfferInbox({ planId }: { planId: string }) {
                         {offer.status}
                       </Badge>
                       <h3 className="mt-2 truncate font-display text-lg text-[var(--color-ink-950)]">
-                        {offer.agency.name}
+                        <Link href={`/agencies/${offer.agency.slug}`} className="transition hover:text-[var(--color-sea-700)]">
+                          {offer.agency.name}
+                        </Link>
                       </h3>
                       <p className="mt-1 flex items-center gap-1.5 text-sm text-[var(--color-ink-600)]">
                         <Star className="size-3.5 fill-current text-[var(--color-sunset-500)]" />
                         {offer.agency.avgRating.toFixed(1)}
                       </p>
+                      {offer.isReferred ? (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-sea-700)]">
+                          Referred {offer.referredAt ? `· ${offer.referredAt.slice(0, 10)}` : ""}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="shrink-0 rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] px-4 py-2.5 text-right shadow-[var(--shadow-clay-sm)]">
                       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-sea-700)]">Price</p>
@@ -249,6 +320,61 @@ export function OfferInbox({ planId }: { planId: string }) {
       </CardInset>
 
       {/* Counter-offer modal */}
+      <Modal
+        open={referralOpen}
+        onClose={() => setReferralOpen(false)}
+        title="Refer this plan to agencies"
+        description="Choose operators you want to notify directly. They will see the plan in their referral inbox."
+      >
+        <div className="space-y-4">
+          <Input
+            value={agencySearch}
+            onChange={(event) => setAgencySearch(event.target.value)}
+            placeholder="Search by agency, city, or destination"
+          />
+
+          <div className="max-h-72 space-y-2 overflow-y-auto hide-scrollbar">
+            {filteredAgencies.length === 0 ? (
+              <CardInset className="p-4 text-sm text-[var(--color-ink-500)]">
+                No additional agencies match this filter.
+              </CardInset>
+            ) : (
+              filteredAgencies.map((agency) => (
+                <button
+                  key={agency.id}
+                  type="button"
+                  onClick={() => toggleAgency(agency.id)}
+                  className={`w-full rounded-[var(--radius-md)] border px-4 py-3 text-left transition ${
+                    selectedAgencyIds.includes(agency.id)
+                      ? "border-[var(--color-sea-200)] bg-[var(--color-sea-50)] shadow-[var(--shadow-clay-sm)]"
+                      : "border-white/50 bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-[var(--color-ink-900)]">{agency.name}</p>
+                      <p className="mt-1 text-xs text-[var(--color-ink-600)]">
+                        {agency.city ?? "India"} · {(agency.destinations ?? []).slice(0, 3).join(", ") || "General operator"}
+                      </p>
+                    </div>
+                    <Badge variant={selectedAgencyIds.includes(agency.id) ? "sea" : "default"}>
+                      {selectedAgencyIds.includes(agency.id) ? "Selected" : "Select"}
+                    </Badge>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setReferralOpen(false)}>Cancel</Button>
+            <Button onClick={submitReferral} disabled={isPending || selectedAgencyIds.length === 0}>
+              {isPending ? "Sending..." : `Refer to ${selectedAgencyIds.length} agenc${selectedAgencyIds.length === 1 ? "y" : "ies"}`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         open={Boolean(counteringOffer)}
         onClose={() => setCounteringOffer(null)}

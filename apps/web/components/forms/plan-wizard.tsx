@@ -113,7 +113,7 @@ export function PlanWizard() {
   }, [values.itineraryDays]);
 
   const generatedTitle = useMemo(() => {
-    if (!values.destination) return "My next TripSync plan";
+    if (!values.destination) return "My next TravellersIn plan";
     return `${values.destination} social trip`;
   }, [values.destination]);
 

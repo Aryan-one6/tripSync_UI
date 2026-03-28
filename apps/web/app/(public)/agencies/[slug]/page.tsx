@@ -27,7 +27,7 @@ export async function generateMetadata({
   if (!agency) {
     return {
       title: "Agency not found",
-      description: "This TripSync agency profile is unavailable.",
+      description: "This TravellersIn agency profile is unavailable.",
     };
   }
 
@@ -76,7 +76,7 @@ export default async function AgencyProfilePage({
     );
   }
 
-  const shareUrl = buildWhatsAppShareHref(`Explore this TripSync agency: ${agency.name}`, `/agencies/${agency.slug}`);
+  const shareUrl = buildWhatsAppShareHref(`Explore this TravellersIn agency: ${agency.name}`, `/agencies/${agency.slug}`);
 
   return (
     <div className="page-shell space-y-8 py-10">
@@ -113,7 +113,7 @@ export default async function AgencyProfilePage({
 
           {/* Stats box */}
           <div className="shrink-0 rounded-[var(--radius-lg)] bg-[var(--color-surface-2)] px-5 py-4 text-right shadow-[var(--shadow-clay-inset)]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">TripSync snapshot</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">TravellersIn snapshot</p>
             <p className="mt-2 font-display text-2xl text-[var(--color-ink-950)]">
               {agency.totalTrips ?? 0} trips
             </p>

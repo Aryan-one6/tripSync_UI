@@ -34,7 +34,7 @@ export default async function HomePage() {
                 Build the trip first. Let the right group find it.
               </h1>
               <p className="mt-6 max-w-2xl text-base text-[var(--color-ink-600)] leading-relaxed sm:text-lg">
-                TripSync blends user-created travel intent with agency packages, live offer comparison,
+                TravellersIn blends user-created travel intent with agency packages, live offer comparison,
                 and structured group discovery for Indian social travel.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">

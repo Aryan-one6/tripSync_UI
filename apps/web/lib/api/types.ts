@@ -358,3 +358,69 @@ export interface ReviewEligibility {
     createdAt: string;
   }>;
 }
+
+export interface PublicTravelerProfile extends UserSummary {
+  bio?: string | null;
+  createdPlans: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    destination: string;
+    destinationState?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    status: PlanStatus;
+    coverImageUrl?: string | null;
+  }>;
+  joinedTrips: Array<
+    | {
+        id: string;
+        slug: string;
+        title: string;
+        destination: string;
+        startDate?: string | null;
+        endDate?: string | null;
+        status: PlanStatus;
+        coverImageUrl?: string | null;
+      }
+    | {
+        id: string;
+        slug: string;
+        title: string;
+        destination: string;
+        startDate?: string | null;
+        endDate?: string | null;
+        status: PlanStatus;
+        galleryUrls?: string[] | null;
+        basePrice?: number | null;
+      }
+  >;
+  reviewsReceived: Array<{
+    id: string;
+    overallRating: number;
+    safetyRating: number;
+    valueRating: number;
+    comment?: string | null;
+    createdAt: string;
+    reviewer: UserSummary;
+  }>;
+}
+
+export interface DirectConversation {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  unreadCount: number;
+  lastReadAt?: string | null;
+  counterpart?: UserSummary | null;
+  lastMessage?: DirectMessage | null;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  sender?: UserSummary | null;
+}

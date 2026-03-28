@@ -19,7 +19,7 @@ export default async function TravelerSignupPage({
             Signup as traveler
           </p>
           <h1 className="font-display text-6xl leading-[0.96] text-[var(--color-ink-950)]">
-            Build your TripSync traveler identity one step at a time.
+            Build your TravellersIn traveler identity one step at a time.
           </h1>
           <p className="max-w-xl text-lg text-[var(--color-ink-600)]">
             Create the account once, then log in with username or email and password whenever you want to

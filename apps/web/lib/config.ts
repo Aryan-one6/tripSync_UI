@@ -6,4 +6,4 @@ export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "";
 export const RAZORPAY_PUBLIC_KEY = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "";
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-export const APP_NAME = "TripSync";
+export const APP_NAME = "TravellersIn";

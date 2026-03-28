@@ -4,6 +4,7 @@ import { Share2 } from "lucide-react";
 import { JoinTripButton } from "@/components/forms/join-trip-button";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
+import type { GroupMember } from "@/lib/api/types";
 
 interface MobileBottomBarProps {
   groupId?: string;
@@ -12,6 +13,7 @@ interface MobileBottomBarProps {
   shareUrl: string;
   requiresFemaleProfile?: boolean;
   label?: string;
+  members?: GroupMember[];
 }
 
 export function MobileBottomBar({
@@ -21,6 +23,7 @@ export function MobileBottomBar({
   shareUrl,
   requiresFemaleProfile = false,
   label = "Join this trip",
+  members = [],
 }: MobileBottomBarProps) {
   return (
     <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/60 bg-[var(--color-surface)]/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur-md lg:hidden">
@@ -50,6 +53,7 @@ export function MobileBottomBar({
               groupId={groupId}
               label={label}
               requiresFemaleProfile={requiresFemaleProfile}
+              members={members}
             />
           </div>
         </div>

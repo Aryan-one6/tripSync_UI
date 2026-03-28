@@ -45,7 +45,7 @@ export function SiteHeader() {
                 <Compass className="size-5" />
               </div>
               <div className="hidden sm:block">
-                <p className="font-display text-lg text-[var(--color-ink-950)]">TripSync</p>
+                <p className="font-display text-lg text-[var(--color-ink-950)]">TravellersIn</p>
                 <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-500)]">
                   Social Travel
                 </p>

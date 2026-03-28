@@ -65,7 +65,7 @@ export default function TripsPage() {
             const needsPayment = plan?.status === "CONFIRMING" && trip.status !== "COMMITTED";
             const canChat = trip.status === "COMMITTED" || plan?.status === "CONFIRMED" || plan?.status === "COMPLETED";
             const canReview = plan?.status === "COMPLETED";
-            const shareHref = buildWhatsAppShareHref(`Check this TripSync trip: ${title}`, href);
+            const shareHref = buildWhatsAppShareHref(`Check this TravellersIn trip: ${title}`, href);
 
             return (
               <Card key={trip.id} className="relative overflow-hidden p-5">

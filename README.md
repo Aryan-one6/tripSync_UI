@@ -1,6 +1,6 @@
-# TripSync
+# TravellersIn
 
-TripSync is a Turborepo with:
+TravellersIn is a Turborepo with:
 
 - `apps/web`: Next.js 16 frontend
 - `apps/api`: Express + Prisma backend

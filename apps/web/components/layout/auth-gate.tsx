@@ -37,7 +37,7 @@ export function AuthGate({
             <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]">
               <LockKeyhole className="size-5 text-[var(--color-sea-700)]" />
             </div>
-            <p className="text-sm text-[var(--color-ink-600)]">Loading your TripSync workspace...</p>
+            <p className="text-sm text-[var(--color-ink-600)]">Loading your TravellersIn workspace...</p>
           </div>
         </Card>
       </div>
