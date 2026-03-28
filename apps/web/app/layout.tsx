@@ -17,7 +17,7 @@ const displayFont = Syne({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "TravellersIn",
+    default: "Travellers India - Social travel marketplace for collaborative plans and agency packages.",
     template: "%s | TravellersIn",
   },
   description: "Social travel marketplace for collaborative plans and agency packages.",
