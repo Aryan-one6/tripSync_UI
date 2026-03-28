@@ -1,4 +1,5 @@
-import { Compass, Heart } from "lucide-react";
+import Image from "next/image";
+import { Heart } from "lucide-react";
 
 export function SiteFooter() {
   return (
@@ -16,15 +17,13 @@ export function SiteFooter() {
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               {/* Brand */}
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-sea-400)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-clay-sea)]">
-                  <Compass className="size-5" />
-                </div>
-                <div>
-                  <p className="font-display text-lg text-[var(--color-ink-950)]">TravellersIn</p>
-                  <p className="text-xs text-[var(--color-ink-500)]">
-                    Plan better trips, find the right group.
-                  </p>
-                </div>
+                <Image
+                  src="/brand/travellersin.png"
+                  alt="TravellersIn"
+                  width={312}
+                  height={92}
+                  className="h-11 w-auto sm:h-12"
+                />
               </div>
 
               {/* Credits */}

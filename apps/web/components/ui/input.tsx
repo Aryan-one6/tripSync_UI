@@ -9,11 +9,10 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
     <input
       ref={ref}
       className={cn(
-        "h-12 w-full rounded-[var(--radius-md)] border border-white/50 bg-[var(--color-surface-2)] px-4 text-sm text-[var(--color-ink-900)]",
-        "shadow-[var(--shadow-clay-inset)]",
-        "outline-none transition-all duration-200",
-        "placeholder:text-[var(--color-ink-400)]",
-        "focus:border-[var(--color-sea-300)] focus:shadow-[var(--shadow-clay-inset),0_0_0_3px_rgba(20,184,138,0.15)]",
+        "h-11 w-full rounded-md border border-(--color-border-strong) bg-(--color-surface-raised) px-4 text-sm text-foreground",
+        "outline-none transition-all duration-150",
+        "placeholder:text-(--color-ink-400)",
+        "focus:border-(--color-sea-400) focus:shadow-[0_0_0_3px_rgba(20,184,138,0.12)]",
         className,
       )}
       {...props}

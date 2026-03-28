@@ -1,10 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  Compass,
   LayoutDashboard,
   LogOut,
   MapPinned,
@@ -38,22 +38,21 @@ export function SiteHeader() {
     <>
       <header className="sticky top-0 z-40 safe-top">
         <div className="mx-auto max-w-[1500px] px-4 pt-3 md:px-6">
-          <div className="flex items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-white/60 bg-[var(--color-surface-raised)]/90 px-4 py-3 shadow-[var(--shadow-clay)] backdrop-blur-xl md:px-6">
+          <div className="flex items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)]/95 px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md md:px-6">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
-              <div className="flex size-10 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-sea-400)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-clay-sea)]">
-                <Compass className="size-5" />
-              </div>
-              <div className="hidden sm:block">
-                <p className="font-display text-lg text-[var(--color-ink-950)]">TravellersIn</p>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-ink-500)]">
-                  Social Travel
-                </p>
-              </div>
+            <Link href="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
+              <Image
+                src="/brand/travellersin.png"
+                alt="TravellersIn"
+                width={312}
+                height={92}
+                priority
+                className="h-10 w-auto sm:h-12"
+              />
             </Link>
 
             {/* Desktop nav */}
-            <nav className="hidden items-center gap-1 rounded-full border border-white/50 bg-[var(--color-surface-2)] p-1 shadow-[var(--shadow-clay-inset)] md:flex">
+            <nav className="hidden items-center gap-0.5 rounded-full border border-(--color-border) bg-(--color-surface-2) p-1 md:flex">
               {links.map((link) => {
                 const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(`${link.href}/`));
                 return (
@@ -63,8 +62,8 @@ export function SiteHeader() {
                     className={cn(
                       "rounded-full px-5 py-2 text-sm font-medium transition-all duration-200",
                       active
-                        ? "bg-[var(--color-surface-raised)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
-                        : "text-[var(--color-ink-600)] hover:text-[var(--color-ink-900)]",
+                        ? "bg-(--color-surface-raised) text-(--color-sea-700) shadow-(--shadow-sm)"
+                        : "text-(--color-ink-600) hover:text-foreground hover:bg-white/60",
                     )}
                   >
                     {link.label}
@@ -138,7 +137,7 @@ export function SiteHeader() {
             {/* Mobile menu button */}
             <button
               type="button"
-              className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-ink-700)] shadow-[var(--shadow-clay-sm)] transition-all active:shadow-[var(--shadow-clay-btn-active)] md:hidden"
+              className="flex size-9 items-center justify-center rounded-md border border-(--color-border) bg-(--color-surface-2) text-(--color-ink-700) transition-colors hover:bg-(--color-surface-3) md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -150,8 +149,8 @@ export function SiteHeader() {
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-30 md:hidden">
-          <div className="absolute inset-0 bg-[var(--color-ink-950)]/30 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-4 right-4 top-20 animate-scale-in rounded-[var(--radius-xl)] border border-white/60 bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-clay-lg)]">
+          <div className="absolute inset-0 bg-(--color-ink-950)/20 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute left-4 right-4 top-20 animate-scale-in rounded-[var(--radius-xl)] border border-(--color-border) bg-(--color-surface-raised) p-5 shadow-(--shadow-lg)">
             {/* Nav links */}
             <nav className="space-y-1">
               {links.map((link) => {
@@ -162,10 +161,10 @@ export function SiteHeader() {
                     href={link.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 rounded-[var(--radius-md)] px-4 py-3.5 text-sm font-medium transition-all",
+                      "flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium transition-colors",
                       active
-                        ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
-                        : "text-[var(--color-ink-700)] hover:bg-[var(--color-surface-2)]",
+                        ? "bg-(--color-sea-50) text-(--color-sea-700)"
+                        : "text-(--color-ink-700) hover:bg-(--color-surface-2)",
                     )}
                   >
                     {link.label}
@@ -174,7 +173,7 @@ export function SiteHeader() {
               })}
             </nav>
 
-            <div className="my-4 h-px bg-[var(--color-line)]" />
+            <div className="my-4 h-px bg-(--color-border)" />
 
             {/* Auth actions */}
             <div className="space-y-2">

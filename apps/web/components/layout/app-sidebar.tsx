@@ -44,22 +44,22 @@ export function AppSidebar({
   const Icon = variant === "agency" ? Building2 : MessageSquareText;
 
   return (
-    <aside className="rounded-[var(--radius-xl)] border border-white/60 bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-clay)] sm:p-5">
+    <aside className="rounded-xl border border-(--color-border) bg-(--color-surface-raised) p-4 shadow-(--shadow-md) sm:p-5">
       {/* Sidebar header */}
       <div className="mb-5 flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-sand-100)] to-[var(--color-sand-200)] text-[var(--color-ink-700)] shadow-[var(--shadow-clay-sm)]">
+        <div className="flex size-10 items-center justify-center rounded-md border border-(--color-border) bg-(--color-surface-2) text-(--color-ink-700)">
           <Icon className="size-5" />
         </div>
         <div>
-          <p className="font-display text-base text-[var(--color-ink-950)]">{title}</p>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+          <p className="font-display text-base text-(--color-ink-950)">{title}</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-(--color-ink-500)">
             Navigation
           </p>
         </div>
       </div>
 
       {/* Nav items */}
-      <nav className="space-y-1.5">
+      <nav className="space-y-0.5">
         {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -69,13 +69,13 @@ export function AppSidebar({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-[var(--radius-md)] px-4 py-3 text-sm font-medium transition-all duration-200",
+                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)] border border-[var(--color-sea-100)]"
-                  : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:shadow-[var(--shadow-clay-sm)] border border-transparent",
+                  ? "bg-(--color-sea-50) text-(--color-sea-700) border border-(--color-sea-100)"
+                  : "text-(--color-ink-600) hover:bg-(--color-surface-2) border border-transparent",
               )}
             >
-              <item.icon className={cn("size-4", active ? "text-[var(--color-sea-500)]" : "")} />
+              <item.icon className={cn("size-4", active ? "text-(--color-sea-500)" : "")} />
               {item.label}
             </Link>
           );

@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-/* ─── Claymorphism Design System ─── */
+/* ─── TravellersIn Design System ─── */
 
 :root {
-  /* Surface palette — warm creams with depth */
-  --color-surface: #f0ebe3;
-  --color-surface-2: #faf6f0;
-  --color-surface-3: #fff9f2;
+  /* Surface palette — clean neutral */
+  --color-surface: #f6f8fb;
+  --color-surface-2: #edf0f6;
+  --color-surface-3: #e4e8f0;
   --color-surface-raised: #ffffff;
 
   /* Ink — text hierarchy */
@@ -61,10 +61,27 @@
   --color-rose-400: #ff6d8a;
 
   /* Structural */
-  --color-line: rgba(26, 26, 46, 0.08);
-  --color-line-strong: rgba(26, 26, 46, 0.14);
+  --color-line: rgba(15, 23, 42, 0.08);
+  --color-line-strong: rgba(15, 23, 42, 0.14);
+  --color-border: rgba(15, 23, 42, 0.1);
+  --color-border-strong: rgba(15, 23, 42, 0.18);
 
-  /* Clay shadows — the key to claymorphism */
+  /* Clean shadows — for most UI surfaces */
+  --shadow-sm:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 1px 3px rgba(15, 23, 42, 0.04);
+
+  --shadow-md:
+    0 4px 8px rgba(15, 23, 42, 0.07),
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+
+  --shadow-lg:
+    0 10px 24px rgba(15, 23, 42, 0.09),
+    0 4px 10px rgba(15, 23, 42, 0.05),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+
+  /* Clay shadows — reserved for buttons, steppers, and featured elements */
   --shadow-clay-sm:
     6px 6px 12px rgba(166, 160, 148, 0.35),
     -4px -4px 10px rgba(255, 255, 255, 0.8),
@@ -122,11 +139,11 @@
     inset -1px -1px 3px rgba(0, 0, 0, 0.1);
 
   /* Border radius scale */
-  --radius-sm: 14px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
-  --radius-xl: 36px;
-  --radius-2xl: 44px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
   --radius-full: 9999px;
 }
 
@@ -149,10 +166,6 @@ html {
 body {
   min-height: 100dvh;
   background: var(--color-surface);
-  background-image:
-    radial-gradient(ellipse at 10% 0%, rgba(94, 219, 181, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 5%, rgba(240, 104, 48, 0.1) 0%, transparent 40%),
-    radial-gradient(ellipse at 50% 100%, rgba(124, 92, 252, 0.06) 0%, transparent 50%);
   color: var(--color-ink-900);
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -188,50 +201,47 @@ a {
   }
 }
 
-/* Clay card base */
+/* Standard card — clean professional surface */
 .clay-card {
   background: var(--color-surface-raised);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: var(--shadow-clay);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .clay-card:hover {
-  box-shadow: var(--shadow-clay-lg);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
 }
 
-/* Clay input base */
+/* Standard input base */
 .clay-input {
-  background: var(--color-surface-2);
+  background: var(--color-surface-raised);
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--shadow-clay-inset);
-  transition: all 0.25s ease;
+  border: 1px solid var(--color-border-strong);
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .clay-input:focus {
-  box-shadow:
-    var(--shadow-clay-inset),
-    0 0 0 3px rgba(20, 184, 138, 0.2);
-  border-color: var(--color-sea-300);
+  border-color: var(--color-sea-400);
+  box-shadow: 0 0 0 3px rgba(20, 184, 138, 0.12);
 }
 
-/* Clay raised surface */
+/* Raised surface — clean white with shadow */
 .clay-raised {
   background: var(--color-surface-raised);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: var(--shadow-clay);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
 }
 
-/* Clay pressed / inset surface */
+/* Inset / secondary surface */
 .clay-inset {
   background: var(--color-surface-2);
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: var(--shadow-clay-inset);
+  border: 1px solid var(--color-border);
 }
 
 /* Clay button base */
@@ -269,7 +279,7 @@ a {
 .mobile-nav-active {
   background: var(--color-sea-50);
   color: var(--color-sea-700);
-  box-shadow: var(--shadow-clay-sm);
+  border-color: var(--color-sea-100);
 }
 
 /* Scrollbar styling */

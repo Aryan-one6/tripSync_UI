@@ -3,22 +3,22 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shadow-[var(--shadow-clay-sm)] border border-white/50 transition-all duration-200",
+  "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium tracking-wide border transition-colors duration-150",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--color-sand-100)] text-[var(--color-ink-700)]",
+          "bg-(--color-surface-2) text-(--color-ink-700) border-(--color-border)",
         sea:
-          "bg-[var(--color-sea-50)] text-[var(--color-sea-700)] border-[var(--color-sea-100)]",
+          "bg-(--color-sea-50) text-(--color-sea-700) border-(--color-sea-100)",
         sunset:
-          "bg-[var(--color-sunset-50)] text-[var(--color-sunset-700)] border-[var(--color-sunset-100)]",
+          "bg-(--color-sunset-50) text-(--color-sunset-700) border-(--color-sunset-100)",
         lavender:
-          "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)] border-[var(--color-lavender-100)]",
+          "bg-(--color-lavender-50) text-(--color-lavender-500) border-(--color-lavender-100)",
         rose:
-          "bg-[var(--color-rose-50)] text-[var(--color-rose-400)] border-[var(--color-rose-100)]",
+          "bg-(--color-rose-50) text-(--color-rose-400) border-(--color-rose-100)",
         outline:
-          "bg-transparent text-[var(--color-ink-600)] border-[var(--color-line-strong)] shadow-none",
+          "bg-transparent text-(--color-ink-600) border-(--color-border-strong)",
       },
     },
     defaultVariants: {

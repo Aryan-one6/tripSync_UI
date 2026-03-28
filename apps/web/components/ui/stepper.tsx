@@ -43,13 +43,13 @@ export function Stepper({ steps, currentStep, onStepClick }: StepperProps) {
                       "bg-gradient-to-b from-[var(--color-sea-400)] to-[var(--color-sea-600)] text-white shadow-[var(--shadow-clay-sea)] scale-110",
                     !isCompleted &&
                       !isActive &&
-                      "bg-[var(--color-surface-2)] text-[var(--color-ink-400)] shadow-[var(--shadow-clay-sm)]",
+                      "bg-(--color-surface-2) text-(--color-ink-400) border border-(--color-border)",
                   )}
                 >
                   {isCompleted ? <Check className="size-4" /> : index + 1}
                 </div>
                 {index < steps.length - 1 && (
-                  <div className="mx-1 h-0.5 flex-1 rounded-full bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]">
+                  <div className="mx-1 h-0.5 flex-1 rounded-full bg-(--color-surface-3)">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-[var(--color-sea-400)] to-[var(--color-sea-500)] transition-all duration-500"
                       style={{ width: isCompleted ? "100%" : "0%" }}
@@ -87,7 +87,7 @@ export function Stepper({ steps, currentStep, onStepClick }: StepperProps) {
                 {/* Step indicator row */}
                 <div className="flex w-full items-center">
                   {index > 0 && (
-                    <div className="h-0.5 flex-1 rounded-full bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]">
+                    <div className="h-0.5 flex-1 rounded-full bg-(--color-surface-3)">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-[var(--color-sea-400)] to-[var(--color-sea-500)] transition-all duration-500"
                         style={{ width: isCompleted || isActive ? "100%" : "0%" }}
@@ -103,13 +103,13 @@ export function Stepper({ steps, currentStep, onStepClick }: StepperProps) {
                         "bg-gradient-to-b from-[var(--color-sea-400)] to-[var(--color-sea-600)] text-white shadow-[var(--shadow-clay-sea)] ring-4 ring-[var(--color-sea-100)]",
                       !isCompleted &&
                         !isActive &&
-                        "bg-[var(--color-surface-raised)] text-[var(--color-ink-400)] shadow-[var(--shadow-clay)]",
+                        "bg-(--color-surface-2) text-(--color-ink-400) border border-(--color-border)",
                     )}
                   >
                     {isCompleted ? <Check className="size-5" /> : step.icon ?? index + 1}
                   </div>
                   {index < steps.length - 1 && (
-                    <div className="h-0.5 flex-1 rounded-full bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]">
+                    <div className="h-0.5 flex-1 rounded-full bg-(--color-surface-3)">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-[var(--color-sea-400)] to-[var(--color-sea-500)] transition-all duration-500"
                         style={{ width: isCompleted ? "100%" : "0%" }}
