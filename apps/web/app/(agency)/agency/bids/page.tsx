@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Gavel, MapPin, MessageSquare, IndianRupee } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -118,6 +120,17 @@ export default function AgencyBidsPage() {
                     No negotiation rounds yet.
                   </CardInset>
                 )}
+
+                {offer.plan?.creator?.id ? (
+                  <div className="flex justify-end">
+                    <Link href={`/agency/inbox?userId=${offer.plan.creator.id}`}>
+                      <Button size="sm" variant="secondary">
+                        <MessageSquare className="size-4" />
+                        Message traveler
+                      </Button>
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             </Card>
           ))}

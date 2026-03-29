@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Save } from "lucide-react";
+import { Save, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { UpdateProfileSchema } from "@tripsync/shared";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import type { UserProfile } from "@/lib/api/types";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { session, apiFetchWithAuth, updateUser } = useAuth();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -101,6 +103,15 @@ export default function ProfilePage() {
           )}
 
           <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push("/dashboard/storefront")}
+              disabled={!session?.user.username}
+            >
+              <ExternalLink className="size-4" />
+              View public profile
+            </Button>
             <Button
               onClick={() =>
                 startTransition(async () => {

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
-import type { DiscoverQuery, SearchQuery } from '@tripsync/shared';
+import type { DiscoverQuery, FollowingDiscoverQuery, SearchQuery } from '@tripsync/shared';
 
 interface DiscoverItem {
   id: string;
@@ -223,6 +223,15 @@ function getSearchRankExpression(term: string): Prisma.Sql {
   `;
 }
 
+function getSearchFilter(term: string): Prisma.Sql {
+  return Prisma.sql`
+    to_tsvector(
+      'simple',
+      concat_ws(' ', title, destination, COALESCE("destinationState", ''))
+    ) @@ websearch_to_tsquery('simple', ${term})
+  `;
+}
+
 async function getSearchCursorRow(cursorId: string, term: string): Promise<CursorRow | null> {
   const rankExpr = getSearchRankExpression(term);
   const rows = await prisma.$queryRaw<CursorRow[]>(Prisma.sql`
@@ -275,12 +284,7 @@ export async function search(query: SearchQuery) {
       : null;
 
   const searchFilters: Prisma.Sql[] = [
-    Prisma.sql`
-      to_tsvector(
-        'simple',
-        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-      ) @@ websearch_to_tsquery('simple', ${term})
-    `,
+    getSearchFilter(term),
   ];
 
   if (cursorFilter) {
@@ -325,6 +329,58 @@ export async function search(query: SearchQuery) {
     FROM discover_feed
     ${buildWhereClause(searchFilters)}
     ORDER BY ${rankExpr} DESC, "createdAt" DESC, id DESC
+    LIMIT ${query.limit}
+  `);
+
+  return {
+    items,
+    cursor: items.length === query.limit ? items[items.length - 1]?.id ?? null : null,
+  };
+}
+
+export async function getFollowingFeed(userId: string, query: FollowingDiscoverQuery) {
+  const follows = await prisma.follow.findMany({
+    where: { followerUserId: userId },
+    select: {
+      targetUserId: true,
+      targetAgencyId: true,
+    },
+  });
+
+  const followedUserIds = follows
+    .map((follow) => follow.targetUserId)
+    .filter((value): value is string => Boolean(value));
+  const followedAgencyIds = follows
+    .map((follow) => follow.targetAgencyId)
+    .filter((value): value is string => Boolean(value));
+
+  if (followedUserIds.length === 0 && followedAgencyIds.length === 0) {
+    return { items: [], cursor: null };
+  }
+
+  const filters = getDiscoverFilters(query);
+  filters.push(
+    Prisma.sql`(
+      "ownerId" IN (${Prisma.join(followedUserIds.length > 0 ? followedUserIds : [Prisma.sql`NULL`] )})
+      OR "agencyId" IN (${Prisma.join(followedAgencyIds.length > 0 ? followedAgencyIds : [Prisma.sql`NULL`] )})
+    )`,
+  );
+
+  if (query.q?.trim()) {
+    filters.push(getSearchFilter(query.q.trim()));
+  }
+
+  if (query.cursor) {
+    const cursorRow = await getDiscoverCursorRow(query.cursor, query.sort);
+    if (cursorRow) {
+      filters.push(getDiscoverCursorFilter(query.sort, cursorRow));
+    }
+  }
+
+  const items = await prisma.$queryRaw<DiscoverItem[]>(Prisma.sql`
+    ${DISCOVER_VIEW}
+    ${buildWhereClause(filters)}
+    ORDER BY ${getDiscoverOrderBy(query.sort)}
     LIMIT ${query.limit}
   `);
 

@@ -280,6 +280,25 @@ export interface ChatMessage {
   sender?: UserSummary | null;
 }
 
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  sender?: UserSummary | null;
+}
+
+export interface DirectConversation {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  counterpart?: UserSummary | null;
+  unreadCount: number;
+  lastReadAt?: string | null;
+  lastMessage?: DirectMessage | null;
+}
+
 export interface PaymentRecord {
   id: string;
   userId: string;

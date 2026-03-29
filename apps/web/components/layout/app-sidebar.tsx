@@ -7,7 +7,9 @@ import {
   BriefcaseBusiness,
   Building2,
   Compass,
+  Eye,
   FilePlus2,
+  Gift,
   Handshake,
   LayoutDashboard,
   MessageSquareText,
@@ -30,11 +32,14 @@ const userNavMain = [
 
 const userNavSecondary = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
+  { href: "/dashboard/storefront", label: "Public Profile", icon: Eye },
+  { href: "/dashboard/refer-and-earn", label: "Refer & Earn", icon: Gift },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 const agencyNavMain = [
   { href: "/agency/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/agency/inbox", label: "Inbox", icon: MessageSquareText },
   { href: "/agency/packages", label: "My Packages", icon: Package },
   { href: "/agency/packages/new", label: "Create Package", icon: FilePlus2 },
   { href: "/agency/bids", label: "Bid Manager", icon: Handshake },

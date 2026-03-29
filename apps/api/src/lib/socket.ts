@@ -10,6 +10,7 @@ type SocketData = {
   userId: string;
   role: 'user' | 'agency_admin' | 'platform_admin';
   agencyId: string | null;
+  fullName: string;
 };
 
 let io: Server | null = null;
@@ -27,6 +28,10 @@ function groupRoom(groupId: string) {
   return `group:${groupId}`;
 }
 
+function directRoom(conversationId: string) {
+  return `direct:${conversationId}`;
+}
+
 async function userCanAccessGroup(userId: string, groupId: string) {
   const membership = await prisma.groupMember.findUnique({
     where: { groupId_userId: { groupId, userId } },
@@ -34,6 +39,17 @@ async function userCanAccessGroup(userId: string, groupId: string) {
   });
 
   return Boolean(membership && membership.status !== 'LEFT' && membership.status !== 'REMOVED');
+}
+
+async function userCanAccessDirectConversation(userId: string, conversationId: string) {
+  const participant = await prisma.directConversationParticipant.findUnique({
+    where: {
+      conversationId_userId: { conversationId, userId },
+    },
+    select: { id: true },
+  });
+
+  return Boolean(participant);
 }
 
 export function initSocket(server: HttpServer) {
@@ -72,10 +88,20 @@ export function initSocket(server: HttpServer) {
       return;
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { fullName: true },
+    });
+    if (!user) {
+      next(new Error('Socket user not found'));
+      return;
+    }
+
     socket.data = {
       userId: payload.userId,
       role: payload.role,
       agencyId: payload.agencyId ?? null,
+      fullName: user.fullName,
     } as SocketData;
 
     next();
@@ -92,13 +118,22 @@ export function initSocket(server: HttpServer) {
     const groups = await prisma.groupMember.findMany({
       where: {
         userId: data.userId,
-        status: { in: ['INTERESTED', 'APPROVED', 'COMMITTED'] },
+        status: { in: ['APPROVED', 'COMMITTED'] },
       },
       select: { groupId: true },
     });
 
     for (const membership of groups) {
       socket.join(groupRoom(membership.groupId));
+    }
+
+    const directConversations = await prisma.directConversationParticipant.findMany({
+      where: { userId: data.userId },
+      select: { conversationId: true },
+    });
+
+    for (const participant of directConversations) {
+      socket.join(directRoom(participant.conversationId));
     }
 
     socket.on('group:subscribe', async (groupId: string) => {
@@ -112,6 +147,50 @@ export function initSocket(server: HttpServer) {
       if (typeof groupId !== 'string' || !groupId) return;
       socket.leave(groupRoom(groupId));
     });
+
+    socket.on('direct:subscribe', async (conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId) return;
+      if (await userCanAccessDirectConversation(data.userId, conversationId)) {
+        socket.join(directRoom(conversationId));
+      }
+    });
+
+    socket.on('direct:unsubscribe', (conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId) return;
+      socket.leave(directRoom(conversationId));
+    });
+
+    socket.on(
+      'group:typing',
+      async (payload: { groupId?: string; isTyping?: boolean }) => {
+        const groupId = typeof payload?.groupId === 'string' ? payload.groupId : '';
+        if (!groupId) return;
+        if (!(await userCanAccessGroup(data.userId, groupId))) return;
+
+        io?.to(groupRoom(groupId)).emit('chat:typing', {
+          groupId,
+          userId: data.userId,
+          fullName: data.fullName,
+          isTyping: Boolean(payload?.isTyping),
+        });
+      },
+    );
+
+    socket.on(
+      'direct:typing',
+      async (payload: { conversationId?: string; isTyping?: boolean }) => {
+        const conversationId = typeof payload?.conversationId === 'string' ? payload.conversationId : '';
+        if (!conversationId) return;
+        if (!(await userCanAccessDirectConversation(data.userId, conversationId))) return;
+
+        io?.to(directRoom(conversationId)).emit('direct:typing', {
+          conversationId,
+          userId: data.userId,
+          fullName: data.fullName,
+          isTyping: Boolean(payload?.isTyping),
+        });
+      },
+    );
   });
 
   return io;
@@ -127,4 +206,8 @@ export function emitUserEvent(userId: string, event: string, payload: unknown) {
 
 export function emitAgencyEvent(agencyId: string, event: string, payload: unknown) {
   io?.to(agencyRoom(agencyId)).emit(event, payload);
+}
+
+export function emitDirectConversationEvent(conversationId: string, event: string, payload: unknown) {
+  io?.to(directRoom(conversationId)).emit(event, payload);
 }

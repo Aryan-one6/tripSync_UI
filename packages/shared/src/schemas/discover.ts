@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const DiscoverQuerySchema = z.object({
+const DiscoverQueryBaseSchema = z.object({
   destination: z.string().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
@@ -12,7 +12,17 @@ export const DiscoverQuerySchema = z.object({
   sort: z.enum(['recent', 'price_low', 'price_high', 'popular']).default('recent'),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
-}).superRefine((data, ctx) => {
+});
+
+function validateDiscoverRanges(
+  data: {
+    startDate?: string;
+    endDate?: string;
+    budgetMin?: number;
+    budgetMax?: number;
+  },
+  ctx: z.RefinementCtx,
+) {
   if (data.startDate && data.endDate && new Date(data.startDate) > new Date(data.endDate)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -32,7 +42,9 @@ export const DiscoverQuerySchema = z.object({
       path: ['budgetMin'],
     });
   }
-});
+}
+
+export const DiscoverQuerySchema = DiscoverQueryBaseSchema.superRefine(validateDiscoverRanges);
 
 export const SearchQuerySchema = z.object({
   q: z.string().min(1).max(200),
@@ -40,5 +52,10 @@ export const SearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+export const FollowingDiscoverQuerySchema = DiscoverQueryBaseSchema.extend({
+  q: z.string().max(200).optional(),
+}).superRefine(validateDiscoverRanges);
+
 export type DiscoverQuery = z.infer<typeof DiscoverQuerySchema>;
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
+export type FollowingDiscoverQuery = z.infer<typeof FollowingDiscoverQuerySchema>;

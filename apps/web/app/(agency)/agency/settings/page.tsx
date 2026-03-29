@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Building2, ShieldCheck, Save, FileCheck2 } from "lucide-react";
+import { Building2, ShieldCheck, Save, FileCheck2, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -19,6 +20,7 @@ function arrayFromCsv(value: string) {
 }
 
 export default function AgencySettingsPage() {
+  const router = useRouter();
   const { session, apiFetchWithAuth, updateUser } = useAuth();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSaving, startSaving] = useTransition();
@@ -221,6 +223,15 @@ export default function AgencySettingsPage() {
           )}
 
           <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push("/agency/storefront")}
+              disabled={!agency?.slug}
+            >
+              <ExternalLink className="size-4" />
+              View storefront
+            </Button>
             <Button
               onClick={() =>
                 startSaving(async () => {

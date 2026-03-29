@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import { authenticate } from '../../middleware/auth.js';
 import { validateQuery } from '../../middleware/validate.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
-import type { DiscoverQuery, SearchQuery } from '@tripsync/shared';
-import { DiscoverQuerySchema, SearchQuerySchema } from '@tripsync/shared';
+import type { DiscoverQuery, FollowingDiscoverQuery, SearchQuery } from '@tripsync/shared';
+import { DiscoverQuerySchema, FollowingDiscoverQuerySchema, SearchQuerySchema } from '@tripsync/shared';
 import * as discoverService from './service.js';
 
 export const discoverRouter = Router();
@@ -23,6 +24,19 @@ discoverRouter.get(
   asyncHandler(async (_req, res) => {
     const result = await discoverService.getTrending();
     res.json({ data: result.items });
+  }),
+);
+
+discoverRouter.get(
+  '/following',
+  authenticate,
+  validateQuery(FollowingDiscoverQuerySchema),
+  asyncHandler(async (req, res) => {
+    const result = await discoverService.getFollowingFeed(
+      req.userId!,
+      req.validatedQuery as FollowingDiscoverQuery,
+    );
+    res.json({ data: result.items, meta: { cursor: result.cursor } });
   }),
 );
 

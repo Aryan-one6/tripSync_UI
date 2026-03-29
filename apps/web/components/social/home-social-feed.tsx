@@ -81,7 +81,7 @@ export function HomeSocialFeed({ initialItems }: { initialItems: SocialFeedItem[
           title="Log in to see your following feed"
           description="Follow travelers and agencies to turn the homepage into a relationship-driven feed."
           action={
-            <Link href="/login?next=%2F">
+            <Link href="/login?next=%2Fdiscover">
               <Button size="sm">Login</Button>
             </Link>
           }

@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
 import {
   Bell,
+  Gift,
+  Inbox,
   LogOut,
   MapPinned,
   Menu,
@@ -18,12 +20,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
-
-const links = [
-  { href: "/", label: "Home" },
-  { href: "/discover", label: "Discover" },
-  { href: "/agencies", label: "Agencies" },
-];
 
 function UserAvatar({ name, size = 9 }: { name: string; size?: number }) {
   return (
@@ -42,12 +38,18 @@ export function SiteHeader() {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
-  const dashboardHref =
-    session?.role === "agency_admin" ? "/agency/dashboard" : "/dashboard/plans";
-  const profileHref = "/dashboard/profile";
-  const settingsHref = "/dashboard/settings";
+  const isAgency = session?.role === "agency_admin";
+  const dashboardHref = isAgency ? "/agency/dashboard" : "/dashboard/plans";
+  const profileHref = isAgency ? "/agency/storefront" : "/dashboard/profile";
+  const settingsHref = isAgency ? "/agency/settings" : "/dashboard/settings";
+  const inboxHref = isAgency ? "/agency/inbox" : "/dashboard/messages";
+  const referEarnHref = "/dashboard/refer-and-earn";
   const userName = session?.user?.fullName ?? session?.user?.username ?? "User";
   const userEmail = session?.user?.email ?? "";
+  const navLinks = [
+    { href: "/discover", label: "Home" },
+    { href: "/agencies", label: "Agencies" },
+  ];
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -82,10 +84,10 @@ export function SiteHeader() {
 
           {/* Desktop nav — direct links, no pill */}
           <nav className="hidden items-center gap-6 md:flex">
-            {links.map((link) => {
+            {navLinks.map((link) => {
               const active =
                 pathname === link.href ||
-                (link.href !== "/" && pathname.startsWith(`${link.href}/`));
+                pathname.startsWith(`${link.href}/`);
               return (
                 <Link
                   key={link.href}
@@ -107,6 +109,20 @@ export function SiteHeader() {
           <div className="hidden items-center gap-2 md:flex">
             {status === "authenticated" && session ? (
               <div ref={avatarRef} className="flex items-center gap-2">
+                <Link href={inboxHref}>
+                  <Button type="button" variant="ghost" size="sm">
+                    <Inbox className="size-4" />
+                    Inbox
+                  </Button>
+                </Link>
+                {!isAgency ? (
+                  <Link href={referEarnHref}>
+                    <Button type="button" variant="soft" size="sm">
+                      <Gift className="size-4" />
+                      Refer & Earn
+                    </Button>
+                  </Link>
+                ) : null}
                 {/* Notification bell */}
                 <button
                   type="button"
@@ -145,8 +161,24 @@ export function SiteHeader() {
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
                       >
                         <User className="size-4 text-[var(--color-sea-600)]" />
-                        Profile
+                        {isAgency ? "Storefront" : "Profile"}
                       </Link>
+                      <Link
+                        href={inboxHref}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                      >
+                        <Inbox className="size-4 text-[var(--color-sea-600)]" />
+                        Inbox
+                      </Link>
+                      {!isAgency ? (
+                        <Link
+                          href={referEarnHref}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <Gift className="size-4 text-[var(--color-sea-600)]" />
+                          Refer & Earn
+                        </Link>
+                      ) : null}
                       <Link
                         href={settingsHref}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
@@ -199,10 +231,10 @@ export function SiteHeader() {
           <div className="absolute inset-0 bg-[var(--color-ink-950)]/20" onClick={() => setMobileMenuOpen(false)} />
           <div className="relative border-b border-[var(--color-border)] bg-white/98 backdrop-blur-lg px-4 pb-5 pt-3 shadow-[var(--shadow-lg)]">
             <nav className="space-y-0.5">
-              {links.map((link) => {
+              {navLinks.map((link) => {
                 const active =
                   pathname === link.href ||
-                  (link.href !== "/" && pathname.startsWith(`${link.href}/`));
+                  pathname.startsWith(`${link.href}/`);
                 return (
                   <Link
                     key={link.href}
@@ -248,8 +280,26 @@ export function SiteHeader() {
                     className="flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
                   >
                     <User className="size-4 text-[var(--color-sea-600)]" />
-                    Profile
+                    {isAgency ? "Storefront" : "Profile"}
                   </Link>
+                  <Link
+                    href={inboxHref}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Inbox className="size-4 text-[var(--color-sea-600)]" />
+                    Inbox
+                  </Link>
+                  {!isAgency ? (
+                    <Link
+                      href={referEarnHref}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <Gift className="size-4 text-[var(--color-sea-600)]" />
+                      Refer & Earn
+                    </Link>
+                  ) : null}
                   <Link
                     href={settingsHref}
                     onClick={() => setMobileMenuOpen(false)}

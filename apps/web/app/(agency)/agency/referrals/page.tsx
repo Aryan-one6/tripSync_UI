@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Mail, MapPin, CalendarRange, IndianRupee, User } from "lucide-react";
+import { Mail, MapPin, CalendarRange, IndianRupee, User, MessageSquareMore } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -21,7 +23,7 @@ interface ReferralOffer {
     endDate?: string | null;
     budgetMin?: number | null;
     budgetMax?: number | null;
-    creator: { fullName: string };
+    creator: { id: string; fullName: string };
   };
 }
 
@@ -124,6 +126,15 @@ export default function ReferralsPage() {
                       {referral.plan.creator.fullName}
                     </p>
                   </CardInset>
+                </div>
+
+                <div className="flex justify-end">
+                  <Link href={`/agency/inbox?userId=${referral.plan.creator.id}`}>
+                    <Button size="sm" variant="secondary">
+                      <MessageSquareMore className="size-4" />
+                      Message traveler
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </Card>

@@ -8,7 +8,7 @@ import type {
 } from '@tripsync/shared';
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
-import { emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
+import { emitDirectConversationEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
 
@@ -26,7 +26,15 @@ function buildDirectConversationKey(leftUserId: string, rightUserId: string) {
   return [leftUserId, rightUserId].sort().join(':');
 }
 
-async function assertTravelerEligibleForDirectMessages(userId: string) {
+async function getDirectMessagingContext(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!user) {
+    throw new NotFoundError('User');
+  }
+
   const membership = await prisma.groupMember.findFirst({
     where: {
       userId,
@@ -35,8 +43,84 @@ async function assertTravelerEligibleForDirectMessages(userId: string) {
     select: { id: true },
   });
 
-  if (!membership) {
-    throw new ForbiddenError('Traveler must have active trip participation to use direct messages');
+  const agency = await prisma.agency.findUnique({
+    where: { ownerId: userId },
+    select: { id: true },
+  });
+
+  return {
+    userId,
+    hasTripParticipation: Boolean(membership),
+    ownedAgencyId: agency?.id ?? null,
+  };
+}
+
+async function assertUserEligibleForDirectMessages(userId: string) {
+  const context = await getDirectMessagingContext(userId);
+
+  if (!context.hasTripParticipation && !context.ownedAgencyId) {
+    throw new ForbiddenError(
+      'Direct messages unlock after joining a trip or operating an agency with live offers',
+    );
+  }
+
+  return context;
+}
+
+async function assertDirectConversationEligibility(leftUserId: string, rightUserId: string) {
+  const [left, right] = await Promise.all([
+    assertUserEligibleForDirectMessages(leftUserId),
+    assertUserEligibleForDirectMessages(rightUserId),
+  ]);
+
+  const leftIsAgency = Boolean(left.ownedAgencyId);
+  const rightIsAgency = Boolean(right.ownedAgencyId);
+
+  if (leftIsAgency && rightIsAgency) {
+    throw new ForbiddenError('Direct messaging between two agencies is not supported');
+  }
+
+  if (leftIsAgency || rightIsAgency) {
+    const agencyOwnerId = leftIsAgency ? leftUserId : rightUserId;
+    const travelerUserId = leftIsAgency ? rightUserId : leftUserId;
+
+    const relatedOffer = await prisma.offer.findFirst({
+      where: {
+        plan: { creatorId: travelerUserId },
+        agency: { ownerId: agencyOwnerId },
+      },
+      select: { id: true },
+    });
+
+    if (!relatedOffer) {
+      throw new ForbiddenError(
+        'Agency and traveler direct chat starts only after an offer exists between them',
+      );
+    }
+
+    return;
+  }
+
+  const sharedTrip = await prisma.groupMember.findFirst({
+    where: {
+      userId: leftUserId,
+      status: { in: ['APPROVED', 'COMMITTED'] },
+      group: {
+        members: {
+          some: {
+            userId: rightUserId,
+            status: { in: ['APPROVED', 'COMMITTED'] },
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!sharedTrip) {
+    throw new ForbiddenError(
+      'Traveler direct chat unlocks only after both users share an approved or committed trip',
+    );
   }
 }
 
@@ -308,16 +392,13 @@ export async function createDirectConversation(
     throw new BadRequestError('Cannot message yourself');
   }
 
-  const [targetUser] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: data.targetUserId },
-      select: { id: true },
-    }),
-    assertTravelerEligibleForDirectMessages(userId),
-    assertTravelerEligibleForDirectMessages(data.targetUserId),
-  ]);
+  const targetUser = await prisma.user.findUnique({
+    where: { id: data.targetUserId },
+    select: { id: true },
+  });
 
   if (!targetUser) throw new NotFoundError('User');
+  await assertDirectConversationEligibility(userId, data.targetUserId);
 
   const key = buildDirectConversationKey(userId, data.targetUserId);
   const conversation = await prisma.directConversation.upsert({
@@ -430,7 +511,7 @@ function serializeDirectConversation(
 }
 
 export async function listDirectConversations(userId: string) {
-  await assertTravelerEligibleForDirectMessages(userId);
+  await assertUserEligibleForDirectMessages(userId);
 
   const conversations = await prisma.directConversation.findMany({
     where: {
@@ -481,7 +562,7 @@ export async function listDirectConversations(userId: string) {
 }
 
 export async function listDirectMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
-  await assertTravelerEligibleForDirectMessages(userId);
+  await assertUserEligibleForDirectMessages(userId);
   await assertDirectConversationAccess(conversationId, userId);
 
   const messages = await prisma.directMessage.findMany({
@@ -518,7 +599,7 @@ export async function sendDirectMessage(
   userId: string,
   data: SendDirectMessageInput,
 ) {
-  await assertTravelerEligibleForDirectMessages(userId);
+  await assertUserEligibleForDirectMessages(userId);
   const participant = await assertDirectConversationAccess(conversationId, userId);
   const content = normalizeContent(data.content);
 
@@ -570,6 +651,7 @@ export async function sendDirectMessage(
   for (const recipientId of recipientIds) {
     emitUserEvent(recipientId, 'direct:message_created', { conversationId, message });
   }
+  emitDirectConversationEvent(conversationId, 'direct:message_created', { conversationId, message });
 
   if (recipientIds.length > 0) {
     await queueNotification({
@@ -586,7 +668,7 @@ export async function sendDirectMessage(
 }
 
 export async function markDirectConversationRead(conversationId: string, userId: string) {
-  await assertTravelerEligibleForDirectMessages(userId);
+  await assertUserEligibleForDirectMessages(userId);
   const participant = await assertDirectConversationAccess(conversationId, userId);
 
   return prisma.directConversationParticipant.update({

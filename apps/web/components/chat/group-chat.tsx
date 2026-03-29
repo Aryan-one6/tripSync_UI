@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { MessageSquareMore, PlusCircle, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -36,6 +36,18 @@ export function GroupChat({ groupId }: { groupId: string }) {
   const [pollOptions, setPollOptions] = useState("Yes\nNo");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
+  const isTypingRef = useRef(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const emitTyping = useCallback(
+    (isTyping: boolean) => {
+      if (!socket) return;
+      socket.emit("group:typing", { groupId, isTyping });
+      isTypingRef.current = isTyping;
+    },
+    [groupId, socket],
+  );
 
   const loadMembers = useCallback(async () => {
     const data = await apiFetchWithAuth<{ group: Group; members: GroupMember[] }>(`/groups/${groupId}/members`);
@@ -66,19 +78,81 @@ export function GroupChat({ groupId }: { groupId: string }) {
     const handleMessageCreated = (message: ChatMessage) => setMessages((c) => upsertMessage(c, message));
     const handleMessageUpdated = (message: ChatMessage) => setMessages((c) => upsertMessage(c, message));
     const handleMemberUpdate = () => void loadMembers();
+    const handleTyping = (payload: {
+      groupId?: string;
+      userId?: string;
+      fullName?: string;
+      isTyping?: boolean;
+    }) => {
+      if (payload.groupId !== groupId) return;
+      if (!payload.userId || payload.userId === session?.user.id) return;
+      const userId = payload.userId;
+      const fullName = payload.fullName ?? "Someone";
+      const isTyping = Boolean(payload.isTyping);
+
+      setTypingUsers((current) => {
+        if (isTyping) {
+          if (current.some((entry) => entry.userId === userId)) {
+            return current;
+          }
+          return [...current, { userId, fullName }];
+        }
+        return current.filter((entry) => entry.userId !== userId);
+      });
+    };
 
     socket.emit("group:subscribe", groupId);
     socket.on("chat:message_created", handleMessageCreated);
     socket.on("chat:message_updated", handleMessageUpdated);
     socket.on("group:member_updated", handleMemberUpdate);
+    socket.on("chat:typing", handleTyping);
 
     return () => {
       socket.emit("group:unsubscribe", groupId);
       socket.off("chat:message_created", handleMessageCreated);
       socket.off("chat:message_updated", handleMessageUpdated);
       socket.off("group:member_updated", handleMemberUpdate);
+      socket.off("chat:typing", handleTyping);
     };
-  }, [groupId, loadMembers, socket]);
+  }, [groupId, loadMembers, session?.user.id, socket]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const nextDraft = draft.trim();
+
+    if (!nextDraft) {
+      if (isTypingRef.current) {
+        emitTyping(false);
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      return;
+    }
+
+    if (!isTypingRef.current) {
+      emitTyping(true);
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      emitTyping(false);
+    }, 1400);
+  }, [draft, emitTyping, socket]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (isTypingRef.current) {
+        emitTyping(false);
+      }
+    };
+  }, [emitTyping]);
 
   const activeMembers = useMemo(
     () => members.filter((m) => m.status === "APPROVED" || m.status === "COMMITTED"),
@@ -95,6 +169,7 @@ export function GroupChat({ groupId }: { groupId: string }) {
           body: JSON.stringify({ content }),
         });
         setDraft("");
+        emitTyping(false);
         setFeedback(null);
       } catch (error) {
         setFeedback(error instanceof Error ? error.message : "Unable to send the message.");
@@ -240,6 +315,13 @@ export function GroupChat({ groupId }: { groupId: string }) {
             </div>
 
             {/* Compose */}
+            {typingUsers.length > 0 ? (
+              <p className="text-xs text-[var(--color-ink-500)]">
+                {typingUsers.map((entry) => entry.fullName).join(", ")}{" "}
+                {typingUsers.length === 1 ? "is" : "are"} typing...
+              </p>
+            ) : null}
+
             <div className="flex gap-3">
               <div className="flex-1">
                 <Textarea
