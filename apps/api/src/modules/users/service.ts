@@ -7,6 +7,7 @@ const publicUserSelect = {
   fullName: true,
   avatarUrl: true,
   city: true,
+  travelPreferences: true,
   bio: true,
   verification: true,
   avgRating: true,

@@ -9,7 +9,7 @@ import { initials } from "@/lib/format";
 import { buildWhatsAppShareHref } from "@/lib/share";
 
 export function AgencyCard({ agency }: { agency: AgencySummary }) {
-  const href = `/agencies/${agency.slug}`;
+  const href = `/profile/${agency.slug}`;
   const shareHref = buildWhatsAppShareHref(`Explore this TravellersIn agency: ${agency.name}`, href);
 
   return (

@@ -16,6 +16,7 @@ import { agenciesRouter } from './modules/agencies/router.js';
 import { reviewsRouter } from './modules/reviews/router.js';
 import { referralsRouter } from './modules/referrals/router.js';
 import { usersRouter } from './modules/users/router.js';
+import { socialRouter } from './modules/social/router.js';
 import { generalLimiter, authLimiter } from './middleware/rate-limit.js';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/v1/agencies', agenciesRouter);
 app.use('/api/v1/reviews', reviewsRouter);
 app.use('/api/v1/referrals', referralsRouter);
 app.use('/api/v1/users', usersRouter);
+app.use('/api/v1/social', socialRouter);
 
 app.use(errorHandler);
 

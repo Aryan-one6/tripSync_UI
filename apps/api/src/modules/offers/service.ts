@@ -90,7 +90,7 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
     title: `${agency.name} sent a new offer`,
     body: `${agency.name} quoted a new price for ${plan.title}.`,
     userIds: [plan.creatorId],
-    ctaUrl: `${env.FRONTEND_URL}/dashboard/plans/${plan.id}/offers`,
+    ctaUrl: `${env.FRONTEND_URL}/dashboard/plans`,
     metadata: { offerId: offer.id, planId: plan.id },
   });
 

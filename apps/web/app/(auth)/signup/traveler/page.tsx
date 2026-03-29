@@ -9,7 +9,7 @@ export default async function TravelerSignupPage({
 }) {
   const params = await searchParams;
   const nextPath =
-    typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/dashboard/plans";
+    typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/dashboard/feed";
 
   return (
     <div className="page-shell flex min-h-[80vh] items-center py-10">

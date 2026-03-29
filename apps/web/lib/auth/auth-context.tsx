@@ -26,6 +26,7 @@ type SignupTravelerInput = {
   dateOfBirth: string;
   gender: "male" | "female" | "other";
   city: string;
+  travelPreferences: string;
   bio?: string;
   avatarUrl?: string;
 };
@@ -49,15 +50,10 @@ interface AuthContextValue {
   session: AuthSession | null;
   status: "loading" | "guest" | "authenticated";
   isPending: boolean;
-  login: (
-    identifier: string,
-    password: string,
-    requestedRole?: "user" | "agency_admin",
-  ) => Promise<AuthSession>;
+  login: (email: string, password: string) => Promise<AuthSession>;
   signupTraveler: (input: SignupTravelerInput) => Promise<void>;
   signupAgency: (input: SignupAgencyInput) => Promise<void>;
   refreshAuthSession: () => Promise<AuthSession | null>;
-  switchRole: (role: "user" | "agency_admin") => Promise<AuthSession>;
   updateUser: (user: AuthSession["user"]) => void;
   logout: () => void;
   apiFetchWithAuth: <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -79,7 +75,6 @@ function parseSession(raw: string | null) {
       parsed.role === "agency_admin"
         ? (parsed.agencyId ?? parsed.user.agency?.id ?? null)
         : null,
-    availableRoles: parsed.availableRoles ?? deriveAvailableRoles(parsed.user),
   } as AuthSession;
 }
 
@@ -152,13 +147,6 @@ function subscribeToHydration() {
   return () => {};
 }
 
-function deriveAvailableRoles(user: AuthSession["user"] | null | undefined) {
-  if (user?.agency?.id) {
-    return ["user", "agency_admin"] as AuthSession["availableRoles"];
-  }
-  return ["user"] as AuthSession["availableRoles"];
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const session = useSyncExternalStore(subscribeToSession, readSession, () => null);
   const hasHydrated = useSyncExternalStore(
@@ -173,14 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? "authenticated"
       : "guest";
 
-  async function login(
-    identifier: string,
-    password: string,
-    requestedRole?: "user" | "agency_admin",
-  ) {
+  async function login(email: string, password: string) {
     const nextSession = await apiFetch<AuthSession>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ identifier, password, requestedRole }),
+      body: JSON.stringify({ email, password }),
     });
 
     startTransition(() => {
@@ -205,20 +189,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshSession(currentSession: AuthSession) {
-    const tokens = await apiFetch<
-      Pick<AuthSession, "accessToken" | "refreshToken" | "role" | "agencyId" | "availableRoles">
-    >("/auth/refresh", {
+    const nextSession = await apiFetch<AuthSession>("/auth/refresh", {
       method: "POST",
       body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
     });
-
-    const nextSession: AuthSession = {
-      ...currentSession,
-      ...tokens,
-      user: await apiFetch<AuthSession["user"]>("/auth/me", {
-        token: tokens.accessToken,
-      }),
-    };
 
     persistSession(nextSession);
 
@@ -228,16 +202,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refreshAuthSession() {
     if (!session) return null;
     return refreshSession(session);
-  }
-
-  async function switchRole(role: "user" | "agency_admin") {
-    const nextSession = await apiFetchWithAuth<AuthSession>("/auth/switch-role", {
-      method: "POST",
-      body: JSON.stringify({ role }),
-    });
-
-    persistSession(nextSession);
-    return nextSession;
   }
 
   async function apiFetchWithAuth<T>(path: string, init: RequestInit = {}) {
@@ -274,7 +238,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       agencyId:
         session.role === "agency_admin" ? (user.agency?.id ?? session.agencyId ?? null) : null,
-      availableRoles: deriveAvailableRoles(user),
     };
     persistSession(nextSession);
   }
@@ -287,7 +250,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signupTraveler,
     signupAgency,
     refreshAuthSession,
-    switchRole,
     updateUser,
     logout,
     apiFetchWithAuth,

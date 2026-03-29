@@ -6,6 +6,8 @@ import type {
   PackageDetails,
   PlanDetails,
   PublicTravelerProfile,
+  SocialFeedItem,
+  SocialProfile,
 } from "@/lib/api/types";
 
 interface DiscoverQuery extends QueryParams {
@@ -83,6 +85,19 @@ export async function getAgencyBySlug(slug: string) {
 
 export async function getTravelerByUsername(username: string) {
   return apiFetch<PublicTravelerProfile>(`/users/profile/${username}`, {
+    cache: "no-store",
+  }).catch(() => null);
+}
+
+export async function getSocialFeed(query: { limit?: number } = {}) {
+  return safeApiFetch<SocialFeedItem[]>("/social/feed", [], {
+    query,
+    cache: "no-store",
+  });
+}
+
+export async function getPublicProfile(handle: string) {
+  return apiFetch<SocialProfile>(`/social/profiles/${handle}`, {
     cache: "no-store",
   }).catch(() => null);
 }

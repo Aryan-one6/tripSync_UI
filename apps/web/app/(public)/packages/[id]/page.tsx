@@ -417,7 +417,7 @@ export default async function PackageDetailPage({
               </div>
               <div>
                 <Link
-                  href={`/agencies/${pkg.agency.slug}`}
+                  href={`/profile/${pkg.agency.slug}`}
                   className="font-display text-lg text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
                 >
                   {pkg.agency.name}

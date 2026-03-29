@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   LogOut,
@@ -24,15 +24,9 @@ const links = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { session, status, logout, switchRole } = useAuth();
-  const [isPending, startTransition] = useTransition();
+  const { session, status, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const dashboardHref = session?.role === "agency_admin" ? "/agency/dashboard" : "/dashboard/plans";
-  const canSwitchToAgency =
-    session?.role === "user" && session.availableRoles.includes("agency_admin");
-  const canSwitchToUser =
-    session?.role === "agency_admin" && session.availableRoles.includes("user");
+  const dashboardHref = session?.role === "agency_admin" ? "/agency/dashboard" : "/dashboard/feed";
 
   return (
     <>
@@ -76,36 +70,6 @@ export function SiteHeader() {
             <div className="hidden items-center gap-2 md:flex">
               {status === "authenticated" && session ? (
                 <>
-                  {canSwitchToAgency && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        startTransition(async () => {
-                          await switchRole("agency_admin");
-                          router.push("/agency/dashboard");
-                        })
-                      }
-                      disabled={isPending}
-                    >
-                      {isPending ? "Switching..." : "Agency Mode"}
-                    </Button>
-                  )}
-                  {canSwitchToUser && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        startTransition(async () => {
-                          await switchRole("user");
-                          router.push("/dashboard/plans");
-                        })
-                      }
-                      disabled={isPending}
-                    >
-                      {isPending ? "Switching..." : "Traveler Mode"}
-                    </Button>
-                  )}
                   <Link href={dashboardHref}>
                     <Button variant="secondary" size="sm">
                       <LayoutDashboard className="size-4" />
@@ -179,38 +143,6 @@ export function SiteHeader() {
             <div className="space-y-2">
               {status === "authenticated" && session ? (
                 <>
-                  {canSwitchToAgency && (
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        startTransition(async () => {
-                          await switchRole("agency_admin");
-                          router.push("/agency/dashboard");
-                        });
-                      }}
-                      disabled={isPending}
-                    >
-                      {isPending ? "Switching..." : "Switch to Agency"}
-                    </Button>
-                  )}
-                  {canSwitchToUser && (
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        startTransition(async () => {
-                          await switchRole("user");
-                          router.push("/dashboard/plans");
-                        });
-                      }}
-                      disabled={isPending}
-                    >
-                      {isPending ? "Switching..." : "Switch to Traveler"}
-                    </Button>
-                  )}
                   <Link href={dashboardHref} onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="secondary" className="w-full">
                       <LayoutDashboard className="size-4" />

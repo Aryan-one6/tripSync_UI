@@ -11,17 +11,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/auth-context";
-import { inferRequestedRole } from "@/lib/auth/role-intent";
 
-type LoginValues = { identifier: string; password: string };
+type LoginValues = { email: string; password: string };
+
+function resolveDestination(nextPath: string, role: "user" | "agency_admin" | "platform_admin") {
+  const defaultPath = role === "agency_admin" ? "/agency/dashboard" : "/dashboard/feed";
+
+  if (!nextPath.startsWith("/")) {
+    return defaultPath;
+  }
+
+  if (role === "agency_admin") {
+    return nextPath.startsWith("/agency") ? nextPath : defaultPath;
+  }
+
+  return nextPath.startsWith("/dashboard") ? nextPath : defaultPath;
+}
 
 export function LoginForm({
   nextPath = "/",
-  defaultIdentifier = "",
+  defaultEmail = "",
   successMessage,
 }: {
   nextPath?: string;
-  defaultIdentifier?: string;
+  defaultEmail?: string;
   successMessage?: string;
 }) {
   const router = useRouter();
@@ -30,7 +43,7 @@ export function LoginForm({
   const [isPending, startTransition] = useTransition();
   const form = useForm<LoginValues>({
     resolver: zodResolver(LoginSchema),
-    defaultValues: { identifier: defaultIdentifier, password: "" },
+    defaultValues: { email: defaultEmail, password: "" },
   });
 
   const travelerSignupHref = `/signup/traveler?next=${encodeURIComponent(nextPath)}`;
@@ -45,7 +58,7 @@ export function LoginForm({
         </div>
         <h1 className="font-display text-2xl text-(--color-ink-950) sm:text-3xl">Welcome back</h1>
         <p className="mt-1.5 text-sm text-(--color-ink-600) leading-relaxed">
-          Log in with your username or email. Agency owners and travelers share one account.
+          Log in with your email and password. We will route you into the correct workspace.
         </p>
       </div>
 
@@ -55,8 +68,8 @@ export function LoginForm({
         onSubmit={form.handleSubmit((values) =>
           startTransition(async () => {
             try {
-              await login(values.identifier, values.password, inferRequestedRole(nextPath));
-              router.replace(nextPath);
+              const session = await login(values.email, values.password);
+              router.replace(resolveDestination(nextPath, session.role));
             } catch (error) {
               setFeedback(error instanceof Error ? error.message : "Login failed.");
             }
@@ -64,13 +77,11 @@ export function LoginForm({
         )}
       >
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-(--color-ink-700)">
-            Username or email
-          </label>
-          <Input placeholder="naresh_travel or you@example.com" {...form.register("identifier")} />
-          {form.formState.errors.identifier && (
+          <label className="mb-1.5 block text-sm font-medium text-(--color-ink-700)">Email</label>
+          <Input type="email" placeholder="you@example.com" {...form.register("email")} />
+          {form.formState.errors.email && (
             <p className="mt-1.5 text-xs text-(--color-sunset-600)">
-              {form.formState.errors.identifier.message}
+              {form.formState.errors.email.message}
             </p>
           )}
         </div>

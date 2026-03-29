@@ -8,8 +8,8 @@ export default async function LoginPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const nextPath = typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/";
-  const defaultIdentifier = typeof params.identifier === "string" ? params.identifier : "";
+  const nextPath = typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/dashboard/feed";
+  const defaultEmail = typeof params.email === "string" ? params.email : "";
   const successMessage =
     params.signup === "traveler"
       ? "Traveler account created. Log in with your new credentials."
@@ -25,16 +25,15 @@ export default async function LoginPage({
             Account access
           </p>
           <h1 className="font-display text-6xl leading-[0.96] text-[var(--color-ink-950)]">
-            Password login that keeps traveler and agency workspaces under one account.
+            Email and password login for the core trip workflow.
           </h1>
           <p className="max-w-xl text-lg text-[var(--color-ink-600)]">
-            Signup once as a traveler or create the owner plus agency account together, then keep coming
-            back with username or email and password.
+            Travelers land in the traveler workspace. Agency owners land in the agency workspace.
           </p>
         </div>
         <LoginForm
           nextPath={nextPath}
-          defaultIdentifier={defaultIdentifier}
+          defaultEmail={defaultEmail}
           successMessage={successMessage}
         />
       </div>

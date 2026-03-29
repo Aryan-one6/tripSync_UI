@@ -62,6 +62,11 @@ enum EscrowStatus {
   REFUNDED
 }
 
+enum FollowTargetType {
+  USER
+  AGENCY
+}
+
 // ─── User & Agency ──────────────────────────────────────
 
 model User {
@@ -75,6 +80,7 @@ model User {
   dateOfBirth     DateTime?
   gender          String?          // male | female | other
   city            String?
+  travelPreferences String?
   bio             String?
   verification    VerificationTier @default(BASIC)
   aadhaarHash     String?          // SHA-256, never raw
@@ -94,6 +100,8 @@ model User {
   chatMessages    ChatMessage[]
   directConversationParticipants DirectConversationParticipant[]
   directMessagesSent DirectMessage[] @relation("DirectMessageSender")
+  following       Follow[]         @relation("FollowFollowerRel")
+  followers       Follow[]         @relation("FollowTargetUserRel")
 
   @@map("users")
 }
@@ -127,6 +135,7 @@ model Agency {
   packages        Package[]
   offers          Offer[]
   reviewsReceived Review[] @relation("TargetAgencyRel")
+  followers       Follow[]
 
   @@map("agencies")
 }
@@ -277,6 +286,25 @@ model Offer {
   @@index([planId, status])
   @@index([agencyId, isReferred, referredAt])
   @@map("offers")
+}
+
+model Follow {
+  id             String           @id @default(uuid())
+  followerUserId String
+  targetType     FollowTargetType
+  targetUserId   String?
+  targetAgencyId String?
+  createdAt      DateTime         @default(now())
+
+  follower       User             @relation("FollowFollowerRel", fields: [followerUserId], references: [id], onDelete: Cascade)
+  targetUser     User?            @relation("FollowTargetUserRel", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetAgency   Agency?          @relation(fields: [targetAgencyId], references: [id], onDelete: Cascade)
+
+  @@unique([followerUserId, targetUserId])
+  @@unique([followerUserId, targetAgencyId])
+  @@index([targetUserId])
+  @@index([targetAgencyId])
+  @@map("follows")
 }
 
 model OfferNegotiation {

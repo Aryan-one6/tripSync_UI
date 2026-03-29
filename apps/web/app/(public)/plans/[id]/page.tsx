@@ -775,7 +775,7 @@ export default async function PlanDetailPage({
               </div>
               <div className="min-w-0 flex-1">
                 {plan.creator.username ? (
-                  <Link href={`/travelers/${plan.creator.username}`} className="truncate font-display text-sm text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] sm:text-base">
+                  <Link href={`/profile/${plan.creator.username}`} className="truncate font-display text-sm text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] sm:text-base">
                     {plan.creator.fullName}
                   </Link>
                 ) : (
@@ -802,11 +802,6 @@ export default async function PlanDetailPage({
                   <UserVerificationBadge tier={plan.creator.verification ?? "BASIC"} />
                 </div>
               </div>
-              <Link href={`/dashboard/messages?target=${plan.creator.id}`} className="shrink-0">
-                <Button size="sm" variant="ghost" className="px-3 py-1.5 text-[10px]">
-                  Message
-                </Button>
-              </Link>
             </div>
           </Card>
 
@@ -840,7 +835,7 @@ export default async function PlanDetailPage({
                 </div>
                 <div>
                   <Link
-                    href={`/agencies/${plan.selectedOffer!.agency.slug}`}
+                    href={`/profile/${plan.selectedOffer!.agency.slug}`}
                     className="font-display text-base text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
                   >
                     {plan.selectedOffer!.agency.name}

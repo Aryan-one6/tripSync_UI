@@ -4,7 +4,7 @@ export const RegisterAgencySchema = z.object({
   name: z.string().min(2).max(200),
   description: z.string().max(2000).optional(),
   logoUrl: z.string().url().optional(),
-  gstin: z.string().max(20).optional(),
+  gstin: z.string().min(5).max(20),
   pan: z.string().max(20).optional(),
   tourismLicense: z.string().max(50).optional(),
   address: z.string().max(500).optional(),

@@ -577,7 +577,7 @@ export async function sendDirectMessage(
       title: `${message.sender?.fullName ?? 'A traveler'} sent you a message`,
       body: content.slice(0, 160),
       userIds: recipientIds,
-      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages?conversation=${conversationId}`,
+      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages`,
       metadata: { conversationId, messageId: message.id },
     });
   }

@@ -7,11 +7,8 @@ import {
   AgencySignupSchema,
   LoginSchema,
   RefreshTokenSchema,
-  SendOtpSchema,
-  SwitchRoleSchema,
   TravelerSignupSchema,
   UpdateProfileSchema,
-  VerifyOtpSchema,
 } from '@tripsync/shared';
 import * as authService from './service.js';
 
@@ -39,35 +36,7 @@ authRouter.post(
   '/login',
   validate(LoginSchema),
   asyncHandler(async (req, res) => {
-    const result = await authService.login(
-      req.body.identifier,
-      req.body.password,
-      req.body.requestedRole,
-    );
-    res.json({ data: result });
-  }),
-);
-
-// POST /auth/otp/send
-authRouter.post(
-  '/otp/send',
-  validate(SendOtpSchema),
-  asyncHandler(async (req, res) => {
-    await authService.requestOtp(req.body.phone);
-    res.json({ data: { message: 'OTP sent successfully' } });
-  }),
-);
-
-// POST /auth/otp/verify
-authRouter.post(
-  '/otp/verify',
-  validate(VerifyOtpSchema),
-  asyncHandler(async (req, res) => {
-    const result = await authService.verifyOtpAndLogin(
-      req.body.phone,
-      req.body.otp,
-      req.body.requestedRole,
-    );
+    const result = await authService.login(req.body.email, req.body.password);
     res.json({ data: result });
   }),
 );
@@ -79,16 +48,6 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const tokens = await authService.refreshTokens(req.body.refreshToken);
     res.json({ data: tokens });
-  }),
-);
-
-authRouter.post(
-  '/switch-role',
-  authenticate,
-  validate(SwitchRoleSchema),
-  asyncHandler(async (req, res) => {
-    const session = await authService.switchRole(req.userId!, req.body);
-    res.json({ data: session });
   }),
 );
 

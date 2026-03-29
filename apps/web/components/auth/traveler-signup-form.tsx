@@ -37,7 +37,7 @@ const steps = [
     key: "profile",
     title: "Profile",
     description: "Traveler details",
-    fields: ["gender", "dateOfBirth", "city", "bio"] as Array<keyof TravelerFormValues>,
+    fields: ["gender", "dateOfBirth", "city", "travelPreferences", "bio"] as Array<keyof TravelerFormValues>,
     icon: <Heart className="size-5" />,
   },
   {
@@ -49,7 +49,7 @@ const steps = [
   },
 ];
 
-export function TravelerSignupForm({ nextPath = "/dashboard/plans" }: { nextPath?: string }) {
+export function TravelerSignupForm({ nextPath = "/dashboard/feed" }: { nextPath?: string }) {
   const router = useRouter();
   const { signupTraveler } = useAuth();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -59,14 +59,14 @@ export function TravelerSignupForm({ nextPath = "/dashboard/plans" }: { nextPath
     resolver: zodResolver(travelerFormSchema),
     defaultValues: {
       fullName: "", username: "", email: "", phone: "",
-      dateOfBirth: "", gender: "male", city: "", bio: "",
+      dateOfBirth: "", gender: "male", city: "", travelPreferences: "", bio: "",
       password: "", confirmPassword: "",
     },
   });
 
   const currentStep = steps[step];
   const isLastStep = step === steps.length - 1;
-  const loginNextPath = nextPath.startsWith("/agency") ? "/dashboard/plans" : nextPath;
+  const loginNextPath = nextPath.startsWith("/agency") ? "/dashboard/feed" : nextPath;
 
   async function goNext() {
     const valid = await form.trigger(currentStep.fields);
@@ -118,10 +118,11 @@ export function TravelerSignupForm({ nextPath = "/dashboard/plans" }: { nextPath
                   fullName: values.fullName, username: values.username,
                   email: values.email, phone: values.phone, password: values.password,
                   dateOfBirth: values.dateOfBirth, gender: values.gender,
-                  city: values.city, bio: values.bio || undefined,
+                  city: values.city, travelPreferences: values.travelPreferences,
+                  bio: values.bio || undefined,
                 });
                 router.replace(
-                  `/login?signup=traveler&identifier=${encodeURIComponent(values.username)}&next=${encodeURIComponent(loginNextPath)}`,
+                  `/login?signup=traveler&email=${encodeURIComponent(values.email)}&next=${encodeURIComponent(loginNextPath)}`,
                 );
               } catch (error) {
                 setFeedback(error instanceof Error ? error.message : "Unable to create your account.");
@@ -163,6 +164,16 @@ export function TravelerSignupForm({ nextPath = "/dashboard/plans" }: { nextPath
               </Field>
               <Field label="City" error={form.formState.errors.city?.message}>
                 <Input placeholder="Delhi" {...form.register("city")} />
+              </Field>
+              <Field
+                label="Travel preferences"
+                error={form.formState.errors.travelPreferences?.message}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  placeholder="Weekend treks, mixed groups, early starts, budget hostels, flexible plans..."
+                  {...form.register("travelPreferences")}
+                />
               </Field>
               <Field label="Short bio" error={form.formState.errors.bio?.message} className="sm:col-span-2">
                 <Textarea

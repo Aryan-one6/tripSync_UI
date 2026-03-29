@@ -4,6 +4,7 @@ export * from './packages.js';
 export * from './offers.js';
 export * from './agencies.js';
 export * from './discover.js';
+export * from './social.js';
 export * from './groups.js';
 export * from './chat.js';
 export * from './payments.js';

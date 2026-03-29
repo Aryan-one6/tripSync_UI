@@ -2,12 +2,10 @@ import type {
   AadhaarVerificationInput,
   AgencySignupInput,
   LoginInput,
-  SwitchRoleInput,
   TravelerSignupInput,
   UpdateProfileInput,
 } from '@tripsync/shared';
 import { prisma } from '../../lib/prisma.js';
-import { sendOtp, verifyOtp } from './otp.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, type TokenPayload } from './jwt.js';
 import {
   BadRequestError,
@@ -24,12 +22,6 @@ import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
-
-export async function requestOtp(phone: string): Promise<void> {
-  await sendOtp(phone);
-}
-
-type RequestedRole = Extract<TokenPayload['role'], 'user' | 'agency_admin'>;
 type SafeAgency = {
   id: string;
   name: string;
@@ -61,6 +53,7 @@ type SafeUser = {
   dateOfBirth: Date | null;
   gender: string | null;
   city: string | null;
+  travelPreferences: string | null;
   bio: string | null;
   verification: TokenPayload['verification'];
   completedTrips: number;
@@ -103,6 +96,7 @@ const safeUserSelect = {
   dateOfBirth: true,
   gender: true,
   city: true,
+  travelPreferences: true,
   bio: true,
   verification: true,
   completedTrips: true,
@@ -140,29 +134,12 @@ async function loadUserWithAgency(userId: string) {
   });
 }
 
-function getAllowedRoles(user: { agency?: { id: string } | null }) {
-  const roles: TokenPayload['role'][] = ['user'];
-  if (user.agency?.id) {
-    roles.push('agency_admin');
-  }
-  return roles;
+function resolveAccountRole(user: { agency?: { id: string } | null }) {
+  return user.agency?.id ? 'agency_admin' : 'user';
 }
 
-function resolveRequestedRole(
-  user: { agency?: { id: string } | null },
-  requestedRole?: RequestedRole,
-): RequestedRole {
-  if (requestedRole === 'agency_admin') {
-    if (!user.agency?.id) {
-      throw new ForbiddenError('Agency account required');
-    }
-    return 'agency_admin';
-  }
-
-  return 'user';
-}
-
-function buildSessionPayload(user: SafeUser, role: RequestedRole) {
+function buildSessionPayload(user: SafeUser) {
+  const role = resolveAccountRole(user);
   const agencyId = role === 'agency_admin' ? user.agency?.id ?? null : null;
   const payload: TokenPayload = {
     userId: user.id,
@@ -173,16 +150,16 @@ function buildSessionPayload(user: SafeUser, role: RequestedRole) {
 
   return {
     payload,
+    role,
     agencyId,
   };
 }
 
-async function createSession(userId: string, requestedRole?: RequestedRole) {
+async function createSession(userId: string) {
   const user = await loadUserWithAgency(userId);
   if (!user) throw new NotFoundError('User');
 
-  const role = resolveRequestedRole(user, requestedRole);
-  const { payload, agencyId } = buildSessionPayload(user, role);
+  const { payload, role, agencyId } = buildSessionPayload(user);
 
   const [accessToken, refreshToken] = await Promise.all([
     signAccessToken(payload),
@@ -195,7 +172,6 @@ async function createSession(userId: string, requestedRole?: RequestedRole) {
     refreshToken,
     role,
     agencyId,
-    availableRoles: getAllowedRoles(user),
   };
 }
 
@@ -290,6 +266,7 @@ export async function signupTraveler(data: TravelerSignupInput) {
           dateOfBirth: new Date(`${data.dateOfBirth}T00:00:00.000Z`),
           gender: data.gender,
           city: data.city.trim(),
+          travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
         },
@@ -305,6 +282,7 @@ export async function signupTraveler(data: TravelerSignupInput) {
           dateOfBirth: new Date(`${data.dateOfBirth}T00:00:00.000Z`),
           gender: data.gender,
           city: data.city.trim(),
+          travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
         },
@@ -338,6 +316,7 @@ export async function signupAgency(data: AgencySignupInput) {
             dateOfBirth: new Date(`${data.dateOfBirth}T00:00:00.000Z`),
             gender: data.gender,
             city: data.city.trim(),
+            travelPreferences: data.travelPreferences.trim(),
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
           },
@@ -353,6 +332,7 @@ export async function signupAgency(data: AgencySignupInput) {
             dateOfBirth: new Date(`${data.dateOfBirth}T00:00:00.000Z`),
             gender: data.gender,
             city: data.city.trim(),
+            travelPreferences: data.travelPreferences.trim(),
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
           },
@@ -409,14 +389,13 @@ export async function signupAgency(data: AgencySignupInput) {
 }
 
 export async function login(
-  identifier: LoginInput['identifier'],
+  email: LoginInput['email'],
   password: LoginInput['password'],
-  requestedRole?: RequestedRole,
 ) {
-  const normalizedIdentifier = identifier.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findFirst({
     where: {
-      OR: [{ email: normalizedIdentifier }, { username: normalizedIdentifier }],
+      email: normalizedEmail,
     },
     select: {
       id: true,
@@ -426,7 +405,7 @@ export async function login(
   });
 
   if (!user || !user.passwordHash) {
-    throw new UnauthorizedError('Invalid email, username, or password');
+    throw new UnauthorizedError('Invalid email or password');
   }
 
   if (!user.isActive) {
@@ -435,34 +414,10 @@ export async function login(
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    throw new UnauthorizedError('Invalid email, username, or password');
+    throw new UnauthorizedError('Invalid email or password');
   }
 
-  return createSession(user.id, requestedRole);
-}
-
-export async function verifyOtpAndLogin(
-  phone: string,
-  otp: string,
-  requestedRole?: RequestedRole,
-) {
-  const valid = await verifyOtp(phone, otp);
-  if (!valid) {
-    throw new UnauthorizedError('Invalid or expired OTP');
-  }
-
-  let user = await prisma.user.findUnique({ where: { phone } });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        phone,
-        fullName: `User_${phone.slice(-4)}`,
-      },
-    });
-  }
-
-  return createSession(user.id, requestedRole);
+  return createSession(user.id);
 }
 
 export async function refreshTokens(token: string) {
@@ -476,14 +431,7 @@ export async function refreshTokens(token: string) {
     throw new UnauthorizedError('User not found or inactive');
   }
 
-  const requestedRole: RequestedRole =
-    payload.role === 'agency_admin' && user.agency?.id ? 'agency_admin' : 'user';
-
-  return createSession(user.id, requestedRole);
-}
-
-export async function switchRole(userId: string, data: SwitchRoleInput) {
-  return createSession(userId, data.role);
+  return createSession(user.id);
 }
 
 export async function getProfile(userId: string) {
@@ -501,7 +449,9 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     data: {
       ...data,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+      travelPreferences: data.travelPreferences?.trim(),
     },
+    select: safeUserSelect,
   });
   return user;
 }

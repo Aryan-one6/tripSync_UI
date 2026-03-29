@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, BadgeCheck, Star, MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import type { GroupMember } from "@/lib/api/types";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,8 +22,7 @@ function VerificationIcon({ tier }: { tier?: string | null }) {
 
 function MemberCard({ member }: { member: GroupMember }) {
   const user = member.user;
-  const profileHref = user.username ? `/travelers/${user.username}` : null;
-  const messageHref = `/dashboard/messages?target=${user.id}`;
+  const profileHref = user.username ? `/profile/${user.username}` : null;
   return (
     <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-white/40 bg-[var(--color-surface-2)] px-3 py-2.5 shadow-[var(--shadow-clay-inset)] transition hover:shadow-[var(--shadow-clay-sm)] sm:items-center">
       {/* Avatar */}
@@ -99,11 +97,6 @@ function MemberCard({ member }: { member: GroupMember }) {
             ? "Approved"
             : "Interested"}
       </span>
-      <Link href={messageHref}>
-        <Button size="sm" variant="ghost" className="shrink-0 px-3 py-1.5 text-[10px]">
-          Message
-        </Button>
-      </Link>
     </div>
   );
 }

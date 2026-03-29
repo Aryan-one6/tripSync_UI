@@ -213,6 +213,7 @@ export interface PackageDetails {
 export interface UserProfile extends UserSummary {
   phone: string;
   email?: string | null;
+  travelPreferences?: string | null;
   bio?: string | null;
   dateOfBirth?: string | null;
   agency?: AgencySummary | null;
@@ -242,7 +243,6 @@ export interface AuthSession {
   user: UserProfile;
   agencyId: string | null;
   role: "user" | "agency_admin" | "platform_admin";
-  availableRoles: Array<"user" | "agency_admin" | "platform_admin">;
 }
 
 export interface TripMembership {
@@ -360,6 +360,7 @@ export interface ReviewEligibility {
 }
 
 export interface PublicTravelerProfile extends UserSummary {
+  travelPreferences?: string | null;
   bio?: string | null;
   createdPlans: Array<{
     id: string;
@@ -406,21 +407,97 @@ export interface PublicTravelerProfile extends UserSummary {
   }>;
 }
 
-export interface DirectConversation {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  unreadCount: number;
-  lastReadAt?: string | null;
-  counterpart?: UserSummary | null;
-  lastMessage?: DirectMessage | null;
+export interface SocialFeedAuthor {
+  profileType: "traveler" | "agency";
+  handle: string;
+  name: string;
+  avatarUrl?: string | null;
+  verification?: VerificationTier | AgencyVerificationStatus | string | null;
 }
 
-export interface DirectMessage {
+export interface SocialFeedItem {
   id: string;
-  conversationId: string;
-  senderId: string;
-  content: string;
+  slug: string;
+  originType: "plan" | "package";
+  title: string;
+  destination: string;
+  destinationState?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  priceLow?: number | null;
+  priceHigh?: number | null;
+  groupSizeMin: number;
+  groupSizeMax: number;
+  joinedCount: number;
+  coverImageUrl?: string | null;
+  excerpt?: string | null;
   createdAt: string;
-  sender?: UserSummary | null;
+  author: SocialFeedAuthor;
+}
+
+export interface SocialTripSummary {
+  id: string;
+  slug: string;
+  title: string;
+  destination: string;
+  destinationState?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  status: PlanStatus;
+  coverImageUrl?: string | null;
+  galleryUrls?: string[] | null;
+  basePrice?: number | null;
+}
+
+export interface SocialReview {
+  id: string;
+  overallRating: number;
+  safetyRating?: number;
+  valueRating?: number;
+  comment?: string | null;
+  createdAt: string;
+  reviewer: UserSummary;
+}
+
+interface BaseSocialProfile {
+  id: string;
+  handle: string;
+  name: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  followerCount: number;
+  followingCount: number;
+  travelMap: string[];
+}
+
+export interface TravelerSocialProfile extends BaseSocialProfile {
+  profileType: "traveler";
+  verification: VerificationTier;
+  travelPreferences?: string | null;
+  avgRating: number;
+  completedTrips: number;
+  plansCreated: SocialTripSummary[];
+  tripsJoined: SocialTripSummary[];
+  reviewsReceived: SocialReview[];
+}
+
+export interface AgencySocialProfile extends BaseSocialProfile {
+  profileType: "agency";
+  ownerId: string;
+  verification: AgencyVerificationStatus | string;
+  avgRating: number;
+  totalTrips: number;
+  totalReviews: number;
+  packages: SocialTripSummary[];
+  reviewsReceived: SocialReview[];
+}
+
+export type SocialProfile = TravelerSocialProfile | AgencySocialProfile;
+
+export interface FollowState {
+  isFollowing: boolean;
+  isOwnProfile: boolean;
+  followerCount: number;
+  followingCount: number;
 }

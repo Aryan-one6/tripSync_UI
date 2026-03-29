@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import {
   BriefcaseBusiness,
   Building2,
+  Compass,
   FilePlus2,
   Handshake,
   LayoutDashboard,
   MessageSquareText,
+  UserRound,
   Route,
   Settings,
   Ticket,
@@ -16,10 +18,12 @@ import {
 import { cn } from "@/lib/utils";
 
 const userNav = [
+  { href: "/dashboard/feed", label: "Feed", icon: Compass },
   { href: "/dashboard/plans", label: "My Plans", icon: Route },
-  { href: "/dashboard/plans/new", label: "New Plan", icon: FilePlus2 },
+  { href: "/dashboard/plans/new", label: "Create Plan", icon: FilePlus2 },
   { href: "/dashboard/trips", label: "My Trips", icon: Ticket },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText },
+  { href: "/dashboard/profile", label: "Profile", icon: UserRound },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

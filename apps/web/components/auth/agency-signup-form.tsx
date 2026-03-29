@@ -26,6 +26,7 @@ const agencyFormSchema = z
     dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be in YYYY-MM-DD format"),
     gender: z.enum(["male", "female", "other"]),
     city: z.string().trim().min(2).max(100),
+    travelPreferences: z.string().trim().min(10).max(500),
     bio: z.string().trim().max(500).optional(),
     agencyName: z.string().trim().min(2).max(120),
     agencyDescription: z.string().trim().min(20).max(1200),
@@ -34,7 +35,7 @@ const agencyFormSchema = z
     agencyAddress: z.string().trim().min(5).max(300),
     agencyCity: z.string().trim().min(2).max(100),
     agencyState: z.string().trim().min(2).max(100),
-    gstin: z.string().trim().max(30).optional(),
+    gstin: z.string().trim().min(5).max(30),
     pan: z.string().trim().max(30).optional(),
     tourismLicense: z.string().trim().max(80).optional(),
     specializationsInput: z.string().min(2, "Add at least one specialization"),
@@ -59,7 +60,7 @@ const steps = [
     key: "profile",
     title: "Owner Profile",
     description: "Personal details",
-    fields: ["gender", "dateOfBirth", "city", "bio"] as Array<keyof AgencyFormValues>,
+    fields: ["gender", "dateOfBirth", "city", "travelPreferences", "bio"] as Array<keyof AgencyFormValues>,
     icon: <Heart className="size-5" />,
   },
   {
@@ -93,7 +94,7 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
     defaultValues: {
       fullName: "", username: "", email: "", phone: "",
       password: "", confirmPassword: "",
-      dateOfBirth: "", gender: "male", city: "", bio: "",
+      dateOfBirth: "", gender: "male", city: "", travelPreferences: "", bio: "",
       agencyName: "", agencyDescription: "",
       agencyPhone: "", agencyEmail: "",
       agencyAddress: "", agencyCity: "", agencyState: "",
@@ -156,7 +157,8 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
                   fullName: values.fullName, username: values.username,
                   email: values.email, phone: values.phone, password: values.password,
                   dateOfBirth: values.dateOfBirth, gender: values.gender,
-                  city: values.city, bio: values.bio || undefined,
+                  city: values.city, travelPreferences: values.travelPreferences,
+                  bio: values.bio || undefined,
                   agencyName: values.agencyName, agencyDescription: values.agencyDescription,
                   agencyPhone: values.agencyPhone || undefined, agencyEmail: values.agencyEmail || undefined,
                   agencyAddress: values.agencyAddress, agencyCity: values.agencyCity,
@@ -167,7 +169,7 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
                   destinations: arrayFromCsv(values.destinationsInput),
                 });
                 router.replace(
-                  `/login?signup=agency&identifier=${encodeURIComponent(values.username)}&next=${encodeURIComponent(loginNextPath)}`,
+                  `/login?signup=agency&email=${encodeURIComponent(values.email)}&next=${encodeURIComponent(loginNextPath)}`,
                 );
               } catch (error) {
                 setFeedback(error instanceof Error ? error.message : "Unable to create the agency account.");
@@ -216,6 +218,16 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
               <Field label="City" error={form.formState.errors.city?.message}>
                 <Input placeholder="Delhi" {...form.register("city")} />
               </Field>
+              <Field
+                label="Travel preferences"
+                error={form.formState.errors.travelPreferences?.message}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  placeholder="Tell travelers how you like to run trips, pacing, accommodation style, and group energy."
+                  {...form.register("travelPreferences")}
+                />
+              </Field>
               <Field label="Owner bio" error={form.formState.errors.bio?.message} className="sm:col-span-2">
                 <Textarea
                   placeholder="Tell travelers about your experience operating travel groups..."
@@ -263,7 +275,7 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
                 <Input placeholder="Bir, Manali, Spiti" {...form.register("destinationsInput")} />
               </Field>
               <Field label="GSTIN" error={form.formState.errors.gstin?.message}>
-                <Input placeholder="Optional for now" {...form.register("gstin")} />
+                <Input placeholder="Required GSTIN" {...form.register("gstin")} />
               </Field>
               <Field label="PAN" error={form.formState.errors.pan?.message}>
                 <Input placeholder="Optional for now" {...form.register("pan")} />

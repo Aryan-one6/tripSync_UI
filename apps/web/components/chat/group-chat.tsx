@@ -281,7 +281,7 @@ export function GroupChat({ groupId }: { groupId: string }) {
                 </div>
                 <div className="min-w-0">
                   {member.user.username ? (
-                    <Link href={`/travelers/${member.user.username}`} className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+                    <Link href={`/profile/${member.user.username}`} className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
                       {member.user.fullName}
                     </Link>
                   ) : (
