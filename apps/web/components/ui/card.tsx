@@ -6,9 +6,9 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     <div
       className={cn(
         "rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 sm:p-6",
-        "shadow-[var(--shadow-md)]",
+        "shadow-[var(--shadow-sm)]",
         "overflow-hidden",
-        "transition-shadow duration-200",
+        "transition-shadow duration-200 hover:shadow-[var(--shadow-md)]",
         className,
       )}
       {...props}
@@ -29,16 +29,15 @@ export function CardInset({ className, ...props }: HTMLAttributes<HTMLDivElement
   );
 }
 
-/** Featured card — keeps clay shadow for high-emphasis surfaces */
+/** Featured card — high-emphasis surface with stronger shadow */
 export function CardFeatured({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-lg)] border border-white/70 bg-[var(--color-surface-raised)] p-4 sm:p-6",
-        "shadow-[var(--shadow-clay)]",
+        "rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 sm:p-6",
+        "shadow-[var(--shadow-md)]",
         "overflow-hidden",
-        "transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-        "hover:shadow-[var(--shadow-clay-lg)] hover:-translate-y-1",
+        "transition-shadow duration-200 hover:shadow-[var(--shadow-lg)]",
         className,
       )}
       {...props}

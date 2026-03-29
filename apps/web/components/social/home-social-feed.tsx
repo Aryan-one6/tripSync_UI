@@ -2,15 +2,20 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Compass, Users } from "lucide-react";
+import { Compass, TrendingUp, Users } from "lucide-react";
 import { SocialFeedCard } from "@/components/social/social-feed-card";
 import { Button } from "@/components/ui/button";
-import { CardInset } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { SocialFeedItem } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth/auth-context";
 
-type FeedTab = "for-you" | "following";
+type FeedTab = "for-you" | "following" | "trending";
+
+const tabs: { id: FeedTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "for-you", label: "For You", icon: Compass },
+  { id: "following", label: "Following", icon: Users },
+  { id: "trending", label: "Trending", icon: TrendingUp },
+];
 
 export function HomeSocialFeed({ initialItems }: { initialItems: SocialFeedItem[] }) {
   const { status, apiFetchWithAuth } = useAuth();
@@ -34,43 +39,43 @@ export function HomeSocialFeed({ initialItems }: { initialItems: SocialFeedItem[
     });
   }, [activeTab, apiFetchWithAuth, followingItems, status]);
 
-  const items = activeTab === "for-you" ? initialItems : followingItems ?? [];
+  // Trending: sort by joinedCount descending as a proxy for popularity
+  const trendingItems = [...initialItems].sort(
+    (a, b) => (b.joinedCount ?? 0) - (a.joinedCount ?? 0),
+  );
+
+  const items =
+    activeTab === "for-you"
+      ? initialItems
+      : activeTab === "trending"
+        ? trendingItems
+        : (followingItems ?? []);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <CardInset className="p-2">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("for-you")}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "for-you"
-                ? "bg-[var(--color-surface-raised)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
-                : "text-[var(--color-ink-600)] hover:bg-white/60"
-            }`}
-          >
-            <span className="inline-flex items-center gap-2">
-              <Compass className="size-4" />
-              For you
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("following")}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              activeTab === "following"
-                ? "bg-[var(--color-surface-raised)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
-                : "text-[var(--color-ink-600)] hover:bg-white/60"
-            }`}
-          >
-            <span className="inline-flex items-center gap-2">
-              <Users className="size-4" />
-              Following
-            </span>
-          </button>
-        </div>
-      </CardInset>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      {/* Tab switcher */}
+      <div className="flex items-center gap-0.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                activeTab === tab.id
+                  ? "bg-[var(--color-surface-raised)] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]"
+                  : "text-[var(--color-ink-600)] hover:bg-white/60 hover:text-[var(--color-ink-900)]"
+              }`}
+            >
+              <Icon className="size-4" />
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
+      {/* Log in prompt for Following tab */}
       {activeTab === "following" && status !== "authenticated" ? (
         <EmptyState
           title="Log in to see your following feed"
@@ -83,22 +88,30 @@ export function HomeSocialFeed({ initialItems }: { initialItems: SocialFeedItem[
         />
       ) : null}
 
+      {/* Loading state */}
       {activeTab === "following" && status === "authenticated" && isPending ? (
-        <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-6 text-center text-sm text-[var(--color-ink-500)]">
           Loading people you follow...
-        </CardInset>
+        </div>
       ) : null}
 
+      {/* Feed items */}
       {!(activeTab === "following" && status !== "authenticated") ? (
         items.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {items.map((item) => (
               <SocialFeedCard key={`${item.originType}-${item.id}`} item={item} />
             ))}
           </div>
         ) : (
           <EmptyState
-            title={activeTab === "following" ? "Your following feed is empty" : "Nothing in the feed yet"}
+            title={
+              activeTab === "following"
+                ? "Your following feed is empty"
+                : activeTab === "trending"
+                  ? "No trending trips yet"
+                  : "Nothing in the feed yet"
+            }
             description={
               activeTab === "following"
                 ? "Follow a few travelers or agencies and their plans and packages will show up here."

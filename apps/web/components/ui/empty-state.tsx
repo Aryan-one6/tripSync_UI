@@ -14,13 +14,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <Card className="relative flex flex-col items-center gap-5 overflow-hidden p-8 text-center sm:p-12">
-      {/* Decorative blobs */}
-      <div className="clay-blob -top-12 -right-12 size-40 bg-[var(--color-sea-200)] opacity-15" />
-      <div className="clay-blob -bottom-10 -left-10 size-32 bg-[var(--color-sunset-200)] opacity-10" />
-
+    <Card className="flex flex-col items-center gap-5 p-8 text-center sm:p-12">
       {Icon ? (
-        <div className="relative flex size-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-surface-2)] shadow-[var(--shadow-clay)] text-[var(--color-ink-400)]">
+        <div className="flex size-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-surface-2)] shadow-[var(--shadow-sm)] text-[var(--color-ink-400)]">
           <Icon className="size-7" />
         </div>
       ) : null}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   BriefcaseBusiness,
   Building2,
   Compass,
@@ -10,30 +11,72 @@ import {
   Handshake,
   LayoutDashboard,
   MessageSquareText,
-  UserRound,
+  Package,
   Route,
   Settings,
+  Store,
   Ticket,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const userNav = [
-  { href: "/dashboard/feed", label: "Feed", icon: Compass },
+const userNavMain = [
+  { href: "/discover", label: "Discover", icon: Compass },
   { href: "/dashboard/plans", label: "My Plans", icon: Route },
   { href: "/dashboard/plans/new", label: "Create Plan", icon: FilePlus2 },
   { href: "/dashboard/trips", label: "My Trips", icon: Ticket },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquareText },
-  { href: "/dashboard/profile", label: "Profile", icon: UserRound },
+];
+
+const userNavSecondary = [
+  { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-const agencyNav = [
+const agencyNavMain = [
   { href: "/agency/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/agency/packages", label: "My Packages", icon: Package },
   { href: "/agency/packages/new", label: "Create Package", icon: FilePlus2 },
   { href: "/agency/bids", label: "Bid Manager", icon: Handshake },
   { href: "/agency/referrals", label: "Referrals", icon: BriefcaseBusiness },
+];
+
+const agencyNavSecondary = [
+  { href: "/agency/storefront", label: "Storefront", icon: Store },
+  { href: "/agency/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/agency/settings", label: "Verification", icon: Settings },
 ];
+
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  pathname,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const active = pathname === href || (href !== "/discover" && pathname.startsWith(`${href}/`));
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+        active
+          ? "border border-(--color-sea-100) bg-(--color-sea-50) text-(--color-sea-700)"
+          : "border border-transparent text-(--color-ink-600) hover:bg-(--color-surface-2)",
+      )}
+    >
+      <Icon className={cn("size-4", active ? "text-(--color-sea-500)" : "")} />
+      {label}
+    </Link>
+  );
+}
 
 export function AppSidebar({
   variant,
@@ -43,12 +86,13 @@ export function AppSidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const items = variant === "agency" ? agencyNav : userNav;
-  const title = variant === "agency" ? "Agency Console" : "Traveler Space";
-  const Icon = variant === "agency" ? Building2 : MessageSquareText;
+  const title = variant === "agency" ? "Agency Console" : "My Space";
+  const Icon = variant === "agency" ? Building2 : Compass;
+  const mainItems = variant === "agency" ? agencyNavMain : userNavMain;
+  const secondaryItems = variant === "agency" ? agencyNavSecondary : userNavSecondary;
 
   return (
-    <aside className="rounded-xl border border-(--color-border) bg-(--color-surface-raised) p-4 shadow-(--shadow-md) sm:p-5">
+    <aside className="rounded-xl border border-(--color-border) bg-(--color-surface-raised) p-4 shadow-(--shadow-sm) sm:p-5">
       {/* Sidebar header */}
       <div className="mb-5 flex items-center gap-3">
         <div className="flex size-10 items-center justify-center rounded-md border border-(--color-border) bg-(--color-surface-2) text-(--color-ink-700)">
@@ -62,28 +106,21 @@ export function AppSidebar({
         </div>
       </div>
 
-      {/* Nav items */}
+      {/* Main nav items */}
       <nav className="space-y-0.5">
-        {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {mainItems.map((item) => (
+          <NavItem key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+        ))}
+      </nav>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-150",
-                active
-                  ? "bg-(--color-sea-50) text-(--color-sea-700) border border-(--color-sea-100)"
-                  : "text-(--color-ink-600) hover:bg-(--color-surface-2) border border-transparent",
-              )}
-            >
-              <item.icon className={cn("size-4", active ? "text-(--color-sea-500)" : "")} />
-              {item.label}
-            </Link>
-          );
-        })}
+      {/* Divider */}
+      <div className="my-3 border-t border-(--color-border)" />
+
+      {/* Secondary nav items */}
+      <nav className="space-y-0.5">
+        {secondaryItems.map((item) => (
+          <NavItem key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+        ))}
       </nav>
     </aside>
   );

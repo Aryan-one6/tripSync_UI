@@ -72,7 +72,6 @@ function ReviewComposer({
 }) {
   return (
     <Card className="relative overflow-hidden p-5 sm:p-6">
-      <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-sunset-200)] opacity-10" />
       <div className="relative space-y-4">
         <div>
           <h3 className="font-display text-lg text-[var(--color-ink-950)]">{title}</h3>
@@ -259,7 +258,6 @@ export function GroupReviewPanel({ groupId }: { groupId: string }) {
   if (!eligibility) {
     return (
       <Card className="relative overflow-hidden p-8 text-center">
-        <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-lavender-200)] opacity-10" />
         <div className="relative">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)] shadow-[var(--shadow-clay-sm)]">
             <Award className="size-5 text-[var(--color-lavender-700)]" />
@@ -346,7 +344,6 @@ export function GroupReviewPanel({ groupId }: { groupId: string }) {
       {/* Submitted reviews log */}
       {reviews.length > 0 && (
         <Card className="relative overflow-hidden p-5 sm:p-6">
-          <div className="clay-blob -bottom-8 -left-8 size-20 bg-[var(--color-sea-200)] opacity-10" />
           <div className="relative space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">

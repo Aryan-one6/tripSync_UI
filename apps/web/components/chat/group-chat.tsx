@@ -150,7 +150,6 @@ export function GroupChat({ groupId }: { groupId: string }) {
       <div className="space-y-5">
         <Card className="relative overflow-hidden p-5 sm:p-6">
           {/* Blob decoration */}
-          <div className="clay-blob -top-10 -right-10 size-28 bg-[var(--color-sea-200)] opacity-10" />
 
           <div className="relative space-y-5">
             {/* Header */}

@@ -52,7 +52,6 @@ export default async function DiscoverPage({
 
       {/* Filters */}
       <Card className="relative overflow-hidden p-5">
-        <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-sea-200)] opacity-8" />
         <div className="relative space-y-4">
           <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]">
             <Input name="q" defaultValue={q} placeholder="Search destination or trip title" />

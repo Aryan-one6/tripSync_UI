@@ -71,7 +71,6 @@ export default function UserPlansPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           {plans.map((plan) => (
             <Card key={plan.id} className="relative overflow-hidden p-5">
-              <div className="clay-blob -top-6 -right-6 size-16 bg-[var(--color-sea-200)] opacity-10" />
               <div className="relative space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

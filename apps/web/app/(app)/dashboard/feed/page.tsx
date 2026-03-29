@@ -57,7 +57,6 @@ export default async function FeedPage({
 
       {/* Filters */}
       <Card className="relative overflow-hidden p-5">
-        <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-sea-200)] opacity-8" />
         <div className="relative space-y-4">
           <form
             action="/dashboard/feed"

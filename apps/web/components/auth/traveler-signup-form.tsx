@@ -76,8 +76,6 @@ export function TravelerSignupForm({ nextPath = "/dashboard/feed" }: { nextPath?
   return (
     <Card className="relative mx-auto w-full max-w-2xl overflow-hidden p-6 sm:p-8">
       {/* Decorative blobs */}
-      <div className="clay-blob -top-14 -right-14 size-40 bg-[var(--color-sea-200)] opacity-15 animate-blob" />
-      <div className="clay-blob -bottom-10 -left-10 size-28 bg-[var(--color-sunset-200)] opacity-10 animate-blob delay-300" />
 
       <div className="relative">
         {/* Header */}

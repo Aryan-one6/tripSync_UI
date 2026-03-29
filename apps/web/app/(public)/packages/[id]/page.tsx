@@ -169,7 +169,6 @@ export default async function PackageDetailPage({
 
         {/* Title & quick info bar */}
         <Card className="relative overflow-hidden p-0">
-          <div className="clay-blob -top-12 -right-12 size-32 bg-[var(--color-sea-200)] opacity-10 animate-blob" />
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-start gap-3">
               <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">

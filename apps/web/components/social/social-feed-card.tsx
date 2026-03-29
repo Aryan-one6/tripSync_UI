@@ -1,136 +1,143 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowUpRight, CalendarRange, MapPin, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardInset } from "@/components/ui/card";
-import { TripVisual } from "@/components/cards/trip-visual";
+import { CalendarRange, Share2, Users } from "lucide-react";
 import type { SocialFeedItem } from "@/lib/api/types";
 import { formatCompactDate, formatCurrency, initials } from "@/lib/format";
+import { TripVisual } from "@/components/cards/trip-visual";
 
-function formatVerificationLabel(profileType: "traveler" | "agency", verification: string | null | undefined) {
-  if (profileType === "traveler") {
-    if (verification === "TRUSTED") return "Trusted traveler";
-    if (verification === "VERIFIED") return "Verified traveler";
-    return "Basic traveler";
-  }
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+      <div
+        className="h-full rounded-full bg-[var(--color-sea-500)] transition-all"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
 
-  if (verification === "verified") return "Verified agency";
-  if (verification === "under_review") return "Agency under review";
-  return "Agency pending";
+function buildWhatsAppUrl(url: string, text: string) {
+  return `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`;
 }
 
 export function SocialFeedCard({ item }: { item: SocialFeedItem }) {
   const isPlan = item.originType === "plan";
   const detailHref = isPlan ? `/plans/${item.slug}` : `/packages/${item.slug}`;
   const profileHref = `/profile/${item.author.handle}`;
-  const listingLabel = isPlan ? "Plan" : "Package";
-  const joinedLabel = `${item.joinedCount}/${item.groupSizeMax} joined`;
+  const joinedCount = item.joinedCount ?? 0;
+  const groupMax = item.groupSizeMax ?? 0;
+
   const priceLabel =
-    isPlan && item.priceHigh && item.priceLow && item.priceLow !== item.priceHigh
-      ? `${formatCurrency(item.priceLow)} - ${formatCurrency(item.priceHigh)}`
-      : formatCurrency(item.priceLow);
+    item.priceLow
+      ? `From ${formatCurrency(item.priceLow)}`
+      : null;
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="border-b border-[var(--color-line)] px-5 py-4">
-        <div className="flex items-start gap-3">
-          <Link
-            href={profileHref}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-sm font-bold text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
-          >
-            {initials(item.author.name)}
-          </Link>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <Link
-                  href={profileHref}
-                  className="truncate text-sm font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
-                >
-                  {item.author.name}
-                </Link>
-                <p className="truncate text-xs text-[var(--color-ink-500)]">
-                  @{item.author.handle} · {formatVerificationLabel(item.author.profileType, item.author.verification as string)}
-                </p>
-              </div>
-              <Link
-                href={detailHref}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-500)] shadow-[var(--shadow-clay-sm)] transition hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-sea-700)]"
-              >
-                <ArrowUpRight className="size-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Link href={detailHref} className="block">
+    <article className="overflow-hidden rounded-xl bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]">
+      {/* Image area — 16:9 with overlay badges */}
+      <Link href={detailHref} className="relative block aspect-[16/9] overflow-hidden rounded-t-xl">
         <TripVisual
           title={item.title}
           eyebrow={item.destination}
           coverImageUrl={item.coverImageUrl ?? undefined}
-          className="min-h-60 rounded-none"
+          className="h-full w-full rounded-none"
         />
+        {/* Destination badge — bottom left */}
+        <span className="absolute bottom-3 left-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+          {item.destination}
+          {item.destinationState ? `, ${item.destinationState}` : ""}
+        </span>
+        {/* Price badge — bottom right */}
+        {priceLabel ? (
+          <span className="absolute bottom-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+            {priceLabel}
+          </span>
+        ) : null}
       </Link>
 
-      <div className="space-y-4 px-5 py-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={isPlan ? "lavender" : "sea"}>{listingLabel}</Badge>
-          <Badge variant="outline">{isPlan ? "Community-created" : "Agency-created"}</Badge>
-        </div>
-
-        <div>
-          <Link href={detailHref}>
-            <h2 className="font-display text-2xl text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]">
-              {item.title}
-            </h2>
+      {/* Content area */}
+      <div className="p-4">
+        {/* Author row */}
+        <div className="mb-3 flex items-center gap-2.5">
+          <Link
+            href={profileHref}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-xs font-bold text-[var(--color-sea-700)]"
+          >
+            {initials(item.author.name)}
           </Link>
-          {item.excerpt ? (
-            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[var(--color-ink-600)]">
-              {item.excerpt}
+          <div className="min-w-0 flex-1">
+            <Link
+              href={profileHref}
+              className="text-sm font-semibold text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]"
+            >
+              {item.author.name}
+            </Link>
+            <p className="text-[11px] text-[var(--color-ink-500)]">
+              @{item.author.handle}
             </p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <CardInset className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-              Location
-            </p>
-            <p className="flex items-center gap-1.5 text-sm text-[var(--color-ink-800)]">
-              <MapPin className="size-3.5 text-[var(--color-sea-600)]" />
-              <span className="line-clamp-1">
-                {item.destination}
-                {item.destinationState ? `, ${item.destinationState}` : ""}
-              </span>
-            </p>
-          </CardInset>
-          <CardInset className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-              Dates
-            </p>
-            <p className="flex items-center gap-1.5 text-sm text-[var(--color-ink-800)]">
-              <CalendarRange className="size-3.5 text-[var(--color-sea-600)]" />
-              {item.startDate ? formatCompactDate(item.startDate) : "Flexible"}
-            </p>
-          </CardInset>
-          <CardInset className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-              Price
-            </p>
-            <p className="text-sm font-semibold text-[var(--color-sea-700)]">{priceLabel}</p>
-          </CardInset>
-        </div>
-
-        <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-white/50 bg-[var(--color-surface-2)] px-4 py-3 shadow-[var(--shadow-clay-inset)]">
-          <div className="flex items-center gap-2 text-sm text-[var(--color-ink-700)]">
-            <Users className="size-4 text-[var(--color-sea-600)]" />
-            {joinedLabel}
           </div>
-          <Link href={profileHref} className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-ink-500)] transition hover:text-[var(--color-sea-700)]">
-            @{item.author.handle}
-          </Link>
+        </div>
+
+        {/* Title */}
+        <Link href={detailHref}>
+          <h2 className="truncate font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]">
+            {item.title}
+          </h2>
+        </Link>
+
+        {/* Date row */}
+        {item.startDate ? (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--color-ink-500)]">
+            <CalendarRange className="size-3.5" />
+            {formatCompactDate(item.startDate)}
+            {item.endDate ? ` → ${formatCompactDate(item.endDate)}` : ""}
+          </p>
+        ) : null}
+
+        {/* Group progress */}
+        {groupMax > 0 ? (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center justify-between text-xs text-[var(--color-ink-500)]">
+              <span className="flex items-center gap-1">
+                <Users className="size-3.5" />
+                {joinedCount}/{groupMax} joined
+              </span>
+              <span>{Math.round((joinedCount / groupMax) * 100)}%</span>
+            </div>
+            <ProgressBar value={joinedCount} max={groupMax} />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-[var(--color-border)] px-4 py-2.5">
+        {/* Origin type label */}
+        <span
+          className={`text-xs font-semibold ${
+            isPlan ? "text-[var(--color-lavender-500)]" : "text-[var(--color-sea-600)]"
+          }`}
+        >
+          {isPlan ? "Travel Plan" : "Agency Package"}
+        </span>
+
+        {/* Share buttons */}
+        <div className="flex items-center gap-1">
+          <a
+            href={buildWhatsAppUrl(
+              `${typeof window !== "undefined" ? window.location.origin : ""}${detailHref}`,
+              `Check out this trip: ${item.title}`,
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="flex size-8 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[#128C7E]"
+            aria-label="Share on WhatsApp"
+          >
+            <Share2 className="size-4" />
+          </a>
         </div>
       </div>
-    </Card>
+    </article>
   );
 }

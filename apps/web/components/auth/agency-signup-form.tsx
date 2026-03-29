@@ -115,8 +115,6 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
   return (
     <Card className="relative mx-auto w-full max-w-3xl overflow-hidden p-6 sm:p-8">
       {/* Decorative blobs */}
-      <div className="clay-blob -top-14 -right-14 size-40 bg-[var(--color-sand-200)] opacity-20 animate-blob" />
-      <div className="clay-blob -bottom-10 -left-10 size-28 bg-[var(--color-sea-200)] opacity-12 animate-blob delay-300" />
 
       <div className="relative">
         {/* Header */}

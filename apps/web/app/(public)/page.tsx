@@ -1,48 +1,77 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Search } from "lucide-react";
 import { HomeSocialFeed } from "@/components/social/home-social-feed";
 import { getSocialFeed } from "@/lib/api/public";
 
 export const dynamic = "force-dynamic";
 
+const trendingDestinations = [
+  "Himachal",
+  "Goa",
+  "Ladakh",
+  "Rajasthan",
+  "Kerala",
+  "Uttarakhand",
+];
+
 export default async function HomePage() {
   const feed = await getSocialFeed({ limit: 20 });
 
   return (
-    <div className="page-shell space-y-8 py-10">
-      <Card className="relative overflow-hidden p-8">
-        <div className="clay-blob -top-16 -right-16 size-40 bg-[var(--color-sea-200)] opacity-15 animate-blob" />
-        <div className="clay-blob -bottom-10 -left-10 size-32 bg-[var(--color-lavender-100)] opacity-80 animate-blob delay-300" />
-        <div className="relative">
-          <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
-            <Sparkles className="mr-1.5 size-3" />
-            Social feed
-          </span>
-          <h1 className="mt-4 max-w-4xl font-display text-4xl leading-[0.95] text-[var(--color-ink-950)] sm:text-5xl md:text-6xl">
-            Plans and packages now live in one scroll.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--color-ink-600)] sm:text-lg">
-            The homepage is the marketplace now: traveler plans, agency packages, and soon travel stories.
-            Follow profiles to turn it into a relationship-driven feed.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/dashboard/plans/new">
-              <Button size="lg">
-                Create a plan
-                <ArrowRight className="size-4" />
-              </Button>
-            </Link>
-            <Link href="/discover">
-              <Button size="lg" variant="secondary">
-                Open discover
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </Card>
+    <div className="page-shell space-y-6 py-6">
+      {/* Compact Hero — max ~200px */}
+      <section
+        className="relative overflow-hidden rounded-[var(--radius-xl)] px-6 py-8"
+        style={{
+          background:
+            "linear-gradient(to bottom, var(--color-sea-50), transparent)",
+        }}
+      >
+        {/* Heading */}
+        <h1 className="font-display text-2xl font-bold leading-tight text-[var(--color-ink-950)] sm:text-3xl">
+          Discover your next adventure
+        </h1>
+        <p className="mt-1 text-sm text-[var(--color-ink-600)]">
+          Group trips, agency packages, and travel stories
+        </p>
 
+        {/* Inline search bar */}
+        <form
+          action="/discover"
+          method="get"
+          className="mt-4 flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-4 py-2.5 shadow-[var(--shadow-sm)] max-w-lg"
+        >
+          <Search className="size-4 shrink-0 text-[var(--color-ink-400)]" />
+          <input
+            id="hero-search"
+            type="text"
+            name="q"
+            placeholder="Search destinations, trips, agencies…"
+            className="flex-1 bg-transparent text-sm text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-[var(--color-sea-600)] px-4 py-1.5 text-xs font-semibold text-white shadow-[var(--shadow-sm)] hover:bg-[var(--color-sea-700)] transition-colors"
+          >
+            Search
+          </button>
+        </form>
+
+        {/* Trending destination pills */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {trendingDestinations.map((dest) => (
+            <Link
+              key={dest}
+              href={`/discover?q=${encodeURIComponent(dest)}`}
+              className="rounded-full border border-[var(--color-border)] bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition hover:border-[var(--color-sea-200)] hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+            >
+              {dest}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Social feed with For You / Following / Trending tabs */}
       <HomeSocialFeed initialItems={feed} />
     </div>
   );

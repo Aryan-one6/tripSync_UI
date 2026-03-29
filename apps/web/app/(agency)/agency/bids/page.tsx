@@ -60,7 +60,6 @@ export default function AgencyBidsPage() {
         <div className="grid gap-5">
           {offers.map((offer) => (
             <Card key={offer.id} className="relative overflow-hidden p-5 sm:p-6">
-              <div className="clay-blob -top-8 -right-8 size-24 bg-[var(--color-sea-200)] opacity-10" />
               <div className="relative space-y-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-4">

@@ -74,7 +74,6 @@ export default function ReferralsPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           {referrals.map((referral) => (
             <Card key={referral.id} className="relative overflow-hidden p-5">
-              <div className="clay-blob -top-6 -right-6 size-16 bg-[var(--color-lavender-200)] opacity-10" />
               <div className="relative space-y-4">
                 <div className="flex items-start gap-4">
                   <div className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)] text-[var(--color-lavender-700)] shadow-[var(--shadow-clay-sm)]">

@@ -11,8 +11,6 @@ export function SiteFooter() {
         <div className="page-shell pb-8 pt-4">
           <div className="rounded-[var(--radius-xl)] border border-white/60 bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-clay)] sm:p-6">
             {/* Decorative blobs */}
-            <div className="clay-blob -top-16 right-10 size-36 bg-[var(--color-sea-200)] opacity-15 animate-blob" />
-            <div className="clay-blob -bottom-10 left-20 size-28 bg-[var(--color-sunset-200)] opacity-10 animate-blob delay-300" />
 
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               {/* Brand */}

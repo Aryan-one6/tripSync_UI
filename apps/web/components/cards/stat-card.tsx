@@ -13,11 +13,8 @@ export function StatCard({
   icon: ReactNode;
 }) {
   return (
-    <Card className="relative overflow-hidden p-5">
-      {/* Subtle blob */}
-      <div className="clay-blob -top-6 -right-6 size-20 bg-[var(--color-sea-200)] opacity-15" />
-
-      <div className="relative flex items-start justify-between gap-4">
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--color-ink-500)]">
             {label}

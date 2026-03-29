@@ -47,7 +47,6 @@ export function AgencyOverviewPage() {
     >
       {/* Verification banner */}
       <Card className="relative overflow-hidden p-5 sm:p-6">
-        <div className="clay-blob -top-8 -right-8 size-24 bg-[var(--color-sand-200)] opacity-12" />
         <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-b from-[var(--color-sand-50)] to-[var(--color-sand-100)] text-[var(--color-ink-700)] shadow-[var(--shadow-clay-sm)]">

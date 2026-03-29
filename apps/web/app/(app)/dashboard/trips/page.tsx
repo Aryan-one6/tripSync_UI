@@ -69,7 +69,6 @@ export default function TripsPage() {
 
             return (
               <Card key={trip.id} className="relative overflow-hidden p-5">
-                <div className="clay-blob -top-6 -right-6 size-16 bg-[var(--color-lavender-200)] opacity-10" />
                 <div className="relative space-y-3">
                   <Badge variant={trip.status === "COMMITTED" ? "sea" : trip.status === "APPROVED" ? "lavender" : "default"}>
                     {trip.status}

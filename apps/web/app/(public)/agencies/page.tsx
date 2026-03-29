@@ -34,7 +34,6 @@ export default async function AgenciesPage({
 
       {/* Filters */}
       <Card className="relative overflow-hidden p-5">
-        <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-sand-200)] opacity-10" />
         <form className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
           <Input name="city" placeholder="City" defaultValue={typeof params.city === "string" ? params.city : ""} />
           <Input name="state" placeholder="State" defaultValue={typeof params.state === "string" ? params.state : ""} />

@@ -11,7 +11,9 @@
       "Bash(ls -la /Users/nareshsharma/Desktop/TripSync/apps/web/app/\\\\\\(public\\\\\\)/)",
       "Bash(docker compose:*)",
       "Bash(npm run:*)",
-      "Bash(brew reinstall:*)"
+      "Bash(brew reinstall:*)",
+      "Bash(ls /Users/nareshsharma/Desktop/Files/TripSync/apps/web/app/\\\\\\(dashboard\\\\\\)/dashboard/)",
+      "Bash(ls /Users/nareshsharma/Desktop/Files/TripSync/apps/web/app/\\\\\\(dashboard\\\\\\)/settings/agency/)"
     ]
   }
 }

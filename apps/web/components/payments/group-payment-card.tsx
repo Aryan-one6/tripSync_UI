@@ -149,7 +149,6 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
   if (!state) {
     return (
       <Card className="relative overflow-hidden p-8 text-center">
-        <div className="clay-blob -top-8 -right-8 size-20 bg-[var(--color-sea-200)] opacity-10" />
         <div className="relative">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]">
             <Wallet className="size-5 text-[var(--color-sea-700)]" />
@@ -171,8 +170,6 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.9fr]">
       {/* Main payment card */}
       <Card className="relative overflow-hidden p-5 sm:p-6">
-        <div className="clay-blob -top-10 -right-10 size-28 bg-[var(--color-sea-200)] opacity-10" />
-        <div className="clay-blob -bottom-8 -left-8 size-20 bg-[var(--color-lavender-200)] opacity-8" />
 
         <div className="relative space-y-5">
           {/* Header */}

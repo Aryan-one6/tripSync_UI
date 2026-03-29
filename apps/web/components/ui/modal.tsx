@@ -56,11 +56,7 @@ export function Modal({
           size === "full" && "sm:max-w-5xl",
         )}
       >
-        {/* Clay blob decoration */}
-        <div className="clay-blob -top-10 -right-10 size-32 bg-[var(--color-sea-200)] opacity-20" />
-        <div className="clay-blob -bottom-8 -left-8 size-24 bg-[var(--color-sunset-200)] opacity-15" />
-
-        <div className="relative p-5 sm:p-7">
+        <div className="p-5 sm:p-7">
           {/* Header */}
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>

@@ -25,7 +25,7 @@ export function DashboardShell({
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-white/60 bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-clay-sm)] transition-all active:shadow-[var(--shadow-clay-btn-active)] md:hidden"
+          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)] md:hidden"
         >
           <Menu className="size-5 text-[var(--color-ink-600)]" />
           <span className="text-sm font-medium text-[var(--color-ink-700)]">
@@ -37,13 +37,13 @@ export function DashboardShell({
         {sidebarOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
             <div className="absolute inset-0 bg-[var(--color-ink-950)]/30 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-            <div className="absolute bottom-0 left-0 right-0 max-h-[80dvh] animate-slide-up overflow-y-auto rounded-t-[var(--radius-xl)] border-t border-white/60 bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-clay-lg)] safe-bottom">
+            <div className="absolute bottom-0 left-0 right-0 max-h-[80dvh] animate-slide-up overflow-y-auto rounded-t-[var(--radius-xl)] border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-lg)] safe-bottom">
               <div className="mb-4 flex items-center justify-between">
                 <p className="font-display text-lg text-[var(--color-ink-950)]">Navigation</p>
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(false)}
-                  className="flex size-9 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-600)] shadow-[var(--shadow-clay-sm)]"
+                  className="flex size-9 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-600)] shadow-[var(--shadow-sm)]"
                 >
                   <X className="size-4" />
                 </button>
@@ -63,13 +63,9 @@ export function DashboardShell({
         {/* Main content */}
         <div className="space-y-5 sm:space-y-6">
           {/* Dashboard header */}
-          <header className="relative overflow-hidden rounded-[var(--radius-xl)] border border-white/60 bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-clay)] sm:p-7">
-            {/* Decorative blobs */}
-            <div className="clay-blob -top-10 right-0 size-40 bg-[var(--color-sea-200)] opacity-15 animate-blob" />
-            <div className="clay-blob -bottom-8 -left-8 size-28 bg-[var(--color-lavender-200)] opacity-10 animate-blob delay-300" />
-
+          <header className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-md)] sm:p-7">
             <div className="relative">
-              <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
+              <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
                 {variant === "agency" ? "Agency Dashboard" : "Traveler Dashboard"}
               </span>
               <h1 className="mt-3 font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl">

@@ -50,7 +50,7 @@ export function TripVisual({
     return (
       <div
         className={cn(
-          "relative overflow-hidden rounded-[var(--radius-lg)] shadow-[var(--shadow-clay)]",
+          "relative overflow-hidden rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)]",
           className,
         )}
       >
@@ -72,16 +72,12 @@ export function TripVisual({
     <div
       className={cn(
         "relative overflow-hidden rounded-[var(--radius-lg)] bg-gradient-to-br p-5 text-white",
-        "shadow-[var(--shadow-clay)]",
+        "shadow-[var(--shadow-sm)]",
         "border border-white/10",
         palette.gradient,
         className,
       )}
     >
-      {/* Decorative clay blobs */}
-      <div className={cn("clay-blob -top-6 -right-6 size-24", palette.blob1, "opacity-50 animate-blob")} />
-      <div className={cn("clay-blob bottom-2 right-8 size-16", palette.blob2, "opacity-40 animate-blob delay-200")} />
-
       {/* Floating icon */}
       <div className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
         <Icon className="size-5 text-white/70" />
