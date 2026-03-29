@@ -19,7 +19,7 @@ export function DashboardShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-4 md:px-6 md:py-8">
+    <div className="mx-auto w-full container px-4 py-4 md:px-6 md:py-8">
       <div className="grid gap-6 md:grid-cols-[260px_1fr] lg:grid-cols-[280px_1fr]">
         {/* Mobile sidebar toggle */}
         <button

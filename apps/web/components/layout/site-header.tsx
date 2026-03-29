@@ -31,7 +31,7 @@ export function SiteHeader() {
   return (
     <>
       <header className="sticky top-0 z-40 safe-top">
-        <div className="mx-auto max-w-[1500px] px-4 pt-3 md:px-6">
+        <div className="mx-auto container px-4 pt-3 md:px-6">
           <div className="flex items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)]/95 px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md md:px-6">
             {/* Logo */}
             <Link href="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
