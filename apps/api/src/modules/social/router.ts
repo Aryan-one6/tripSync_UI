@@ -63,3 +63,19 @@ socialRouter.delete(
     res.json({ data: state });
   }),
 );
+
+socialRouter.get(
+  '/profiles/:handle/followers',
+  asyncHandler(async (req, res) => {
+    const list = await socialService.getFollowersList(param(req.params.handle));
+    res.json({ data: list });
+  }),
+);
+
+socialRouter.get(
+  '/profiles/:handle/following',
+  asyncHandler(async (req, res) => {
+    const list = await socialService.getFollowingList(param(req.params.handle));
+    res.json({ data: list });
+  }),
+);

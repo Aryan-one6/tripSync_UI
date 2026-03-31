@@ -598,3 +598,94 @@ export async function unfollowProfile(handle: string, viewerUserId: string) {
 
   return getFollowState(handle, viewerUserId);
 }
+
+// ─── Followers / Following Lists ─────────────────────────────────────────────
+
+export async function getFollowersList(handle: string) {
+  const resolved = await resolveProfileHandle(handle);
+
+  const where =
+    resolved.kind === 'traveler'
+      ? { targetUserId: resolved.user.id }
+      : { targetAgencyId: resolved.agency.id };
+
+  const follows = await prisma.follow.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: {
+      follower: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+  return follows.map((f) => ({
+    id: f.follower.id,
+    handle: f.follower.username ?? f.follower.id,
+    name: f.follower.fullName,
+    avatarUrl: f.follower.avatarUrl,
+    profileType: 'traveler' as const,
+  }));
+}
+
+export async function getFollowingList(handle: string) {
+  const resolved = await resolveProfileHandle(handle);
+
+  // For agencies, following is tracked by the owner's userId
+  const followerUserId =
+    resolved.kind === 'traveler' ? resolved.user.id : resolved.agency.ownerId;
+
+  const follows = await prisma.follow.findMany({
+    where: { followerUserId },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: {
+      targetType: true,
+      targetUser: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+        },
+      },
+      targetAgency: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
+        },
+      },
+    },
+  });
+
+  return follows.map((f) => {
+    if (f.targetType === 'USER' && f.targetUser) {
+      return {
+        id: f.targetUser.id,
+        handle: f.targetUser.username ?? f.targetUser.id,
+        name: f.targetUser.fullName,
+        avatarUrl: f.targetUser.avatarUrl,
+        profileType: 'traveler' as const,
+      };
+    }
+    if (f.targetType === 'AGENCY' && f.targetAgency) {
+      return {
+        id: f.targetAgency.id,
+        handle: f.targetAgency.slug,
+        name: f.targetAgency.name,
+        avatarUrl: f.targetAgency.logoUrl,
+        profileType: 'agency' as const,
+      };
+    }
+    return null;
+  }).filter(Boolean);
+}
+

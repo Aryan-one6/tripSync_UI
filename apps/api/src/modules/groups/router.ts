@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { param } from '../../lib/helpers.js';
+import { SubmitOfferViaGroupSchema } from '@tripsync/shared';
 import * as groupService from './service.js';
+import * as offerService from '../offers/service.js';
+import { prisma } from '../../lib/prisma.js';
+import { NotFoundError, BadRequestError } from '../../lib/errors.js';
+import { createSystemMessage } from '../chat/service.js';
 
 export const groupsRouter = Router();
 
@@ -56,5 +62,47 @@ groupsRouter.post(
   asyncHandler(async (req, res) => {
     await groupService.removeMember(param(req.params.id), req.userId!, param(req.params.userId));
     res.json({ data: { success: true } });
+  }),
+);
+
+// ── Submit offer via group chat ─────────────────────────────────────────────
+// The SubmitOfferModal in group-chat.tsx calls POST /groups/:id/offers.
+// This resolves the group → plan and delegates to the offer service, then
+// posts a system message in the group chat to announce the new offer.
+groupsRouter.post(
+  '/:id/offers',
+  authenticate,
+  validate(SubmitOfferViaGroupSchema),
+  asyncHandler(async (req, res) => {
+    const groupId = param(req.params.id);
+
+    // Resolve group → plan
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { planId: true },
+    });
+    if (!group) throw new NotFoundError('Group');
+    if (!group.planId) throw new BadRequestError('This group is not associated with a plan');
+
+    // Delegate to existing offer service (handles agency validation, plan status, etc.)
+    const offer = await offerService.submitOffer(req.userId!, {
+      planId: group.planId,
+      pricePerPerson: req.body.pricePerPerson,
+      pricingTiers: req.body.pricingTiers,
+      inclusions: req.body.inclusions,
+      itinerary: req.body.itinerary,
+      cancellationPolicy: req.body.cancellationPolicy,
+      validUntil: req.body.validUntil,
+    });
+
+    // Post system message so all chat members see the new offer inline
+    const priceFormatted = `₹${offer.pricePerPerson.toLocaleString('en-IN')}`;
+    await createSystemMessage(
+      groupId,
+      `${offer.agency.name} submitted a new offer at ${priceFormatted}/person.`,
+      { offerId: offer.id, planId: group.planId, action: 'offer_submitted' },
+    );
+
+    res.status(201).json({ data: offer });
   }),
 );

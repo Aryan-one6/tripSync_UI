@@ -57,12 +57,19 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
       },
     });
 
-    emitUserEvent(plan.creatorId, 'offer:updated', {
-      action: 'submitted',
+    const group = await prisma.group.findUnique({
+      where: { planId: data.planId },
+      select: { id: true },
+    });
+
+    emitUserEvent(plan.creatorId, 'offer:created', {
       offerId: updated.id,
       planId: data.planId,
       agencyId: agency.id,
     });
+    if (group) {
+      emitGroupEvent(group.id, 'offer:created', updated);
+    }
 
     return updated;
   }
@@ -78,12 +85,19 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
     },
   });
 
-  emitUserEvent(plan.creatorId, 'offer:updated', {
-    action: 'submitted',
+  const group = await prisma.group.findUnique({
+    where: { planId: data.planId },
+    select: { id: true },
+  });
+
+  emitUserEvent(plan.creatorId, 'offer:created', {
     offerId: offer.id,
     planId: data.planId,
     agencyId: agency.id,
   });
+  if (group) {
+    emitGroupEvent(group.id, 'offer:created', offer);
+  }
 
   await queueNotification({
     type: 'offer_submitted',
@@ -213,14 +227,28 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
     }),
   ]);
 
-  emitUserEvent(offer.plan.creatorId, 'offer:updated', {
-    action: 'countered',
+  // Post a system message in the group chat
+  const group = await prisma.group.findUnique({
+    where: { planId: offer.planId },
+    select: { id: true },
+  });
+  if (group) {
+    const counterByLabel = senderType === 'user' ? 'The trip creator' : offer.agency.name;
+    const counterPrice = data.price ? `₹${data.price.toLocaleString('en-IN')}/person` : 'same price';
+    await createSystemMessage(
+      group.id,
+      `${counterByLabel} countered the offer at ${counterPrice}.`,
+      { offerId, planId: offer.planId, round: currentRound, action: 'offer_countered' },
+    );
+    emitGroupEvent(group.id, 'offer:countered', { offerId, planId: offer.planId, round: currentRound });
+  }
+
+  emitUserEvent(offer.plan.creatorId, 'offer:countered', {
     offerId,
     planId: offer.planId,
     round: currentRound,
   });
-  emitAgencyEvent(offer.agencyId, 'offer:updated', {
-    action: 'countered',
+  emitAgencyEvent(offer.agencyId, 'offer:countered', {
     offerId,
     planId: offer.planId,
     round: currentRound,
@@ -287,8 +315,21 @@ export async function reject(offerId: string, userId: string) {
     data: { status: OfferStatus.REJECTED },
   });
 
-  emitAgencyEvent(offer.agencyId, 'offer:updated', {
-    action: 'rejected',
+  // Post a system message in the group chat
+  const group = await prisma.group.findUnique({
+    where: { planId: offer.planId },
+    select: { id: true },
+  });
+  if (group) {
+    await createSystemMessage(
+      group.id,
+      'An offer was declined.',
+      { offerId, planId: offer.planId, action: 'offer_rejected' },
+    );
+    emitGroupEvent(group.id, 'offer:rejected', { offerId, planId: offer.planId, status: 'REJECTED' });
+  }
+
+  emitAgencyEvent(offer.agencyId, 'offer:rejected', {
     offerId,
     planId: offer.planId,
     status: 'REJECTED',

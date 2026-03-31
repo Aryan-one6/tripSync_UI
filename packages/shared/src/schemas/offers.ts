@@ -32,6 +32,17 @@ export const CreateOfferSchema = z.object({
   validUntil: z.string().datetime().optional(),
 });
 
+// Used by POST /groups/:id/offers — planId is resolved server-side from the group
+export const SubmitOfferViaGroupSchema = z.object({
+  pricePerPerson: z.number().int().min(0),
+  pricingTiers: z.array(PricingTierSchema).optional(),
+  inclusions: InclusionsSchema.optional(),
+  itinerary: z.array(ItineraryItemSchema).optional(),
+  cancellationPolicy: z.string().max(2000).optional(),
+  validUntil: z.string().datetime().optional(),
+  message: z.string().max(1000).optional(),
+});
+
 export const CounterOfferSchema = z.object({
   price: z.number().int().min(0).optional(),
   inclusionsDelta: z.record(z.unknown()).optional(),
@@ -47,4 +58,5 @@ export const CounterOfferSchema = z.object({
 );
 
 export type CreateOfferInput = z.infer<typeof CreateOfferSchema>;
+export type SubmitOfferViaGroupInput = z.infer<typeof SubmitOfferViaGroupSchema>;
 export type CounterOfferInput = z.infer<typeof CounterOfferSchema>;
