@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { param } from '../../lib/helpers.js';
-import { CreateOfferSchema, CounterOfferSchema } from '@tripsync/shared';
+import { AcceptOfferSchema, CreateOfferSchema, CounterOfferSchema } from '@tripsync/shared';
 import * as offerService from './service.js';
 
 export const offersRouter = Router();
@@ -49,8 +49,9 @@ offersRouter.post(
 offersRouter.post(
   '/:id/accept',
   authenticate,
+  validate(AcceptOfferSchema),
   asyncHandler(async (req, res) => {
-    const offer = await offerService.accept(param(req.params.id), req.userId!);
+    const offer = await offerService.accept(param(req.params.id), req.userId!, req.body);
     res.json({ data: offer });
   }),
 );

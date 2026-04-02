@@ -19,6 +19,7 @@ interface CounterOfferSheetProps {
   onClose: () => void;
   onSubmit: (payload: CounterOfferPayload) => Promise<void>;
   currentPrice: number;
+  initialPrice?: number;
   counterRound?: number;
   maxRounds?: number;
 }
@@ -44,6 +45,7 @@ export function CounterOfferSheet({
   onClose,
   onSubmit,
   currentPrice,
+  initialPrice,
   counterRound = 1,
   maxRounds = 3,
 }: CounterOfferSheetProps) {
@@ -56,11 +58,11 @@ export function CounterOfferSheet({
   // Reset state when sheet opens with a new current price
   useEffect(() => {
     if (open) {
-      setCounterPrice(currentPrice);
+      setCounterPrice(initialPrice ?? currentPrice);
       setSelectedAdditions([]);
       setMessage("");
     }
-  }, [open, currentPrice]);
+  }, [open, currentPrice, initialPrice]);
 
   // Close on overlay click
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {

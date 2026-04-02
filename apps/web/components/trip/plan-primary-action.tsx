@@ -51,6 +51,9 @@ export function PlanPrimaryAction({
     transport: false,
     accommodation: false,
     meals: false,
+    guide: false,
+    visa: false,
+    insurance: false,
   });
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -88,6 +91,9 @@ export function PlanPrimaryAction({
       transport: false,
       accommodation: false,
       meals: false,
+      guide: false,
+      visa: false,
+      insurance: false,
     });
   }
 
@@ -109,8 +115,12 @@ export function PlanPrimaryAction({
             cancellationPolicy: cancellationPolicy.trim() || undefined,
             inclusions: {
               transport: inclusions.transport || undefined,
+              hotel: inclusions.accommodation || undefined,
               accommodation: inclusions.accommodation || undefined,
               meals: inclusions.meals ? "included" : undefined,
+              guide: inclusions.guide || undefined,
+              visa: inclusions.visa || undefined,
+              insurance: inclusions.insurance || undefined,
             },
           }),
         });
@@ -227,6 +237,9 @@ export function PlanPrimaryAction({
                 ["transport", "Transport"],
                 ["accommodation", "Hotels"],
                 ["meals", "Meals"],
+                ["guide", "Guide"],
+                ["visa", "Visa"],
+                ["insurance", "Insurance"],
               ].map(([key, label]) => {
                 const typedKey = key as keyof typeof inclusions;
                 const active = inclusions[typedKey];

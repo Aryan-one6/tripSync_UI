@@ -17,9 +17,13 @@ const ItineraryItemSchema = z.object({
 
 const InclusionsSchema = z.object({
   transport: z.boolean().optional(),
-  meals: z.string().optional(),
-  activities: z.array(z.string()).optional(),
+  hotel: z.boolean().optional(),
   accommodation: z.boolean().optional(),
+  meals: z.union([z.string(), z.boolean()]).optional(),
+  guide: z.boolean().optional(),
+  visa: z.boolean().optional(),
+  insurance: z.boolean().optional(),
+  activities: z.array(z.string()).optional(),
 });
 
 export const CreateOfferSchema = z.object({
@@ -57,6 +61,11 @@ export const CounterOfferSchema = z.object({
   },
 );
 
+export const AcceptOfferSchema = z.object({
+  acceptedPrice: z.number().int().min(0).optional(),
+});
+
 export type CreateOfferInput = z.infer<typeof CreateOfferSchema>;
 export type SubmitOfferViaGroupInput = z.infer<typeof SubmitOfferViaGroupSchema>;
 export type CounterOfferInput = z.infer<typeof CounterOfferSchema>;
+export type AcceptOfferInput = z.infer<typeof AcceptOfferSchema>;

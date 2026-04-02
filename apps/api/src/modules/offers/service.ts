@@ -1,14 +1,35 @@
 import { OfferStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
-import type { CounterOfferInput, CreateOfferInput } from '@tripsync/shared';
+import type { AcceptOfferInput, CounterOfferInput, CreateOfferInput } from '@tripsync/shared';
 import { acceptOfferForPlan } from '../plans/service.js';
 import { emitAgencyEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { queueNotification } from '../../lib/queue.js';
-import { createSystemMessage } from '../chat/service.js';
+import { createDirectConversation, createSystemMessage, sendDirectMessage } from '../chat/service.js';
 import { env } from '../../lib/env.js';
 
 const MAX_NEGOTIATION_ROUNDS = 3;
+
+async function postOfferUpdateToDirectChat(
+  senderUserId: string,
+  recipientUserId: string,
+  content: string,
+) {
+  try {
+    const conversation = await createDirectConversation(senderUserId, {
+      targetUserId: recipientUserId,
+    });
+
+    await sendDirectMessage(conversation.id, senderUserId, { content });
+  } catch (error) {
+    // Offer lifecycle should not fail just because DM bootstrap fails.
+    console.warn('[offers] unable to mirror update to direct chat', {
+      senderUserId,
+      recipientUserId,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+  }
+}
 
 export async function submitOffer(userId: string, data: CreateOfferInput) {
   const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
@@ -71,6 +92,12 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
       emitGroupEvent(group.id, 'offer:created', updated);
     }
 
+    await postOfferUpdateToDirectChat(
+      userId,
+      plan.creatorId,
+      `We updated our offer for "${plan.title}" to ₹${updated.pricePerPerson.toLocaleString('en-IN')}/person.`,
+    );
+
     return updated;
   }
 
@@ -98,6 +125,12 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
   if (group) {
     emitGroupEvent(group.id, 'offer:created', offer);
   }
+
+  await postOfferUpdateToDirectChat(
+    userId,
+    plan.creatorId,
+    `We sent an offer for "${plan.title}" at ₹${offer.pricePerPerson.toLocaleString('en-IN')}/person.`,
+  );
 
   await queueNotification({
     type: 'offer_submitted',
@@ -166,10 +199,17 @@ export async function listAgencyOffers(userId: string) {
           startDate: true,
           endDate: true,
           status: true,
+          group: {
+            select: {
+              id: true,
+              currentSize: true,
+            },
+          },
           creator: {
             select: {
               id: true,
               fullName: true,
+              username: true,
               avatarUrl: true,
             },
           },
@@ -254,19 +294,52 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
     round: currentRound,
   });
 
+  const recipientUserId = isCreator ? offer.agency.ownerId : offer.plan.creatorId;
+  const senderLabel = senderType === 'agency' ? 'Agency' : 'Creator';
+  const counterPrice = data.price
+    ? `₹${data.price.toLocaleString('en-IN')}/person`
+    : 'updated terms';
+  await postOfferUpdateToDirectChat(
+    userId,
+    recipientUserId,
+    `${senderLabel} countered "${offer.plan.title}" at ${counterPrice}.`,
+  );
+
   return negotiation;
 }
 
-export async function accept(offerId: string, userId: string) {
+export async function accept(offerId: string, userId: string, data?: AcceptOfferInput) {
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    include: { plan: true },
+    include: {
+      plan: true,
+      negotiations: {
+        select: { price: true },
+      },
+    },
   });
 
   if (!offer) throw new NotFoundError('Offer');
   if (offer.plan.creatorId !== userId) throw new ForbiddenError('Only the plan creator can accept');
+  if (offer.status !== 'PENDING' && offer.status !== 'COUNTERED') {
+    throw new BadRequestError('Offer cannot be accepted in current state');
+  }
 
-  const result = await acceptOfferForPlan(offer.planId, offerId, userId);
+  let acceptedPrice: number | undefined;
+  if (typeof data?.acceptedPrice === 'number') {
+    const seenQuotePrices = new Set<number>([offer.pricePerPerson]);
+    for (const entry of offer.negotiations) {
+      if (typeof entry.price === 'number') {
+        seenQuotePrices.add(entry.price);
+      }
+    }
+    if (!seenQuotePrices.has(data.acceptedPrice)) {
+      throw new BadRequestError('Accepted price must match a quoted offer value');
+    }
+    acceptedPrice = data.acceptedPrice;
+  }
+
+  const result = await acceptOfferForPlan(offer.planId, offerId, userId, acceptedPrice);
 
   const group = await prisma.group.findUnique({
     where: { planId: offer.planId },
@@ -274,9 +347,13 @@ export async function accept(offerId: string, userId: string) {
   });
 
   if (group) {
+    const priceNote =
+      typeof acceptedPrice === 'number'
+        ? ` at ₹${acceptedPrice.toLocaleString('en-IN')}/person`
+        : '';
     await createSystemMessage(
       group.id,
-      'An agency offer was accepted. Payment collection is now open for approved travelers.',
+      `An agency offer was accepted${priceNote}. Payment collection is now open for approved travelers.`,
       { planId: offer.planId, offerId },
     );
 
@@ -294,6 +371,22 @@ export async function accept(offerId: string, userId: string) {
     planId: offer.planId,
     status: 'ACCEPTED',
   });
+
+  const acceptedAgency = await prisma.agency.findUnique({
+    where: { id: offer.agencyId },
+    select: { ownerId: true },
+  });
+  if (acceptedAgency) {
+    const dmPriceNote =
+      typeof acceptedPrice === 'number'
+        ? ` at ₹${acceptedPrice.toLocaleString('en-IN')}/person`
+        : '';
+    await postOfferUpdateToDirectChat(
+      userId,
+      acceptedAgency.ownerId,
+      `Offer accepted for "${offer.plan.title}"${dmPriceNote}. Payment collection is now open.`,
+    );
+  }
 
   return result.offer;
 }
@@ -335,6 +428,18 @@ export async function reject(offerId: string, userId: string) {
     status: 'REJECTED',
   });
 
+  const rejectedAgency = await prisma.agency.findUnique({
+    where: { id: offer.agencyId },
+    select: { ownerId: true },
+  });
+  if (rejectedAgency) {
+    await postOfferUpdateToDirectChat(
+      userId,
+      rejectedAgency.ownerId,
+      `Offer declined for "${offer.plan.title}".`,
+    );
+  }
+
   return rejected;
 }
 
@@ -361,6 +466,12 @@ export async function withdraw(offerId: string, userId: string) {
     planId: offer.planId,
     status: 'WITHDRAWN',
   });
+
+  await postOfferUpdateToDirectChat(
+    userId,
+    offer.plan.creatorId,
+    `We withdrew our offer for "${offer.plan.title}".`,
+  );
 
   return withdrawn;
 }

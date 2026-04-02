@@ -43,6 +43,11 @@ async function getDirectMessagingContext(userId: string) {
     select: { id: true },
   });
 
+  const createdPlan = await prisma.plan.findFirst({
+    where: { creatorId: userId },
+    select: { id: true },
+  });
+
   const agency = await prisma.agency.findUnique({
     where: { ownerId: userId },
     select: { id: true },
@@ -50,7 +55,7 @@ async function getDirectMessagingContext(userId: string) {
 
   return {
     userId,
-    hasTripParticipation: Boolean(membership),
+    hasTripParticipation: Boolean(membership || createdPlan),
     ownedAgencyId: agency?.id ?? null,
   };
 }
@@ -168,11 +173,61 @@ async function assertChatAccess(groupId: string, userId: string) {
     },
   });
 
-  if (!membership || !CHAT_MEMBER_STATUSES.includes(membership.status as (typeof CHAT_MEMBER_STATUSES)[number])) {
-    throw new ForbiddenError('Only approved travelers can access group chat');
+  if (
+    membership &&
+    CHAT_MEMBER_STATUSES.includes(membership.status as (typeof CHAT_MEMBER_STATUSES)[number])
+  ) {
+    return membership;
   }
 
-  return membership;
+  // Agency owners can access a trip room when they have an active offer on that plan.
+  const agency = await prisma.agency.findUnique({
+    where: { ownerId: userId },
+    select: { id: true },
+  });
+
+  if (agency) {
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { planId: true },
+    });
+
+    if (group?.planId) {
+      const activeOffer = await prisma.offer.findFirst({
+        where: {
+          planId: group.planId,
+          agencyId: agency.id,
+          status: { in: ['PENDING', 'COUNTERED', 'ACCEPTED'] },
+        },
+        select: { id: true },
+      });
+
+      if (activeOffer) {
+        const agencyUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, fullName: true, avatarUrl: true },
+        });
+
+        if (!agencyUser) {
+          throw new NotFoundError('User');
+        }
+
+        return {
+          id: `agency:${groupId}:${userId}`,
+          groupId,
+          userId,
+          role: 'MEMBER',
+          status: 'APPROVED',
+          joinedAt: new Date(),
+          committedAt: null,
+          leftAt: null,
+          user: agencyUser,
+        };
+      }
+    }
+  }
+
+  throw new ForbiddenError('Only approved travelers or active bidding agencies can access group chat');
 }
 
 function normalizeContent(content: string) {

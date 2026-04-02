@@ -115,8 +115,12 @@ function SubmitOfferModal({
             cancellationPolicy: cancellationPolicy.trim() || undefined,
             inclusions: {
               transport: inclInclusions.transport || undefined,
+              hotel: inclInclusions.accommodation || undefined,
               accommodation: inclInclusions.accommodation || undefined,
               meals: inclInclusions.meals ? "included" : undefined,
+              guide: inclInclusions.guide || undefined,
+              visa: inclInclusions.visa || undefined,
+              insurance: inclInclusions.insurance || undefined,
             },
           }),
         });

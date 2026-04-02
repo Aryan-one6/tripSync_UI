@@ -70,6 +70,23 @@ function agencyCanCounter(offer: Offer) {
   return lastSender !== "agency";
 }
 
+function agencyHasActiveOfferStatus(status: Offer["status"]) {
+  return status === "PENDING" || status === "COUNTERED" || status === "ACCEPTED";
+}
+
+function offerStatusPillClasses(status: Offer["status"]) {
+  if (status === "COUNTERED") {
+    return "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]";
+  }
+  if (status === "ACCEPTED") {
+    return "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]";
+  }
+  if (status === "REJECTED" || status === "WITHDRAWN") {
+    return "bg-[var(--color-sunset-50)] text-[var(--color-sunset-700)]";
+  }
+  return "bg-[var(--color-surface-2)] text-[var(--color-ink-600)]";
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type GroupMembersResponse = {
@@ -83,6 +100,25 @@ type GroupMembersResponse = {
 type MessageableContact = {
   user: UserSummary;
   sharedGroupIds: string[];
+};
+
+type AgencyOfferThread = {
+  offerId: string;
+  planTitle: string;
+  destination: string;
+  creatorId: string;
+  creatorName: string;
+  status: Offer["status"];
+  updatedAt: string;
+  needsResponse: boolean;
+};
+
+type AgencyGroupChannel = {
+  groupId: string;
+  planTitle: string;
+  destination: string;
+  status: Offer["status"];
+  updatedAt: string;
 };
 
 // ── Avatar helper ─────────────────────────────────────────────────────────────
@@ -210,6 +246,83 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       return title.toLowerCase().includes(q) || dest.toLowerCase().includes(q);
     });
   }, [activeGroupChannels, search]);
+
+  const agencyOfferThreads = useMemo<AgencyOfferThread[]>(() => {
+    if (variant !== "agency") return [];
+    return agencyOffers
+      .filter((offer) => Boolean(offer.plan?.creator?.id))
+      .map((offer) => {
+        const planTitle = offer.plan?.title ?? "Trip plan";
+        const destination = offer.plan?.destination ?? "Destination";
+        const creatorId = offer.plan?.creator?.id ?? "";
+        const creatorName = offer.plan?.creator?.fullName ?? "Traveler";
+        const needsResponse =
+          offer.status === "COUNTERED" &&
+          (offer.negotiations?.[offer.negotiations.length - 1]?.senderType ?? null) === "user";
+        return {
+          offerId: offer.id,
+          planTitle,
+          destination,
+          creatorId,
+          creatorName,
+          status: offer.status,
+          updatedAt: offer.updatedAt,
+          needsResponse,
+        };
+      })
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }, [agencyOffers, variant]);
+
+  const filteredAgencyOfferThreads = useMemo(() => {
+    if (variant !== "agency") return [];
+    if (!search) return agencyOfferThreads;
+    const q = search.toLowerCase();
+    return agencyOfferThreads.filter((thread) => {
+      return (
+        thread.planTitle.toLowerCase().includes(q) ||
+        thread.destination.toLowerCase().includes(q) ||
+        thread.creatorName.toLowerCase().includes(q)
+      );
+    });
+  }, [agencyOfferThreads, search, variant]);
+
+  const agencyGroupChannels = useMemo<AgencyGroupChannel[]>(() => {
+    if (variant !== "agency") return [];
+
+    const grouped = new Map<string, AgencyGroupChannel>();
+    for (const offer of agencyOffers) {
+      if (!agencyHasActiveOfferStatus(offer.status)) continue;
+      const groupId = offer.plan?.group?.id;
+      if (!groupId) continue;
+      const existing = grouped.get(groupId);
+      const channel: AgencyGroupChannel = {
+        groupId,
+        planTitle: offer.plan?.title ?? "Trip group",
+        destination: offer.plan?.destination ?? "Destination",
+        status: offer.status,
+        updatedAt: offer.updatedAt,
+      };
+      if (!existing || channel.updatedAt > existing.updatedAt) {
+        grouped.set(groupId, channel);
+      }
+    }
+
+    return Array.from(grouped.values()).sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    );
+  }, [agencyOffers, variant]);
+
+  const filteredAgencyGroupChannels = useMemo(() => {
+    if (variant !== "agency") return [];
+    if (!search) return agencyGroupChannels;
+    const q = search.toLowerCase();
+    return agencyGroupChannels.filter((channel) => {
+      return (
+        channel.planTitle.toLowerCase().includes(q) ||
+        channel.destination.toLowerCase().includes(q)
+      );
+    });
+  }, [agencyGroupChannels, search, variant]);
 
   const totalUnread = useMemo(
     () => conversations.reduce((sum, c) => sum + c.unreadCount, 0),
@@ -654,41 +767,72 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           {showNewChat && (
             <div>
               <p className="px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
-                People you can message
+                {variant === "agency" ? "Travelers from your offers" : "People you can message"}
               </p>
               {loadingContacts && (
                 <p className="px-4 py-2 text-xs text-[var(--color-ink-500)]">Loading contacts…</p>
               )}
-              {!loadingContacts && messageableContacts.length === 0 && (
+              {!loadingContacts && variant === "user" && messageableContacts.length === 0 && (
                 <p className="px-4 py-3 text-xs text-[var(--color-ink-500)]">
                   Join and get approved for a trip to see co-travelers here.
                 </p>
               )}
-              {messageableContacts.map((contact) => {
-                const hasConvo = conversationByCounterpartId.has(contact.user.id);
-                return (
-                  <button
-                    key={contact.user.id}
-                    type="button"
-                    onClick={() => void openOrCreateConversation(contact.user.id)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
-                  >
-                    <Avatar name={contact.user.fullName} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
-                        {contact.user.fullName}
-                      </p>
-                      <p className="text-xs text-[var(--color-ink-500)]">
-                        {contact.sharedGroupIds.length} shared trip
-                        {contact.sharedGroupIds.length > 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-[var(--color-sea-700)]">
-                      {hasConvo ? "Open" : "Start"}
-                    </span>
-                  </button>
-                );
-              })}
+              {variant === "user" &&
+                messageableContacts.map((contact) => {
+                  const hasConvo = conversationByCounterpartId.has(contact.user.id);
+                  return (
+                    <button
+                      key={contact.user.id}
+                      type="button"
+                      onClick={() => void openOrCreateConversation(contact.user.id)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <Avatar name={contact.user.fullName} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                          {contact.user.fullName}
+                        </p>
+                        <p className="text-xs text-[var(--color-ink-500)]">
+                          {contact.sharedGroupIds.length} shared trip
+                          {contact.sharedGroupIds.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold text-[var(--color-sea-700)]">
+                        {hasConvo ? "Open" : "Start"}
+                      </span>
+                    </button>
+                  );
+                })}
+              {variant === "agency" &&
+                filteredAgencyOfferThreads.map((thread) => {
+                  const hasConvo = conversationByCounterpartId.has(thread.creatorId);
+                  return (
+                    <button
+                      key={thread.offerId}
+                      type="button"
+                      onClick={() => void openOrCreateConversation(thread.creatorId)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <Avatar name={thread.creatorName} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                          {thread.creatorName}
+                        </p>
+                        <p className="truncate text-xs text-[var(--color-ink-500)]">
+                          {thread.planTitle}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-semibold text-[var(--color-sea-700)]">
+                        {hasConvo ? "Open" : "Start"}
+                      </span>
+                    </button>
+                  );
+                })}
+              {variant === "agency" && filteredAgencyOfferThreads.length === 0 && (
+                <p className="px-4 py-3 text-xs text-[var(--color-ink-500)]">
+                  Submit an offer to unlock traveler conversations.
+                </p>
+              )}
               <div className="mx-4 my-2 border-t border-[var(--color-border)]" />
             </div>
           )}
@@ -778,6 +922,48 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </>
           )}
 
+          {!loadingConversations && variant === "agency" && filteredAgencyOfferThreads.length > 0 && (
+            <>
+              <div className="mx-4 my-1 border-t border-[var(--color-border)]" />
+              <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
+                Offer threads
+              </p>
+              {filteredAgencyOfferThreads.map((thread) => {
+                const hasConvo = conversationByCounterpartId.has(thread.creatorId);
+                return (
+                  <button
+                    key={thread.offerId}
+                    type="button"
+                    onClick={() => void openOrCreateConversation(thread.creatorId)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Avatar name={thread.creatorName} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                          {thread.creatorName}
+                        </p>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${offerStatusPillClasses(
+                            thread.status,
+                          )}`}
+                        >
+                          {thread.status.toLowerCase()}
+                        </span>
+                      </div>
+                      <p className="truncate text-xs text-[var(--color-ink-500)]">
+                        {thread.planTitle}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-semibold text-[var(--color-sea-700)]">
+                      {thread.needsResponse ? "Reply" : hasConvo ? "Open" : "Start"}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
           {/* Group channels */}
           {!loadingConversations && filteredGroups.length > 0 && variant === "user" && (
             <>
@@ -822,10 +1008,49 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </>
           )}
 
+          {!loadingConversations && filteredAgencyGroupChannels.length > 0 && variant === "agency" && (
+            <>
+              <div className="mx-4 my-1 border-t border-[var(--color-border)]" />
+              <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
+                Group channels
+              </p>
+              {filteredAgencyGroupChannels.map((channel) => (
+                <Link
+                  key={channel.groupId}
+                  href={`/agency/groups/${channel.groupId}/chat`}
+                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-surface-2)]"
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)]">
+                    <Users className="size-4 text-[var(--color-lavender-500)]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                      {channel.planTitle}
+                    </p>
+                    <p className="flex items-center gap-1 truncate text-xs text-[var(--color-ink-500)]">
+                      <MapPin className="size-3 shrink-0" />
+                      {channel.destination}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${offerStatusPillClasses(
+                      channel.status,
+                    )}`}
+                  >
+                    {channel.status.toLowerCase()}
+                  </span>
+                </Link>
+              ))}
+            </>
+          )}
+
           {/* Empty state */}
           {!loadingConversations &&
             filteredConversations.length === 0 &&
-            (filteredGroups.length === 0 || variant !== "user") &&
+            (variant === "user"
+              ? filteredGroups.length === 0
+              : filteredAgencyOfferThreads.length === 0 &&
+                filteredAgencyGroupChannels.length === 0) &&
             !showNewChat && (
               <div className="p-6">
                 <EmptyState
@@ -834,7 +1059,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                     search
                       ? "Try a different name or keyword."
                       : variant === "agency"
-                      ? "Start conversations from traveler profiles or referrals."
+                      ? "Send offers to plans to auto-unlock inbox chats and group rooms."
                       : "Join a trip to unlock group channels and co-traveler direct messages."
                   }
                 />

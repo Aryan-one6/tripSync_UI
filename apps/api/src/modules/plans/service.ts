@@ -258,7 +258,12 @@ export async function confirm(planId: string, userId: string, offerId: string) {
   return result.plan;
 }
 
-export async function acceptOfferForPlan(planId: string, offerId: string, userId: string) {
+export async function acceptOfferForPlan(
+  planId: string,
+  offerId: string,
+  userId: string,
+  finalPricePerPerson?: number,
+) {
   return prisma.$transaction(
     async (tx) => {
       const plan = await tx.plan.findUnique({ where: { id: planId } });
@@ -299,7 +304,12 @@ export async function acceptOfferForPlan(planId: string, offerId: string, userId
 
       const acceptedOffer = await tx.offer.update({
         where: { id: offerId },
-        data: { status: 'ACCEPTED' },
+        data: {
+          status: 'ACCEPTED',
+          ...(typeof finalPricePerPerson === 'number'
+            ? { pricePerPerson: finalPricePerPerson }
+            : {}),
+        },
       });
 
       await tx.offer.updateMany({

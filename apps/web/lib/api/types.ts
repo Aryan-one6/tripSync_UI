@@ -106,6 +106,10 @@ export interface Offer {
     endDate?: string | null;
     status: PlanStatus;
     creator?: UserSummary;
+    group?: {
+      id: string;
+      currentSize?: number;
+    } | null;
   };
 }
 

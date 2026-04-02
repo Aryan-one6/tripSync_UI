@@ -351,6 +351,7 @@ export function GroupChat({
   const [pollOpen, setPollOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
+  const [counterSheetInitialPrice, setCounterSheetInitialPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
@@ -611,12 +612,18 @@ export function GroupChat({
     });
   }
 
-  async function handleAcceptOffer(offerId: string) {
+  async function handleAcceptOffer(offerId: string, acceptedPrice?: number) {
     try {
+      const acceptedPriceNote =
+        typeof acceptedPrice === "number" ? ` at ₹${acceptedPrice.toLocaleString("en-IN")}/person` : "";
       const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/accept`, {
         method: "POST",
+        body: JSON.stringify(
+          typeof acceptedPrice === "number" ? { acceptedPrice } : {},
+        ),
       });
       setOffers((c) => upsertOffer(c, updated));
+      setFeedback(`Offer accepted${acceptedPriceNote}.`);
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : "Could not accept the offer.");
     }
@@ -647,6 +654,8 @@ export function GroupChat({
             : undefined,
       }),
     });
+    setCounterSheetInitialPrice(null);
+    setCounterSheetOfferId(null);
     await loadOffers();
   }
 
@@ -943,7 +952,9 @@ export function GroupChat({
                 </h3>
                 <span className="text-xs text-[var(--color-ink-500)]">
                   {offers.filter((o) => o.status === "ACCEPTED").length} accepted ·{" "}
-                  {offers.filter((o) => o.status === "PENDING").length} pending
+                  {offers.filter((o) => o.status === "COUNTERED").length} countered ·{" "}
+                  {offers.filter((o) => o.status === "PENDING").length} pending ·{" "}
+                  {offers.filter((o) => o.status === "REJECTED" || o.status === "WITHDRAWN").length} closed
                 </span>
               </div>
               {offers.map((offer) => (
@@ -953,7 +964,10 @@ export function GroupChat({
                   isCreator={isCreator}
                   isAgency={isAgency}
                   onAccept={handleAcceptOffer}
-                  onCounter={(offerId) => setCounterSheetOfferId(offerId)}
+                  onCounter={(offerId, seedPrice) => {
+                    setCounterSheetOfferId(offerId);
+                    setCounterSheetInitialPrice(seedPrice ?? null);
+                  }}
                   onReject={handleRejectOffer}
                   onWithdraw={handleWithdrawOffer}
                 />
@@ -1060,12 +1074,16 @@ export function GroupChat({
       {/* Counter Offer sheet */}
       <CounterOfferSheet
         open={counterSheetOfferId !== null}
-        onClose={() => setCounterSheetOfferId(null)}
+        onClose={() => {
+          setCounterSheetOfferId(null);
+          setCounterSheetInitialPrice(null);
+        }}
         onSubmit={async (payload) => {
           if (!counterSheetOfferId) return;
           await handleCounterOffer(counterSheetOfferId, payload);
         }}
         currentPrice={counteringOffer?.pricePerPerson ?? 0}
+        initialPrice={counterSheetInitialPrice ?? undefined}
         counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
         maxRounds={3}
       />

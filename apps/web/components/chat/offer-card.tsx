@@ -65,8 +65,8 @@ export interface OfferCardProps {
   offer: Offer;
   isCreator: boolean;
   isAgency?: boolean;
-  onAccept?: (offerId: string) => void;
-  onCounter?: (offerId: string) => void;
+  onAccept?: (offerId: string, acceptedPrice?: number) => void;
+  onCounter?: (offerId: string, seedPrice?: number) => void;
   onReject?: (offerId: string) => void;
   onWithdraw?: (offerId: string) => void;
 }
@@ -87,9 +87,11 @@ export function OfferCard({
   const lastNeg = offer.negotiations?.[offer.negotiations.length - 1];
   const lastSender = lastNeg?.senderType;
 
-  const creatorCanAct =
+  const creatorCanCounter =
     isCreator &&
     (offer.status === "PENDING" || (offer.status === "COUNTERED" && lastSender === "agency"));
+  const creatorCanAccept =
+    isCreator && (offer.status === "PENDING" || offer.status === "COUNTERED");
   const agencyCanAct = isAgency && offer.status === "COUNTERED" && lastSender === "user";
 
   const roundsUsed = offer.negotiations?.length ?? 0;
@@ -98,6 +100,35 @@ export function OfferCard({
   const includes = inclusionLabels(offer.inclusions);
   const validityText = getValidityText(offer.validUntil);
   const itineraryDays = offer.itinerary?.length ?? 0;
+  const canReuseQuoteAsCounter = !isTerminal && roundsLeft > 0 && (creatorCanCounter || agencyCanAct);
+
+  const quoteTimeline = [
+    {
+      id: `live-${offer.id}`,
+      label: "Live quote",
+      senderType:
+        offer.status === "COUNTERED" && lastSender === "user"
+          ? ("user" as const)
+          : ("agency" as const),
+      price: offer.pricePerPerson,
+      message: null,
+      createdAt: offer.updatedAt,
+      isLive: true,
+      round: null as number | null,
+    },
+    ...(offer.negotiations ?? [])
+      .filter((entry) => typeof entry.price === "number")
+      .map((entry) => ({
+        id: entry.id,
+        label: `Round ${entry.round}`,
+        senderType: entry.senderType,
+        price: Number(entry.price),
+        message: entry.message ?? null,
+        createdAt: entry.createdAt,
+        isLive: false,
+        round: entry.round,
+      })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <article className="overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
@@ -117,12 +148,34 @@ export function OfferCard({
       </div>
 
       <div className="space-y-3.5 px-4 py-4 sm:px-5 sm:py-5">
+        {offer.plan && (
+          <div className="rounded-[10px] bg-[var(--color-surface-2)] px-3 py-2">
+            <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+              {offer.plan.title}
+            </p>
+            <p className="truncate text-xs text-[var(--color-ink-500)]">{offer.plan.destination}</p>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-baseline gap-2">
           <p className="font-display text-4xl leading-none text-[var(--color-ink-950)] sm:text-5xl">
             {formatCurrency(offer.pricePerPerson)}
           </p>
           <p className="text-2xl font-semibold text-[var(--color-ink-900)] sm:text-3xl">/ person</p>
         </div>
+
+        {offer.pricingTiers && offer.pricingTiers.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {offer.pricingTiers.map((tier) => (
+              <span
+                key={tier.minPax}
+                className="rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-[11px] text-[var(--color-ink-600)]"
+              >
+                {tier.minPax}+ pax: {formatCurrency(tier.price)}
+              </span>
+            ))}
+          </div>
+        )}
 
         {includes.length > 0 && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-sea-800)]">
@@ -150,24 +203,75 @@ export function OfferCard({
           <span>{formatCompactDate(offer.createdAt)}</span>
         </div>
 
-        {offer.negotiations && offer.negotiations.length > 0 && (
+        {quoteTimeline.length > 0 && (
           <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
-              Last counter
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
+              Offer & counter timeline
             </p>
-            <p className="text-xs text-[var(--color-ink-700)]">
-              {lastNeg?.senderType === "agency" ? "Agency" : "Creator"}
-              {lastNeg?.price ? `: ${formatCurrency(lastNeg.price)}/person` : " updated terms"}
-              {lastNeg?.message ? ` — ${lastNeg.message}` : ""}
-            </p>
+            <div className="space-y-2">
+              {quoteTimeline.map((quote) => (
+                <div
+                  key={quote.id}
+                  className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2.5 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-[var(--color-ink-700)]">
+                      {quote.label} · {quote.senderType === "agency" ? "Agency" : "Creator"}
+                    </p>
+                    <p className="text-xs font-semibold text-[var(--color-ink-900)]">
+                      {formatCurrency(quote.price)} / person
+                    </p>
+                  </div>
+                  {quote.message && (
+                    <p className="mt-1 text-xs text-[var(--color-ink-600)]">{quote.message}</p>
+                  )}
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--color-ink-500)]">
+                    <span>{formatCompactDate(quote.createdAt)}</span>
+                    {quote.isLive && (
+                      <>
+                        <span>•</span>
+                        <span className="font-semibold text-[var(--color-sea-700)]">Current</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {creatorCanAccept && quote.senderType === "agency" && (
+                      <button
+                        type="button"
+                        onClick={() => onAccept?.(offer.id, quote.price)}
+                        className="rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-100)]"
+                      >
+                        Accept this quote
+                      </button>
+                    )}
+                    {canReuseQuoteAsCounter && (
+                      <button
+                        type="button"
+                        onClick={() => onCounter?.(offer.id, quote.price)}
+                        className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-lavender-500)] transition hover:bg-[var(--color-lavender-100)]"
+                      >
+                        Re-use in counter
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {creatorCanAct && !isTerminal && (
+        {offer.cancellationPolicy && (
+          <p className="text-xs text-[var(--color-ink-500)]">
+            <span className="font-semibold text-[var(--color-ink-700)]">Cancellation:</span>{" "}
+            {offer.cancellationPolicy}
+          </p>
+        )}
+
+        {creatorCanAccept && !isTerminal && (
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => onAccept?.(offer.id)}
+              onClick={() => onAccept?.(offer.id, offer.pricePerPerson)}
               className="rounded-[10px] bg-[var(--color-sea-700)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-sea-800)]"
             >
               Accept
@@ -175,10 +279,10 @@ export function OfferCard({
             <button
               type="button"
               onClick={() => onCounter?.(offer.id)}
-              disabled={roundsLeft === 0}
+              disabled={!creatorCanCounter || roundsLeft === 0}
               className="rounded-[10px] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Counter{roundsLeft > 0 ? ` (${roundsLeft})` : ""}
+              {creatorCanCounter ? `Counter${roundsLeft > 0 ? ` (${roundsLeft})` : ""}` : "Await agency"}
             </button>
             <button
               type="button"
