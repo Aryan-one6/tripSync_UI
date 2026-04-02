@@ -296,15 +296,6 @@ export function OfferCard({ offer, isCreator, isAgency = false, onAccept, onCoun
         {/* ── Agency action buttons (COUNTERED where creator last replied) ── */}
         {agencyCanAct && !isTerminal && (
           <div className="mt-5 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-4">
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => onAccept?.(offer.id)}
-              className="bg-[var(--color-sea-600)] flex-1 sm:flex-none"
-            >
-              <Check className="size-4" />
-              Accept Counter
-            </Button>
             {negRoundsLeft > 0 && (
               <Button
                 size="sm"

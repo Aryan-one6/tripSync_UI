@@ -344,6 +344,7 @@ export function GroupChat({
 
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(planId ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [draft, setDraft] = useState("");
@@ -413,6 +414,8 @@ export function GroupChat({
     );
     setGroup(data.group);
     setMembers(data.members);
+    const groupPlanId = (data.group as Group & { planId?: string | null }).planId ?? null;
+    setResolvedPlanId((current) => current ?? groupPlanId);
   }, [apiFetchWithAuth, groupId]);
 
   const loadMessages = useCallback(async () => {
@@ -423,18 +426,19 @@ export function GroupChat({
   }, [apiFetchWithAuth, groupId]);
 
   const loadOffers = useCallback(async () => {
-    if (!planId) return;
-    const data = await apiFetchWithAuth<Offer[]>(`/plans/${planId}/offers`).catch(
+    const effectivePlanId = planId ?? resolvedPlanId;
+    if (!effectivePlanId) return;
+    const data = await apiFetchWithAuth<Offer[]>(`/plans/${effectivePlanId}/offers`).catch(
       () => [],
     );
     setOffers(data);
-  }, [apiFetchWithAuth, planId]);
+  }, [apiFetchWithAuth, planId, resolvedPlanId]);
 
   useEffect(() => {
     void (async () => {
       try {
         setLoading(true);
-        await Promise.all([loadMembers(), loadMessages(), loadOffers()]);
+        await Promise.all([loadMembers(), loadMessages()]);
       } catch (err) {
         setFeedback(
           err instanceof Error ? err.message : "Unable to load the trip chat.",
@@ -443,7 +447,11 @@ export function GroupChat({
         setLoading(false);
       }
     })();
-  }, [loadMembers, loadMessages, loadOffers]);
+  }, [loadMembers, loadMessages]);
+
+  useEffect(() => {
+    void loadOffers();
+  }, [loadOffers]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -459,10 +467,9 @@ export function GroupChat({
       setMessages((c) => upsertMessage(c, msg));
     const handleMemberUpdate = () => void loadMembers();
 
-    const handleOfferCreated = (o: Offer) => setOffers((c) => upsertOffer(c, o));
-    const handleOfferCountered = (o: Offer) => setOffers((c) => upsertOffer(c, o));
-    const handleOfferAccepted = (o: Offer) => setOffers((c) => upsertOffer(c, o));
-    const handleOfferRejected = (o: Offer) => setOffers((c) => upsertOffer(c, o));
+    const refreshOffers = () => {
+      void loadOffers();
+    };
 
     const handlePaymentUpdate = (payload: {
       paid: number;
@@ -510,10 +517,11 @@ export function GroupChat({
     socket.on("chat:message_updated", handleMessageUpdated);
     socket.on("group:member_updated", handleMemberUpdate);
     socket.on("chat:typing", handleTyping);
-    socket.on("offer:created", handleOfferCreated);
-    socket.on("offer:countered", handleOfferCountered);
-    socket.on("offer:accepted", handleOfferAccepted);
-    socket.on("offer:rejected", handleOfferRejected);
+    socket.on("offer:created", refreshOffers);
+    socket.on("offer:countered", refreshOffers);
+    socket.on("offer:accepted", refreshOffers);
+    socket.on("offer:rejected", refreshOffers);
+    socket.on("offer:updated", refreshOffers);
     socket.on("payment:update", handlePaymentUpdate);
 
     return () => {
@@ -522,13 +530,14 @@ export function GroupChat({
       socket.off("chat:message_updated", handleMessageUpdated);
       socket.off("group:member_updated", handleMemberUpdate);
       socket.off("chat:typing", handleTyping);
-      socket.off("offer:created", handleOfferCreated);
-      socket.off("offer:countered", handleOfferCountered);
-      socket.off("offer:accepted", handleOfferAccepted);
-      socket.off("offer:rejected", handleOfferRejected);
+      socket.off("offer:created", refreshOffers);
+      socket.off("offer:countered", refreshOffers);
+      socket.off("offer:accepted", refreshOffers);
+      socket.off("offer:rejected", refreshOffers);
+      socket.off("offer:updated", refreshOffers);
       socket.off("payment:update", handlePaymentUpdate);
     };
-  }, [groupId, loadMembers, session?.user.id, socket]);
+  }, [groupId, loadMembers, loadOffers, session?.user.id, socket]);
 
   useEffect(() => {
     if (!socket) return;
@@ -628,15 +637,18 @@ export function GroupChat({
   }
 
   async function handleCounterOffer(offerId: string, payload: CounterOfferPayload) {
-    const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/counter`, {
+    await apiFetchWithAuth(`/offers/${offerId}/counter`, {
       method: "POST",
       body: JSON.stringify({
-        pricePerPerson: payload.price,
+        price: payload.price,
         message: payload.message,
-        requestedAdditions: payload.requestedAdditions,
+        inclusionsDelta:
+          payload.requestedAdditions.length > 0
+            ? { requestedAdditions: payload.requestedAdditions }
+            : undefined,
       }),
     });
-    setOffers((c) => upsertOffer(c, updated));
+    await loadOffers();
   }
 
   async function handleWithdrawOffer(offerId: string) {
@@ -655,7 +667,8 @@ export function GroupChat({
   const counteringOffer = counterSheetOfferId
     ? offers.find((o) => o.id === counterSheetOfferId)
     : null;
-  const isCreator = planCreatorId ? userId === planCreatorId : true;
+  const creatorUserId = planCreatorId ?? members.find((member) => member.role === "CREATOR")?.user.id;
+  const isCreator = creatorUserId ? userId === creatorUserId : false;
 
   // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
