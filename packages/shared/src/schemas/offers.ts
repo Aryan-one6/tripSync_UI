@@ -61,11 +61,6 @@ export const CounterOfferSchema = z.object({
   },
 );
 
-export const AcceptOfferSchema = z.object({
-  acceptedPrice: z.number().int().min(0).optional(),
-});
-
 export type CreateOfferInput = z.infer<typeof CreateOfferSchema>;
 export type SubmitOfferViaGroupInput = z.infer<typeof SubmitOfferViaGroupSchema>;
 export type CounterOfferInput = z.infer<typeof CounterOfferSchema>;
-export type AcceptOfferInput = z.infer<typeof AcceptOfferSchema>;

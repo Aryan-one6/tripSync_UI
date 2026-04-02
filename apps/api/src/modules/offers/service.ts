@@ -1,7 +1,7 @@
 import { OfferStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
-import type { AcceptOfferInput, CounterOfferInput, CreateOfferInput } from '@tripsync/shared';
+import type { CounterOfferInput, CreateOfferInput } from '@tripsync/shared';
 import { acceptOfferForPlan } from '../plans/service.js';
 import { emitAgencyEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { queueNotification } from '../../lib/queue.js';
@@ -188,6 +188,17 @@ export async function listAgencyOffers(userId: string) {
   return prisma.offer.findMany({
     where: { agencyId: agency.id },
     include: {
+      agency: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          avgRating: true,
+          totalReviews: true,
+          verification: true,
+        },
+      },
       plan: {
         select: {
           id: true,
@@ -308,15 +319,10 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
   return negotiation;
 }
 
-export async function accept(offerId: string, userId: string, data?: AcceptOfferInput) {
+export async function accept(offerId: string, userId: string) {
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    include: {
-      plan: true,
-      negotiations: {
-        select: { price: true },
-      },
-    },
+    include: { plan: true },
   });
 
   if (!offer) throw new NotFoundError('Offer');
@@ -325,21 +331,7 @@ export async function accept(offerId: string, userId: string, data?: AcceptOffer
     throw new BadRequestError('Offer cannot be accepted in current state');
   }
 
-  let acceptedPrice: number | undefined;
-  if (typeof data?.acceptedPrice === 'number') {
-    const seenQuotePrices = new Set<number>([offer.pricePerPerson]);
-    for (const entry of offer.negotiations) {
-      if (typeof entry.price === 'number') {
-        seenQuotePrices.add(entry.price);
-      }
-    }
-    if (!seenQuotePrices.has(data.acceptedPrice)) {
-      throw new BadRequestError('Accepted price must match a quoted offer value');
-    }
-    acceptedPrice = data.acceptedPrice;
-  }
-
-  const result = await acceptOfferForPlan(offer.planId, offerId, userId, acceptedPrice);
+  const result = await acceptOfferForPlan(offer.planId, offerId, userId);
 
   const group = await prisma.group.findUnique({
     where: { planId: offer.planId },
@@ -347,13 +339,9 @@ export async function accept(offerId: string, userId: string, data?: AcceptOffer
   });
 
   if (group) {
-    const priceNote =
-      typeof acceptedPrice === 'number'
-        ? ` at ₹${acceptedPrice.toLocaleString('en-IN')}/person`
-        : '';
     await createSystemMessage(
       group.id,
-      `An agency offer was accepted${priceNote}. Payment collection is now open for approved travelers.`,
+      'An agency offer was accepted. Payment collection is now open for approved travelers.',
       { planId: offer.planId, offerId },
     );
 
@@ -377,14 +365,10 @@ export async function accept(offerId: string, userId: string, data?: AcceptOffer
     select: { ownerId: true },
   });
   if (acceptedAgency) {
-    const dmPriceNote =
-      typeof acceptedPrice === 'number'
-        ? ` at ₹${acceptedPrice.toLocaleString('en-IN')}/person`
-        : '';
     await postOfferUpdateToDirectChat(
       userId,
       acceptedAgency.ownerId,
-      `Offer accepted for "${offer.plan.title}"${dmPriceNote}. Payment collection is now open.`,
+      `Offer accepted for "${offer.plan.title}". Payment collection is now open.`,
     );
   }
 

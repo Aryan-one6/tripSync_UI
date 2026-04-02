@@ -7,23 +7,23 @@ import type { Offer } from "@/lib/api/types";
 function offerStatusLabel(status: Offer["status"]) {
   const map: Record<Offer["status"], { label: string; tone: string }> = {
     PENDING: {
-      label: "New",
+      label: "PENDING",
       tone: "bg-[var(--color-sea-50)] text-[var(--color-sea-700)] border-[var(--color-sea-200)]",
     },
     COUNTERED: {
-      label: "Counter",
+      label: "COUNTERED",
       tone: "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)] border-[var(--color-lavender-200)]",
     },
     ACCEPTED: {
-      label: "Accepted",
+      label: "ACCEPTED",
       tone: "bg-[var(--color-sea-100)] text-[var(--color-sea-800)] border-[var(--color-sea-300)]",
     },
     REJECTED: {
-      label: "Declined",
+      label: "REJECTED",
       tone: "bg-[var(--color-sunset-50)] text-[var(--color-sunset-700)] border-[var(--color-sunset-200)]",
     },
     WITHDRAWN: {
-      label: "Withdrawn",
+      label: "WITHDRAWN",
       tone: "bg-[var(--color-surface-2)] text-[var(--color-ink-500)] border-[var(--color-border)]",
     },
   };
@@ -65,7 +65,7 @@ export interface OfferCardProps {
   offer: Offer;
   isCreator: boolean;
   isAgency?: boolean;
-  onAccept?: (offerId: string, acceptedPrice?: number) => void;
+  onAccept?: (offerId: string) => void;
   onCounter?: (offerId: string, seedPrice?: number) => void;
   onReject?: (offerId: string) => void;
   onWithdraw?: (offerId: string) => void;
@@ -101,6 +101,10 @@ export function OfferCard({
   const validityText = getValidityText(offer.validUntil);
   const itineraryDays = offer.itinerary?.length ?? 0;
   const canReuseQuoteAsCounter = !isTerminal && roundsLeft > 0 && (creatorCanCounter || agencyCanAct);
+  const agencyName = offer.agency?.name ?? "Agency";
+  const agencyRating = Number.isFinite(offer.agency?.avgRating)
+    ? Number(offer.agency.avgRating).toFixed(1)
+    : "0.0";
 
   const quoteTimeline = [
     {
@@ -135,10 +139,10 @@ export function OfferCard({
       <div className="flex items-center justify-between gap-3 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-4 py-2.5">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-[var(--color-sea-800)]">
-            {offer.agency.name}
+            {agencyName}
             <span className="ml-2 inline-flex items-center gap-1 text-[var(--color-sea-700)]">
               <Star className="size-3.5 fill-current" />
-              {offer.agency.avgRating.toFixed(1)}
+              {agencyRating}
             </span>
           </p>
         </div>
@@ -235,15 +239,6 @@ export function OfferCard({
                     )}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {creatorCanAccept && quote.senderType === "agency" && (
-                      <button
-                        type="button"
-                        onClick={() => onAccept?.(offer.id, quote.price)}
-                        className="rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-100)]"
-                      >
-                        Accept this quote
-                      </button>
-                    )}
                     {canReuseQuoteAsCounter && (
                       <button
                         type="button"
@@ -271,7 +266,7 @@ export function OfferCard({
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => onAccept?.(offer.id, offer.pricePerPerson)}
+              onClick={() => onAccept?.(offer.id)}
               className="rounded-[10px] bg-[var(--color-sea-700)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-sea-800)]"
             >
               Accept

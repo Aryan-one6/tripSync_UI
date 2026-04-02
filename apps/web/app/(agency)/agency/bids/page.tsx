@@ -40,6 +40,63 @@ function upsertOffer(list: Offer[], next: Offer) {
   return clone;
 }
 
+function normalizeOfferForUi(offer: Offer): Offer {
+  const safeCreatedAt = offer.createdAt ?? new Date(0).toISOString();
+  const safeUpdatedAt = offer.updatedAt ?? safeCreatedAt;
+  const agencySource = (offer as Offer & { agency?: Offer["agency"] }).agency;
+
+  return {
+    ...offer,
+    createdAt: safeCreatedAt,
+    updatedAt: safeUpdatedAt,
+    agency: {
+      id: agencySource?.id ?? "unknown-agency",
+      name: agencySource?.name ?? "Unknown agency",
+      slug: agencySource?.slug ?? "unknown-agency",
+      logoUrl: agencySource?.logoUrl ?? null,
+      description: agencySource?.description ?? null,
+      verification: agencySource?.verification ?? null,
+      gstin: agencySource?.gstin ?? null,
+      pan: agencySource?.pan ?? null,
+      tourismLicense: agencySource?.tourismLicense ?? null,
+      address: agencySource?.address ?? null,
+      phone: agencySource?.phone ?? null,
+      email: agencySource?.email ?? null,
+      city: agencySource?.city ?? null,
+      state: agencySource?.state ?? null,
+      specializations: agencySource?.specializations ?? null,
+      destinations: agencySource?.destinations ?? null,
+      avgRating:
+        typeof agencySource?.avgRating === "number" ? agencySource.avgRating : 0,
+      totalReviews:
+        typeof agencySource?.totalReviews === "number" ? agencySource.totalReviews : 0,
+      totalTrips:
+        typeof agencySource?.totalTrips === "number" ? agencySource.totalTrips : 0,
+    },
+    negotiations: Array.isArray(offer.negotiations) ? offer.negotiations : [],
+  };
+}
+
+function sortOffersByUpdatedDesc(list: Offer[]) {
+  return [...list].sort((a, b) => {
+    const byUpdated = b.updatedAt.localeCompare(a.updatedAt);
+    if (byUpdated !== 0) return byUpdated;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+}
+
+function normalizeOfferList(list: Offer[]) {
+  const deduped = new Map<string, Offer>();
+  for (const raw of list) {
+    const normalized = normalizeOfferForUi(raw);
+    const existing = deduped.get(normalized.id);
+    if (!existing || normalized.updatedAt >= existing.updatedAt) {
+      deduped.set(normalized.id, normalized);
+    }
+  }
+  return sortOffersByUpdatedDesc(Array.from(deduped.values()));
+}
+
 // ── Submit Offer Modal ────────────────────────────────────────────────────────
 
 function SubmitOfferModal({
@@ -323,6 +380,7 @@ export default function AgencyBidsPage() {
   const [showBrowse, setShowBrowse] = useState(false);
   const [submitForPlan, setSubmitForPlan] = useState<DiscoverItem | null>(null);
   const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
+  const [counterSheetInitialPrice, setCounterSheetInitialPrice] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -330,7 +388,7 @@ export default function AgencyBidsPage() {
   async function loadOffers() {
     try {
       const data = await apiFetchWithAuth<Offer[]>("/offers/my");
-      setOffers(data);
+      setOffers(normalizeOfferList(data));
       setFeedback(null);
     } catch (err) {
       setFeedback(
@@ -386,15 +444,17 @@ export default function AgencyBidsPage() {
       const data = await apiFetchWithAuth<Offer[]>("/offers/my").catch(
         () => [] as Offer[],
       );
-      setOffers(data);
+      setOffers(normalizeOfferList(data));
     };
 
+    socket.on("offer:created", refreshFromServer);
     socket.on("offer:countered", refreshFromServer);
     socket.on("offer:accepted", refreshFromServer);
     socket.on("offer:rejected", refreshFromServer);
     socket.on("offer:updated", refreshFromServer);
 
     return () => {
+      socket.off("offer:created", refreshFromServer);
       socket.off("offer:countered", refreshFromServer);
       socket.off("offer:accepted", refreshFromServer);
       socket.off("offer:rejected", refreshFromServer);
@@ -419,7 +479,8 @@ export default function AgencyBidsPage() {
         }),
       });
       const data = await apiFetchWithAuth<Offer[]>("/offers/my");
-      setOffers(data);
+      setOffers(normalizeOfferList(data));
+      setCounterSheetInitialPrice(null);
       setCounterSheetOfferId(null);
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : "Failed to submit counter.");
@@ -433,7 +494,7 @@ export default function AgencyBidsPage() {
       const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/withdraw`, {
         method: "POST",
       });
-      setOffers((cur) => upsertOffer(cur, updated));
+      setOffers((cur) => normalizeOfferList(upsertOffer(cur, updated)));
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : "Failed to withdraw offer.");
     }
@@ -443,7 +504,7 @@ export default function AgencyBidsPage() {
     try {
       setRefreshing(true);
       const data = await apiFetchWithAuth<Offer[]>("/offers/my");
-      setOffers(data);
+      setOffers(normalizeOfferList(data));
     } finally {
       setRefreshing(false);
     }
@@ -454,19 +515,26 @@ export default function AgencyBidsPage() {
     ? offers.find((o) => o.id === counterSheetOfferId)
     : null;
 
-  const needsActionOffers = offers.filter(
-    (o) =>
-      o.status === "COUNTERED" &&
-      o.negotiations?.length > 0 &&
-      o.negotiations[o.negotiations.length - 1]?.senderType === "user",
+  const needsActionOffers = sortOffersByUpdatedDesc(
+    offers.filter(
+      (o) =>
+        o.status === "COUNTERED" &&
+        o.negotiations?.length > 0 &&
+        o.negotiations[o.negotiations.length - 1]?.senderType === "user",
+    ),
   );
 
-  const activeOffers = offers.filter(
-    (o) => o.status === "PENDING" || o.status === "COUNTERED",
+  const activeOffers = sortOffersByUpdatedDesc(
+    offers.filter((o) => o.status === "PENDING" || o.status === "COUNTERED"),
   );
-  const acceptedOffers = offers.filter((o) => o.status === "ACCEPTED");
-  const closedOffers = offers.filter(
-    (o) => o.status === "REJECTED" || o.status === "WITHDRAWN",
+  const acceptedOffers = sortOffersByUpdatedDesc(
+    offers.filter((o) => o.status === "ACCEPTED"),
+  );
+  const closedOffers = sortOffersByUpdatedDesc(
+    offers.filter((o) => o.status === "REJECTED" || o.status === "WITHDRAWN"),
+  );
+  const activeNonNeedsReplyOffers = activeOffers.filter(
+    (o) => !needsActionOffers.some((n) => n.id === o.id),
   );
 
   const bidPlanIds = new Set(offers.map((o) => o.planId).filter(Boolean) as string[]);
@@ -638,7 +706,10 @@ export default function AgencyBidsPage() {
                     offer={offer}
                     isCreator={false}
                     isAgency
-                    onCounter={(id) => setCounterSheetOfferId(id)}
+                    onCounter={(id, seedPrice) => {
+                      setCounterSheetOfferId(id);
+                      setCounterSheetInitialPrice(seedPrice ?? null);
+                    }}
                     onWithdraw={handleWithdraw}
                   />
                 ))}
@@ -647,32 +718,25 @@ export default function AgencyBidsPage() {
           )}
 
           {/* Active bids */}
-          {activeOffers.filter(
-            (o) => !needsActionOffers.some((n) => n.id === o.id),
-          ).length > 0 && (
+          {activeNonNeedsReplyOffers.length > 0 && (
             <section>
               <h3 className="mb-3 font-display text-lg text-[var(--color-ink-950)]">
-                Active bids (
-                {
-                  activeOffers.filter(
-                    (o) => !needsActionOffers.some((n) => n.id === o.id),
-                  ).length
-                }
-                )
+                Active bids ({activeNonNeedsReplyOffers.length})
               </h3>
               <div className="space-y-4">
-                {activeOffers
-                  .filter((o) => !needsActionOffers.some((n) => n.id === o.id))
-                  .map((offer) => (
-                    <OfferCard
-                      key={offer.id}
-                      offer={offer}
-                      isCreator={false}
-                      isAgency
-                      onCounter={(id) => setCounterSheetOfferId(id)}
-                      onWithdraw={handleWithdraw}
-                    />
-                  ))}
+                {activeNonNeedsReplyOffers.map((offer) => (
+                  <OfferCard
+                    key={offer.id}
+                    offer={offer}
+                    isCreator={false}
+                    isAgency
+                    onCounter={(id, seedPrice) => {
+                      setCounterSheetOfferId(id);
+                      setCounterSheetInitialPrice(seedPrice ?? null);
+                    }}
+                    onWithdraw={handleWithdraw}
+                  />
+                ))}
               </div>
             </section>
           )}
@@ -734,12 +798,16 @@ export default function AgencyBidsPage() {
       {/* Counter-offer sheet */}
       <CounterOfferSheet
         open={counterSheetOfferId !== null}
-        onClose={() => setCounterSheetOfferId(null)}
+        onClose={() => {
+          setCounterSheetOfferId(null);
+          setCounterSheetInitialPrice(null);
+        }}
         onSubmit={async (payload) => {
           if (!counterSheetOfferId) return;
           await handleCounter(counterSheetOfferId, payload);
         }}
         currentPrice={counteringOffer?.pricePerPerson ?? 0}
+        initialPrice={counterSheetInitialPrice ?? undefined}
         counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
         maxRounds={3}
       />
@@ -748,7 +816,9 @@ export default function AgencyBidsPage() {
       <SubmitOfferModal
         plan={submitForPlan}
         onClose={() => setSubmitForPlan(null)}
-        onSubmitted={(offer) => setOffers((cur) => upsertOffer(cur, offer))}
+        onSubmitted={(offer) =>
+          setOffers((cur) => normalizeOfferList(upsertOffer(cur, offer)))
+        }
         apiFetchWithAuth={apiFetchWithAuth}
       />
     </DashboardShell>

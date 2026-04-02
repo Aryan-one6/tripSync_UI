@@ -612,18 +612,13 @@ export function GroupChat({
     });
   }
 
-  async function handleAcceptOffer(offerId: string, acceptedPrice?: number) {
+  async function handleAcceptOffer(offerId: string) {
     try {
-      const acceptedPriceNote =
-        typeof acceptedPrice === "number" ? ` at ₹${acceptedPrice.toLocaleString("en-IN")}/person` : "";
       const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/accept`, {
         method: "POST",
-        body: JSON.stringify(
-          typeof acceptedPrice === "number" ? { acceptedPrice } : {},
-        ),
       });
       setOffers((c) => upsertOffer(c, updated));
-      setFeedback(`Offer accepted${acceptedPriceNote}.`);
+      setFeedback("Offer accepted.");
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : "Could not accept the offer.");
     }

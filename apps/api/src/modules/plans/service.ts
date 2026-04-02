@@ -262,7 +262,6 @@ export async function acceptOfferForPlan(
   planId: string,
   offerId: string,
   userId: string,
-  finalPricePerPerson?: number,
 ) {
   return prisma.$transaction(
     async (tx) => {
@@ -304,12 +303,7 @@ export async function acceptOfferForPlan(
 
       const acceptedOffer = await tx.offer.update({
         where: { id: offerId },
-        data: {
-          status: 'ACCEPTED',
-          ...(typeof finalPricePerPerson === 'number'
-            ? { pricePerPerson: finalPricePerPerson }
-            : {}),
-        },
+        data: { status: 'ACCEPTED' },
       });
 
       await tx.offer.updateMany({
