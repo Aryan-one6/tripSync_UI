@@ -10,11 +10,13 @@ export function DashboardShell({
   subtitle,
   variant,
   children,
+  actions,
 }: {
   title: string;
   subtitle: string;
   variant: "user" | "agency";
   children: ReactNode;
+  actions?: ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -61,19 +63,24 @@ export function DashboardShell({
         </div>
 
         {/* Main content */}
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-5 sm:space-y-6 pb-mobile-nav md:pb-0">
           {/* Dashboard header */}
           <header className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-md)] sm:p-7">
             <div className="relative">
               <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
                 {variant === "agency" ? "Agency Dashboard" : "Traveler Dashboard"}
               </span>
-              <h1 className="mt-3 font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl">
-                {title}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm text-[var(--color-ink-600)] leading-relaxed">
-                {subtitle}
-              </p>
+              <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h1 className="font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl">
+                    {title}
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm text-[var(--color-ink-600)] leading-relaxed">
+                    {subtitle}
+                  </p>
+                </div>
+                {actions && <div className="shrink-0">{actions}</div>}
+              </div>
             </div>
           </header>
           {children}

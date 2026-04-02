@@ -330,3 +330,8 @@ a {
 .safe-top {
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
+
+/* Bottom-nav clearance for pages rendered with the mobile tab bar */
+.pb-mobile-nav {
+  padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom)));
+}

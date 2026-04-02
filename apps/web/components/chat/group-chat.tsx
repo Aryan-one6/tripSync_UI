@@ -13,6 +13,7 @@ import { formatCompactDate, initials } from "@/lib/format";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { OfferCard } from "@/components/chat/offer-card";
 import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
+import { PollCard } from "@/components/chat/poll-card";
 import type { ChatMessage, Group, GroupMember, Offer } from "@/lib/api/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,6 +227,25 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
     const handleOfferAccepted = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
     const handleOfferRejected = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
 
+    // ── Payment socket events (Phase 5.2) ──
+    const handlePaymentUpdate = (payload: { paid: number; total: number; status: string }) => {
+      const syntheticId = `payment-sys-${Date.now()}`;
+      const text =
+        payload.status === "CONFIRMED"
+          ? `🎉 All ${payload.total} travelers have paid — the trip is CONFIRMED!`
+          : `💳 Payment update: ${payload.paid} of ${payload.total} confirmed.`;
+      const syntheticMsg: ChatMessage = {
+        id: syntheticId,
+        groupId,
+        senderId: "system",
+        content: text,
+        messageType: "system",
+        metadata: { action: "payment_progress", ...payload },
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((c) => upsertMessage(c, syntheticMsg));
+    };
+
     const handleTyping = (payload: {
       groupId?: string;
       userId?: string;
@@ -255,6 +275,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
     socket.on("offer:countered", handleOfferCountered);
     socket.on("offer:accepted", handleOfferAccepted);
     socket.on("offer:rejected", handleOfferRejected);
+    socket.on("payment:update", handlePaymentUpdate);
 
     return () => {
       socket.emit("group:unsubscribe", groupId);
@@ -266,6 +287,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
       socket.off("offer:countered", handleOfferCountered);
       socket.off("offer:accepted", handleOfferAccepted);
       socket.off("offer:rejected", handleOfferRejected);
+      socket.off("payment:update", handlePaymentUpdate);
     };
   }, [groupId, loadMembers, session?.user.id, socket]);
 
@@ -448,7 +470,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
               )}
 
               {/* Messages */}
-              <div className="max-h-[60vh] space-y-3 overflow-y-auto hide-scrollbar">
+              <div className="max-h-[calc(100dvh-220px)] sm:max-h-[60vh] space-y-3 overflow-y-auto hide-scrollbar">
                 {messages.length === 0 ? (
                   <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
                     No messages yet. Coordinate arrivals, budget, and votes here.
@@ -457,14 +479,17 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                   messages.map((message) => {
                     const mine = session?.user.id === message.senderId;
                     const pollOptionsData = message.metadata?.options ?? [];
+                    const pollQuestion = typeof message.metadata?.question === "string" ? message.metadata.question : message.content;
 
                     if (message.messageType === "system") {
                       // Detect offer-related system messages by metadata
-                      const isOfferMsg = message.metadata &&
+                      const metaAction = message.metadata &&
                         typeof message.metadata === "object" &&
-                        "action" in message.metadata &&
-                        typeof (message.metadata as Record<string, unknown>).action === "string" &&
-                        ((message.metadata as Record<string, unknown>).action as string).startsWith("offer_");
+                        "action" in message.metadata
+                        ? String((message.metadata as Record<string, unknown>).action)
+                        : "";
+                      const isOfferMsg = metaAction.startsWith("offer_");
+                      const isPaymentMsg = metaAction.startsWith("payment_");
 
                       return (
                         <div
@@ -472,6 +497,8 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                           className={`mx-auto flex max-w-md items-center gap-2 rounded-full px-4 py-2 text-center text-xs ${
                             isOfferMsg
                               ? "bg-[var(--color-lavender-50)] border border-[var(--color-lavender-200)] text-[var(--color-lavender-500)]"
+                              : isPaymentMsg
+                              ? "bg-[var(--color-sea-50)] border border-[var(--color-sea-200)] text-[var(--color-sea-700)]"
                               : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)]"
                           }`}
                         >
@@ -496,29 +523,17 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                               {formatCompactDate(message.createdAt)}
                             </span>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
 
-                          {message.messageType === "poll" && (
-                            <div className="mt-3 grid gap-2">
-                              {pollOptionsData.map((option) => {
-                                const voted = option.votes.includes(session?.user.id ?? "");
-                                return (
-                                  <button
-                                    key={option.id}
-                                    type="button"
-                                    onClick={() => vote(message.id, option.id)}
-                                    className={`rounded-[var(--radius-sm)] px-3 py-2.5 text-left text-sm transition-all ${
-                                      mine ? "bg-white/15 hover:bg-white/25" : "bg-[var(--color-surface-2)] hover:bg-[var(--color-sea-50)]"
-                                    } ${voted ? "ring-2 ring-[var(--color-sea-400)]" : ""}`}
-                                  >
-                                    <div className="flex items-center justify-between gap-3">
-                                      <span>{option.label}</span>
-                                      <span className="text-xs opacity-70">{option.votes.length}</span>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                          {message.messageType === "poll" ? (
+                            <PollCard
+                              question={pollQuestion}
+                              options={pollOptionsData}
+                              currentUserId={session?.user.id ?? ""}
+                              isMine={mine}
+                              onVote={(optionId) => vote(message.id, optionId)}
+                            />
+                          ) : (
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                           )}
                         </div>
                       </div>
@@ -536,39 +551,41 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                 </p>
               ) : null}
 
-              {/* Compose */}
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <Textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        sendMessage();
-                      }
-                    }}
-                    placeholder="Type a message... (⌘Enter to send)"
-                    rows={2}
-                    className="min-h-0"
-                  />
-                </div>
-                <div className="flex flex-col gap-2 self-end shrink-0">
-                  {isAgency && (
-                    <Button
-                      variant="soft"
-                      size="sm"
-                      onClick={() => setOfferModalOpen(true)}
-                      title="Submit an offer"
-                      className="flex items-center gap-1.5"
-                    >
-                      <Receipt className="size-4" />
-                      <span className="hidden sm:inline">Submit Offer</span>
+              {/* Compose — sticky on mobile */}
+              <div className="sticky bottom-0 -mx-5 -mb-5 bg-white/95 backdrop-blur-sm px-5 py-3 border-t border-[var(--color-border)] sm:static sm:mx-0 sm:mb-0 sm:bg-transparent sm:backdrop-blur-none sm:px-0 sm:py-0 sm:border-0">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
+                      placeholder="Type a message... (⌘Enter to send)"
+                      rows={2}
+                      className="min-h-0"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 self-end shrink-0">
+                    {isAgency && (
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        onClick={() => setOfferModalOpen(true)}
+                        title="Submit an offer"
+                        className="flex items-center gap-1.5"
+                      >
+                        <Receipt className="size-4" />
+                        <span className="hidden sm:inline">Submit Offer</span>
+                      </Button>
+                    )}
+                    <Button onClick={sendMessage} disabled={isPending} size="icon">
+                      <Send className="size-4" />
                     </Button>
-                  )}
-                  <Button onClick={sendMessage} disabled={isPending} size="icon">
-                    <Send className="size-4" />
-                  </Button>
+                  </div>
                 </div>
               </div>
             </div>
