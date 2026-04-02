@@ -140,7 +140,7 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm text-[var(--color-ink-950)]">{member.user.fullName}</span>
                             {isCreator && <Badge variant="lavender" className="scale-90">CREATOR</Badge>}
-                            {member.status !== "CREATOR" && member.status !== "INTERESTED" && (
+                            {!isCreator && member.status !== "INTERESTED" && (
                               <Badge variant="sea" className="scale-90">{member.status}</Badge>
                             )}
                             {isInterested && (
