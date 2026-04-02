@@ -61,6 +61,18 @@ function inclusionLabels(inclusions?: Record<string, unknown> | null) {
   return labels;
 }
 
+function inclusionCoverage(inclusions?: Record<string, unknown> | null) {
+  const data = inclusions ?? {};
+  return [
+    { label: "Transport", included: Boolean(data.transport) },
+    { label: "Hotels", included: Boolean(data.hotel ?? data.accommodation) },
+    { label: "Meals", included: Boolean(data.meals) },
+    { label: "Guide", included: Boolean(data.guide) },
+    { label: "Visa", included: Boolean(data.visa) },
+    { label: "Insurance", included: Boolean(data.insurance) },
+  ];
+}
+
 export interface OfferCardProps {
   offer: Offer;
   isCreator: boolean;
@@ -98,6 +110,12 @@ export function OfferCard({
   const roundsLeft = Math.max(0, 3 - roundsUsed);
 
   const includes = inclusionLabels(offer.inclusions);
+  const inclusionRows = inclusionCoverage(offer.inclusions);
+  const activities =
+    offer.inclusions && Array.isArray(offer.inclusions.activities)
+      ? offer.inclusions.activities
+          .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
   const validityText = getValidityText(offer.validUntil);
   const itineraryDays = offer.itinerary?.length ?? 0;
   const canReuseQuoteAsCounter = !isTerminal && roundsLeft > 0 && (creatorCanCounter || agencyCanAct);
@@ -106,7 +124,7 @@ export function OfferCard({
     ? Number(offer.agency.avgRating).toFixed(1)
     : "0.0";
 
-  const quoteTimeline = [
+  const timelineRows = [
     {
       id: `live-${offer.id}`,
       label: "Live quote",
@@ -132,7 +150,23 @@ export function OfferCard({
         isLive: false,
         round: entry.round,
       })),
-  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  ];
+
+  const seenTimelineKeys = new Set<string>();
+  const quoteTimeline = timelineRows
+    .filter((row) => {
+      const key = `${row.isLive ? "live" : "round"}:${row.senderType}:${row.round ?? "na"}:${row.price}:${row.message ?? ""}:${row.createdAt}`;
+      if (seenTimelineKeys.has(key)) return false;
+      seenTimelineKeys.add(key);
+      return true;
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const latestAgencyNote =
+    quoteTimeline.find((quote) => quote.senderType === "agency" && quote.message)?.message ?? null;
+  const canReconfirmOldAgencyQuote =
+    isCreator &&
+    creatorCanCounter &&
+    quoteTimeline.some((quote) => !quote.isLive && quote.senderType === "agency");
 
   return (
     <article className="overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
@@ -192,6 +226,40 @@ export function OfferCard({
           </div>
         )}
 
+        <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
+            What this offer includes
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {inclusionRows.map((entry) => (
+              <div key={entry.label} className="flex items-center justify-between gap-2 rounded-[8px] bg-[var(--color-surface-raised)] px-2 py-1.5">
+                <span className="text-[var(--color-ink-700)]">{entry.label}</span>
+                <span className={entry.included ? "font-semibold text-[var(--color-sea-700)]" : "text-[var(--color-ink-500)]"}>
+                  {entry.included ? "Included" : "Not specified"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {activities.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {activities.slice(0, 6).map((activity) => (
+                <span
+                  key={activity}
+                  className="rounded-full bg-[var(--color-lavender-50)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-lavender-500)]"
+                >
+                  {activity}
+                </span>
+              ))}
+            </div>
+          )}
+          {latestAgencyNote && (
+            <p className="mt-2 text-xs text-[var(--color-ink-600)]">
+              <span className="font-semibold text-[var(--color-ink-700)]">Latest agency note:</span>{" "}
+              {latestAgencyNote}
+            </p>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-500)]">
           <span>{itineraryDays > 0 ? `${itineraryDays}-day itinerary shared` : "Custom itinerary available"}</span>
           {validityText && (
@@ -239,19 +307,27 @@ export function OfferCard({
                     )}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {canReuseQuoteAsCounter && (
+                    {canReuseQuoteAsCounter && !quote.isLive && (
                       <button
                         type="button"
                         onClick={() => onCounter?.(offer.id, quote.price)}
                         className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-lavender-500)] transition hover:bg-[var(--color-lavender-100)]"
                       >
-                        Re-use in counter
+                        {isCreator && quote.senderType === "agency"
+                          ? "Reconfirm quote"
+                          : "Re-use in counter"}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
+            {canReconfirmOldAgencyQuote && (
+              <p className="mt-2 text-[11px] text-[var(--color-ink-600)]">
+                To accept an older agency quote: click <strong>Reconfirm quote</strong>, send that
+                counter, then accept the new current quote.
+              </p>
+            )}
           </div>
         )}
 
