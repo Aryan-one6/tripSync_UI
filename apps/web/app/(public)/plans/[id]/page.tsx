@@ -360,6 +360,13 @@ export default async function PlanDetailPage({
         <div className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
           <BookingSidebar
             groupId={plan.group?.id}
+            planId={plan.id}
+            planTitle={plan.title}
+            destination={plan.destination}
+            budgetMin={plan.budgetMin}
+            budgetMax={plan.budgetMax}
+            creatorUserId={plan.creator.id}
+            offers={plan.offers ?? []}
             price={hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin ?? null}
             startDate={plan.startDate}
             endDate={plan.endDate}
@@ -384,10 +391,12 @@ export default async function PlanDetailPage({
             <p className="text-sm font-semibold leading-5 text-[var(--color-ink-900)] sm:leading-6">
               {plan.status === "OPEN" && currentSize < plan.groupSizeMin
                 ? `${plan.groupSizeMin - currentSize} more traveler${plan.groupSizeMin - currentSize > 1 ? "s" : ""} needed to hit the minimum group size`
+                : plan.status === "OPEN" && (plan.offers ?? []).length === 0 && currentSize >= plan.groupSizeMin
+                  ? "Group is ready and waiting for the first agency offer."
                 : plan.status === "OPEN" && (plan.offers ?? []).length === 0
-                  ? "Group is forming! Agencies will start sending offers once more travelers join."
-                  : plan.status === "OPEN" && (plan.offers ?? []).length > 0
-                    ? `${plan.offers!.length} agency offer${plan.offers!.length > 1 ? "s" : ""} received — join the group to vote!`
+                  ? "Group is forming. Agencies can still send early offers while members join."
+                : plan.status === "OPEN" && (plan.offers ?? []).length > 0
+                  ? `${plan.offers!.length} agency offer${plan.offers!.length > 1 ? "s" : ""} received — join the group to vote!`
                     : hasSelectedOffer
                       ? `Trip confirmed with ${plan.selectedOffer!.agency.name} — secure your spot!`
                       : "This trip is progressing. Join now to be part of the journey!"}
@@ -891,6 +900,13 @@ export default async function PlanDetailPage({
       {/* ═══ Sticky mobile bottom bar ═══ */}
       <MobileBottomBar
         groupId={plan.group?.id}
+        planId={plan.id}
+        planTitle={plan.title}
+        destination={plan.destination}
+        budgetMin={plan.budgetMin}
+        budgetMax={plan.budgetMax}
+        creatorUserId={plan.creator.id}
+        offers={plan.offers ?? []}
         price={hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin ?? null}
         spotsLeft={spotsLeft}
         shareUrl={shareUrl}

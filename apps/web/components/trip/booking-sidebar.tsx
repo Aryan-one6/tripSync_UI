@@ -2,13 +2,20 @@
 
 import { Calendar, Users, MessageCircle, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { JoinTripButton } from "@/components/forms/join-trip-button";
 import { WhatsAppShareButton } from "@/components/ui/whatsapp-share-button";
+import { PlanPrimaryAction } from "@/components/trip/plan-primary-action";
 import { formatCurrency, formatDateRange } from "@/lib/format";
-import type { GroupMember } from "@/lib/api/types";
+import type { GroupMember, Offer } from "@/lib/api/types";
 
 interface BookingSidebarProps {
   groupId?: string;
+  planId?: string;
+  planTitle?: string;
+  destination?: string;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  creatorUserId?: string;
+  offers?: Offer[];
   price: number | null;
   startDate?: string | Date | null;
   endDate?: string | Date | null;
@@ -24,6 +31,13 @@ interface BookingSidebarProps {
 
 export function BookingSidebar({
   groupId,
+  planId,
+  planTitle,
+  destination,
+  budgetMin,
+  budgetMax,
+  creatorUserId,
+  offers = [],
   price,
   startDate,
   endDate,
@@ -92,11 +106,18 @@ export function BookingSidebar({
 
         {/* CTA */}
         <div className="mt-5 space-y-2.5">
-          <JoinTripButton
+          <PlanPrimaryAction
             groupId={groupId}
-            label={label}
+            joinLabel={label}
             requiresFemaleProfile={requiresFemaleProfile}
             members={members}
+            planId={planId}
+            planTitle={planTitle}
+            destination={destination}
+            budgetMin={budgetMin}
+            budgetMax={budgetMax}
+            creatorUserId={creatorUserId}
+            offers={offers}
           />
           <WhatsAppShareButton href={shareUrl} className="block" />
         </div>

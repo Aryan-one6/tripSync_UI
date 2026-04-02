@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
   AlertCircle,
@@ -306,8 +306,10 @@ function PlanCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AgencyBidsPage() {
+  const searchParams = useSearchParams();
   const { apiFetchWithAuth } = useAuth();
   const socket = useSocket();
+  const preselectedPlanId = searchParams.get("planId");
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [openPlans, setOpenPlans] = useState<DiscoverItem[]>([]);
@@ -325,6 +327,12 @@ export default function AgencyBidsPage() {
     try {
       const data = await apiFetchWithAuth<Offer[]>("/offers/my");
       setOffers(data);
+      setFeedback(null);
+    } catch (err) {
+      setFeedback(
+        err instanceof Error ? err.message : "Unable to load your offers right now.",
+      );
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -337,17 +345,34 @@ export default function AgencyBidsPage() {
 
   // ── Load open plans when browse panel opens ──────────────────────────────────
   useEffect(() => {
-    if (!showBrowse || openPlans.length > 0) return;
+    if ((!showBrowse && !preselectedPlanId) || openPlans.length > 0) return;
     void (async () => {
       try {
         setLoadingPlans(true);
         const data = await apiFetchWithAuth<DiscoverItem[]>("/discover");
         setOpenPlans(data.filter((p) => p.originType === "plan" && p.status === "OPEN"));
+      } catch {
+        setOpenPlans([]);
       } finally {
         setLoadingPlans(false);
       }
     })();
-  }, [showBrowse, openPlans.length, apiFetchWithAuth]);
+  }, [showBrowse, preselectedPlanId, openPlans.length, apiFetchWithAuth]);
+
+  useEffect(() => {
+    if (!preselectedPlanId || submitForPlan) return;
+    const matched = openPlans.find((plan) => plan.id === preselectedPlanId);
+    if (matched) {
+      setSubmitForPlan(matched);
+      setShowBrowse(false);
+      return;
+    }
+
+    const alreadyBid = offers.some((offer) => offer.planId === preselectedPlanId);
+    if (alreadyBid) {
+      setFeedback("You already have an offer on this plan. Open it below to counter or update.");
+    }
+  }, [preselectedPlanId, openPlans, offers, submitForPlan]);
 
   // ── Socket: real-time offer updates ─────────────────────────────────────────
   useEffect(() => {

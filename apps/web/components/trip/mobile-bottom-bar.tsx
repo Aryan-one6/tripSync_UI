@@ -1,13 +1,20 @@
 "use client";
 
 import { Share2 } from "lucide-react";
-import { JoinTripButton } from "@/components/forms/join-trip-button";
 import { Button } from "@/components/ui/button";
+import { PlanPrimaryAction } from "@/components/trip/plan-primary-action";
 import { formatCurrency } from "@/lib/format";
-import type { GroupMember } from "@/lib/api/types";
+import type { GroupMember, Offer } from "@/lib/api/types";
 
 interface MobileBottomBarProps {
   groupId?: string;
+  planId?: string;
+  planTitle?: string;
+  destination?: string;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  creatorUserId?: string;
+  offers?: Offer[];
   price: number | null;
   spotsLeft: number;
   shareUrl: string;
@@ -18,6 +25,13 @@ interface MobileBottomBarProps {
 
 export function MobileBottomBar({
   groupId,
+  planId,
+  planTitle,
+  destination,
+  budgetMin,
+  budgetMax,
+  creatorUserId,
+  offers = [],
   price,
   spotsLeft,
   shareUrl,
@@ -49,11 +63,18 @@ export function MobileBottomBar({
             </Button>
           </a>
           <div className="shrink-0">
-            <JoinTripButton
+            <PlanPrimaryAction
               groupId={groupId}
-              label={label}
+              joinLabel={label}
               requiresFemaleProfile={requiresFemaleProfile}
               members={members}
+              planId={planId}
+              planTitle={planTitle}
+              destination={destination}
+              budgetMin={budgetMin}
+              budgetMax={budgetMax}
+              creatorUserId={creatorUserId}
+              offers={offers}
             />
           </div>
         </div>
