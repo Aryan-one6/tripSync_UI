@@ -354,7 +354,16 @@ export async function listUserPlans(userId: string) {
 export async function listPlanOffers(planId: string, userId: string) {
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan) throw new NotFoundError('Plan');
-  if (plan.creatorId !== userId) throw new ForbiddenError('Only the creator can view offers');
+
+  // Allow: plan creator OR approved/committed group member
+  if (plan.creatorId !== userId) {
+    const group = await prisma.group.findUnique({ where: { planId }, select: { id: true } });
+    if (!group) throw new ForbiddenError('Only the creator can view offers');
+    const membership = await prisma.groupMember.findFirst({
+      where: { groupId: group.id, userId, status: { in: ['APPROVED', 'COMMITTED'] } },
+    });
+    if (!membership) throw new ForbiddenError('Only plan members can view offers');
+  }
 
   return prisma.offer.findMany({
     where: { planId },

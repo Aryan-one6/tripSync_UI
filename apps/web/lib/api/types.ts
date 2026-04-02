@@ -119,6 +119,7 @@ export interface GroupMember {
 
 export interface Group {
   id: string;
+  planId?: string | null;
   currentSize: number;
   maleCount: number;
   femaleCount: number;

@@ -9,7 +9,6 @@ import {
   MessageSquareMore,
   Minus,
   Plus,
-  PlusCircle,
   Receipt,
   Send,
   Users,
