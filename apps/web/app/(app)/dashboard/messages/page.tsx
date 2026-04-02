@@ -5,8 +5,8 @@ export default function MessagesPage() {
   return (
     <DashboardShell
       variant="user"
-      title="Inbox"
-      subtitle="Direct chats and active group channels in one messenger workspace with live updates and typing indicators."
+      title="Messages"
+      subtitle="Direct messages and group channels — all in one place."
     >
       <InboxChatbox variant="user" />
     </DashboardShell>

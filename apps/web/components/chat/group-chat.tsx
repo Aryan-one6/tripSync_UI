@@ -2,29 +2,41 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MessageSquareMore, PlusCircle, Receipt, Send, Users } from "lucide-react";
+import { format, isToday, isYesterday } from "date-fns";
+import {
+  AtSign,
+  BarChart3,
+  MessageSquareMore,
+  Minus,
+  Plus,
+  PlusCircle,
+  Receipt,
+  Send,
+  Users,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
-import { formatCompactDate, initials } from "@/lib/format";
+import { initials } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { OfferCard } from "@/components/chat/offer-card";
 import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
 import { PollCard } from "@/components/chat/poll-card";
 import type { ChatMessage, Group, GroupMember, Offer } from "@/lib/api/types";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function upsertMessage(list: ChatMessage[], next: ChatMessage) {
-  const existingIndex = list.findIndex((message) => message.id === next.id);
-  if (existingIndex === -1) {
-    return [...list, next].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  }
+  const idx = list.findIndex((m) => m.id === next.id);
+  if (idx === -1)
+    return [...list, next].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const clone = [...list];
-  clone[existingIndex] = next;
+  clone[idx] = next;
   return clone;
 }
 
@@ -36,12 +48,50 @@ function upsertOffer(list: Offer[], next: Offer) {
   return clone;
 }
 
-// ─── Submit Offer Modal ───────────────────────────────────────────────────────
+function chatMsgTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isToday(d)) return format(d, "HH:mm");
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "dd MMM");
+}
+
+/** Render message content with @mention highlighting */
+function MessageContent({
+  content,
+  isMine,
+}: {
+  content: string;
+  isMine: boolean;
+}) {
+  const parts = content.split(/(@[A-Za-z][A-Za-z\s]*[A-Za-z]|@[A-Za-z])/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("@") ? (
+          <strong
+            key={i}
+            className={cn(
+              "font-semibold",
+              isMine
+                ? "text-white underline decoration-dotted decoration-white/60"
+                : "text-[var(--color-sea-700)]",
+            )}
+          >
+            {part}
+          </strong>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+// ── Submit Offer Modal ────────────────────────────────────────────────────────
 
 function SubmitOfferModal({
   open,
   groupId,
-  planCreatorId,
   onClose,
   onSubmitted,
   apiFetchWithAuth,
@@ -121,19 +171,22 @@ function SubmitOfferModal({
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
-            Message <span className="text-[var(--color-ink-400)] font-normal">(optional)</span>
+            Message{" "}
+            <span className="font-normal text-[var(--color-ink-400)]">(optional)</span>
           </label>
           <Textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={3}
-            placeholder="We can arrange transport from Delhi, hotels in Manali..."
+            placeholder="We can arrange transport from Delhi, hotels in Manali…"
           />
         </div>
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={isPending || !price}>
-            {isPending ? "Submitting..." : "Submit offer"}
+            {isPending ? "Submitting…" : "Submit offer"}
           </Button>
         </div>
       </div>
@@ -141,15 +194,154 @@ function SubmitOfferModal({
   );
 }
 
-// ─── Main GroupChat Component ─────────────────────────────────────────────────
+// ── Poll Creation Modal ───────────────────────────────────────────────────────
 
-export function GroupChat({ groupId, planId, planCreatorId }: {
+function PollModal({
+  open,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (question: string, options: string[]) => void;
+  isPending: boolean;
+}) {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState<string[]>(["", ""]);
+
+  function reset() {
+    setQuestion("");
+    setOptions(["", ""]);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
+  function addOption() {
+    if (options.length >= 10) return;
+    setOptions((cur) => [...cur, ""]);
+  }
+
+  function removeOption(idx: number) {
+    if (options.length <= 2) return;
+    setOptions((cur) => cur.filter((_, i) => i !== idx));
+  }
+
+  function updateOption(idx: number, value: string) {
+    setOptions((cur) => cur.map((o, i) => (i === idx ? value : o)));
+  }
+
+  function handleSubmit() {
+    const validOptions = options.map((o) => o.trim()).filter(Boolean);
+    if (!question.trim() || validOptions.length < 2) return;
+    onSubmit(question.trim(), validOptions);
+    reset();
+  }
+
+  const canSubmit =
+    question.trim().length >= 3 &&
+    options.filter((o) => o.trim()).length >= 2;
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Create a poll"
+      description="Ask the group a question — everyone can vote."
+    >
+      <div className="space-y-4">
+        {/* Question */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+            Question
+          </label>
+          <Input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g. What time should we depart?"
+            maxLength={500}
+          />
+          <p className="mt-1 text-right text-[10px] text-[var(--color-ink-400)]">
+            {question.length}/500
+          </p>
+        </div>
+
+        {/* Options */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+            Options{" "}
+            <span className="font-normal text-[var(--color-ink-400)]">
+              (min 2, max 10)
+            </span>
+          </label>
+          <div className="space-y-2">
+            {options.map((opt, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[11px] font-bold text-[var(--color-ink-500)]">
+                  {idx + 1}
+                </span>
+                <Input
+                  value={opt}
+                  onChange={(e) => updateOption(idx, e.target.value)}
+                  placeholder={`Option ${idx + 1}`}
+                  maxLength={200}
+                  className="flex-1"
+                />
+                {options.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeOption(idx)}
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sunset-50)] hover:text-[var(--color-sunset-700)]"
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {options.length < 10 && (
+            <button
+              type="button"
+              onClick={addOption}
+              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
+            >
+              <Plus className="size-4" />
+              Add option
+            </button>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 pt-1">
+          <Button variant="secondary" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isPending || !canSubmit}>
+            {isPending ? "Creating…" : "Create poll"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Main GroupChat Component ──────────────────────────────────────────────────
+
+export function GroupChat({
+  groupId,
+  planId,
+  planCreatorId,
+}: {
   groupId: string;
   planId?: string;
   planCreatorId?: string;
 }) {
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
+
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -159,18 +351,53 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
   const [pollOpen, setPollOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
-  const [pollQuestion, setPollQuestion] = useState("");
-  const [pollOptions, setPollOptions] = useState("Yes\nNo");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isAgency = session?.role === "agency_admin";
   const userId = session?.user.id;
 
+  // ── @mention detection ──────────────────────────────────────────────────────
+  const mentionQuery = useMemo(() => {
+    const match = draft.match(/@([^@\n]*)$/);
+    return match ? match[1] : null;
+  }, [draft]);
+
+  const activeMembers = useMemo(
+    () => members.filter((m) => m.status === "APPROVED" || m.status === "COMMITTED"),
+    [members],
+  );
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return activeMembers
+      .filter((m) => m.user.id !== userId)
+      .filter(
+        (m) => q === "" || m.user.fullName.toLowerCase().startsWith(q),
+      )
+      .slice(0, 6);
+  }, [mentionQuery, activeMembers, userId]);
+
+  useEffect(() => {
+    setShowMentionDropdown(mentionQuery !== null && mentionSuggestions.length > 0);
+  }, [mentionQuery, mentionSuggestions.length]);
+
+  function insertMention(member: GroupMember) {
+    const newDraft = draft.replace(/@([^@\n]*)$/, `@${member.user.fullName} `);
+    setDraft(newDraft);
+    setShowMentionDropdown(false);
+    textareaRef.current?.focus();
+  }
+
+  // ── Data loaders ────────────────────────────────────────────────────────────
   const emitTyping = useCallback(
     (isTyping: boolean) => {
       if (!socket) return;
@@ -181,19 +408,25 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
   );
 
   const loadMembers = useCallback(async () => {
-    const data = await apiFetchWithAuth<{ group: Group; members: GroupMember[] }>(`/groups/${groupId}/members`);
+    const data = await apiFetchWithAuth<{ group: Group; members: GroupMember[] }>(
+      `/groups/${groupId}/members`,
+    );
     setGroup(data.group);
     setMembers(data.members);
   }, [apiFetchWithAuth, groupId]);
 
   const loadMessages = useCallback(async () => {
-    const data = await apiFetchWithAuth<ChatMessage[]>(`/chat/groups/${groupId}/messages`);
+    const data = await apiFetchWithAuth<ChatMessage[]>(
+      `/chat/groups/${groupId}/messages`,
+    );
     setMessages(data);
   }, [apiFetchWithAuth, groupId]);
 
   const loadOffers = useCallback(async () => {
     if (!planId) return;
-    const data = await apiFetchWithAuth<Offer[]>(`/plans/${planId}/offers`).catch(() => []);
+    const data = await apiFetchWithAuth<Offer[]>(`/plans/${planId}/offers`).catch(
+      () => [],
+    );
     setOffers(data);
   }, [apiFetchWithAuth, planId]);
 
@@ -202,40 +435,46 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
       try {
         setLoading(true);
         await Promise.all([loadMembers(), loadMessages(), loadOffers()]);
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Unable to load the trip chat.");
+      } catch (err) {
+        setFeedback(
+          err instanceof Error ? err.message : "Unable to load the trip chat.",
+        );
       } finally {
         setLoading(false);
       }
     })();
   }, [loadMembers, loadMessages, loadOffers]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // ── Socket events ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
-    const handleMessageCreated = (message: ChatMessage) => setMessages((c) => upsertMessage(c, message));
-    const handleMessageUpdated = (message: ChatMessage) => setMessages((c) => upsertMessage(c, message));
+
+    const handleMessageCreated = (msg: ChatMessage) =>
+      setMessages((c) => upsertMessage(c, msg));
+    const handleMessageUpdated = (msg: ChatMessage) =>
+      setMessages((c) => upsertMessage(c, msg));
     const handleMemberUpdate = () => void loadMembers();
 
-    // ── Offer socket events (Phase 4) ──
-    const handleOfferCreated = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
-    const handleOfferCountered = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
-    const handleOfferAccepted = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
-    const handleOfferRejected = (offer: Offer) => setOffers((c) => upsertOffer(c, offer));
+    const handleOfferCreated = (o: Offer) => setOffers((c) => upsertOffer(c, o));
+    const handleOfferCountered = (o: Offer) => setOffers((c) => upsertOffer(c, o));
+    const handleOfferAccepted = (o: Offer) => setOffers((c) => upsertOffer(c, o));
+    const handleOfferRejected = (o: Offer) => setOffers((c) => upsertOffer(c, o));
 
-    // ── Payment socket events (Phase 5.2) ──
-    const handlePaymentUpdate = (payload: { paid: number; total: number; status: string }) => {
-      const syntheticId = `payment-sys-${Date.now()}`;
+    const handlePaymentUpdate = (payload: {
+      paid: number;
+      total: number;
+      status: string;
+    }) => {
       const text =
         payload.status === "CONFIRMED"
           ? `🎉 All ${payload.total} travelers have paid — the trip is CONFIRMED!`
           : `💳 Payment update: ${payload.paid} of ${payload.total} confirmed.`;
       const syntheticMsg: ChatMessage = {
-        id: syntheticId,
+        id: `payment-sys-${Date.now()}`,
         groupId,
         senderId: "system",
         content: text,
@@ -257,12 +496,12 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
       const uid = payload.userId;
       const fullName = payload.fullName ?? "Someone";
       const isTyping = Boolean(payload.isTyping);
-      setTypingUsers((current) => {
+      setTypingUsers((cur) => {
         if (isTyping) {
-          if (current.some((entry) => entry.userId === uid)) return current;
-          return [...current, { userId: uid, fullName }];
+          if (cur.some((e) => e.userId === uid)) return cur;
+          return [...cur, { userId: uid, fullName }];
         }
-        return current.filter((entry) => entry.userId !== uid);
+        return cur.filter((e) => e.userId !== uid);
       });
     };
 
@@ -311,11 +550,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
     };
   }, [emitTyping]);
 
-  const activeMembers = useMemo(
-    () => members.filter((m) => m.status === "APPROVED" || m.status === "COMMITTED"),
-    [members],
-  );
-
+  // ── Actions ─────────────────────────────────────────────────────────────────
   function sendMessage() {
     const content = draft.trim();
     if (!content) return;
@@ -328,26 +563,27 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
         setDraft("");
         emitTyping(false);
         setFeedback(null);
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Unable to send the message.");
+      } catch (err) {
+        setFeedback(
+          err instanceof Error ? err.message : "Unable to send the message.",
+        );
       }
     });
   }
 
-  function createPoll() {
-    const options = pollOptions.split("\n").map((o) => o.trim()).filter(Boolean);
+  function createPoll(question: string, options: string[]) {
     startTransition(async () => {
       try {
         await apiFetchWithAuth(`/chat/groups/${groupId}/polls`, {
           method: "POST",
-          body: JSON.stringify({ question: pollQuestion, options }),
+          body: JSON.stringify({ question, options }),
         });
         setPollOpen(false);
-        setPollQuestion("");
-        setPollOptions("Yes\nNo");
         setFeedback(null);
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Unable to create the poll.");
+      } catch (err) {
+        setFeedback(
+          err instanceof Error ? err.message : "Unable to create the poll.",
+        );
       }
     });
   }
@@ -359,8 +595,10 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
           method: "POST",
           body: JSON.stringify({ optionId }),
         });
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Unable to register the vote.");
+      } catch (err) {
+        setFeedback(
+          err instanceof Error ? err.message : "Unable to register the vote.",
+        );
       }
     });
   }
@@ -383,7 +621,9 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
       });
       setOffers((c) => upsertOffer(c, updated));
     } catch (err) {
-      setFeedback(err instanceof Error ? err.message : "Could not reject the offer.");
+      setFeedback(
+        err instanceof Error ? err.message : "Could not reject the offer.",
+      );
     }
   }
 
@@ -406,29 +646,34 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
       });
       setOffers((c) => upsertOffer(c, updated));
     } catch (err) {
-      setFeedback(err instanceof Error ? err.message : "Could not withdraw the offer.");
+      setFeedback(
+        err instanceof Error ? err.message : "Could not withdraw the offer.",
+      );
     }
   }
 
-
-  const counteringOffer = counterSheetOfferId ? offers.find((o) => o.id === counterSheetOfferId) : null;
+  const counteringOffer = counterSheetOfferId
+    ? offers.find((o) => o.id === counterSheetOfferId)
+    : null;
   const isCreator = planCreatorId ? userId === planCreatorId : true;
 
+  // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
     return (
       <Card className="flex items-center justify-center p-12 text-[var(--color-ink-500)]">
         <div className="animate-pulse-soft text-center">
           <div className="mx-auto mb-3 size-10 rounded-full bg-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]" />
-          <p className="text-sm">Loading group chat...</p>
+          <p className="text-sm">Loading group chat…</p>
         </div>
       </Card>
     );
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="grid gap-5 xl:grid-cols-[1.5fr_0.8fr]">
-        {/* Chat area */}
+        {/* ── Chat area ── */}
         <div className="space-y-5">
           <Card className="relative overflow-hidden p-5 sm:p-6">
             <div className="relative space-y-5">
@@ -443,22 +688,23 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* View all offers badge */}
                   {offers.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        document.getElementById("offers-section")?.scrollIntoView({ behavior: "smooth" });
-                      }}
-                      className="flex items-center gap-1.5 rounded-full bg-[var(--color-lavender-50)] border border-[var(--color-lavender-200)] px-3 py-1.5 text-xs font-semibold text-[var(--color-lavender-500)] hover:bg-[var(--color-lavender-100)] transition-colors"
+                      onClick={() =>
+                        document
+                          .getElementById("offers-section")
+                          ?.scrollIntoView({ behavior: "smooth" })
+                      }
+                      className="flex items-center gap-1.5 rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-3 py-1.5 text-xs font-semibold text-[var(--color-lavender-500)] transition-colors hover:bg-[var(--color-lavender-100)]"
                     >
                       <Receipt className="size-3.5" />
                       View all offers ({offers.length})
                     </button>
                   )}
                   <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
-                    <PlusCircle className="size-4" />
-                    Start poll
+                    <BarChart3 className="size-4" />
+                    Poll
                   </Button>
                 </div>
               </div>
@@ -470,71 +716,107 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
               )}
 
               {/* Messages */}
-              <div className="max-h-[calc(100dvh-220px)] sm:max-h-[60vh] space-y-3 overflow-y-auto hide-scrollbar">
+              <div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto sm:max-h-[60vh]">
                 {messages.length === 0 ? (
                   <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
                     No messages yet. Coordinate arrivals, budget, and votes here.
                   </CardInset>
                 ) : (
-                  messages.map((message) => {
+                  messages.map((message, idx) => {
                     const mine = session?.user.id === message.senderId;
                     const pollOptionsData = message.metadata?.options ?? [];
-                    const pollQuestion = typeof message.metadata?.question === "string" ? message.metadata.question : message.content;
+                    const pollQuestion =
+                      typeof message.metadata?.question === "string"
+                        ? message.metadata.question
+                        : message.content;
+
+                    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                    const showDate =
+                      !prevMsg ||
+                      new Date(message.createdAt).toDateString() !==
+                        new Date(prevMsg.createdAt).toDateString();
 
                     if (message.messageType === "system") {
-                      // Detect offer-related system messages by metadata
-                      const metaAction = message.metadata &&
+                      const metaAction =
+                        message.metadata &&
                         typeof message.metadata === "object" &&
                         "action" in message.metadata
-                        ? String((message.metadata as Record<string, unknown>).action)
-                        : "";
+                          ? String(
+                              (message.metadata as Record<string, unknown>).action,
+                            )
+                          : "";
                       const isOfferMsg = metaAction.startsWith("offer_");
                       const isPaymentMsg = metaAction.startsWith("payment_");
 
                       return (
-                        <div
-                          key={message.id}
-                          className={`mx-auto flex max-w-md items-center gap-2 rounded-full px-4 py-2 text-center text-xs ${
-                            isOfferMsg
-                              ? "bg-[var(--color-lavender-50)] border border-[var(--color-lavender-200)] text-[var(--color-lavender-500)]"
-                              : isPaymentMsg
-                              ? "bg-[var(--color-sea-50)] border border-[var(--color-sea-200)] text-[var(--color-sea-700)]"
-                              : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)]"
-                          }`}
-                        >
-                          {isOfferMsg && <Receipt className="size-3.5 shrink-0" />}
-                          <span>{message.content}</span>
+                        <div key={message.id}>
+                          {showDate && (
+                            <DateDivider date={message.createdAt} />
+                          )}
+                          <div
+                            className={cn(
+                              "mx-auto flex max-w-md items-center gap-2 rounded-full px-4 py-2 text-center text-xs",
+                              isOfferMsg
+                                ? "border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
+                                : isPaymentMsg
+                                ? "border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                                : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)]",
+                            )}
+                          >
+                            {isOfferMsg && <Receipt className="size-3.5 shrink-0" />}
+                            <span>{message.content}</span>
+                          </div>
                         </div>
                       );
                     }
 
                     return (
-                      <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                      <div key={message.id}>
+                        {showDate && <DateDivider date={message.createdAt} />}
                         <div
-                          className={`max-w-[85%] sm:max-w-[70%] rounded-[var(--radius-lg)] px-4 py-3 sm:px-5 sm:py-4 ${
-                            mine
-                              ? "bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-sm)]"
-                              : "border border-white/60 bg-[var(--color-surface-raised)] text-[var(--color-ink-900)] shadow-[var(--shadow-md)]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em]">
-                            <span className="font-semibold">{message.sender?.fullName ?? "System"}</span>
-                            <span className={mine ? "text-white/60" : "text-[var(--color-ink-400)]"}>
-                              {formatCompactDate(message.createdAt)}
-                            </span>
-                          </div>
-
-                          {message.messageType === "poll" ? (
-                            <PollCard
-                              question={pollQuestion}
-                              options={pollOptionsData}
-                              currentUserId={session?.user.id ?? ""}
-                              isMine={mine}
-                              onVote={(optionId) => vote(message.id, optionId)}
-                            />
-                          ) : (
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                          className={cn(
+                            "flex",
+                            mine ? "justify-end" : "justify-start",
                           )}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[85%] rounded-[var(--radius-lg)] px-4 py-3 sm:max-w-[70%] sm:px-5 sm:py-4",
+                              mine
+                                ? "bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-sm)]"
+                                : "border border-white/60 bg-[var(--color-surface-raised)] text-[var(--color-ink-900)] shadow-[var(--shadow-md)]",
+                            )}
+                          >
+                            {/* Sender + time */}
+                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em]">
+                              <span className="font-semibold">
+                                {message.sender?.fullName ?? "System"}
+                              </span>
+                              <span
+                                className={
+                                  mine
+                                    ? "text-white/60"
+                                    : "text-[var(--color-ink-400)]"
+                                }
+                              >
+                                {chatMsgTime(message.createdAt)}
+                              </span>
+                            </div>
+
+                            {message.messageType === "poll" ? (
+                              <PollCard
+                                question={pollQuestion}
+                                options={pollOptionsData}
+                                currentUserId={session?.user.id ?? ""}
+                                isMine={mine}
+                                onVote={(optionId) => vote(message.id, optionId)}
+                              />
+                            ) : (
+                              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                                <MessageContent content={message.content} isMine={mine} />
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -543,33 +825,82 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                 <div ref={messageEndRef} />
               </div>
 
-              {/* Typing indicators */}
-              {typingUsers.length > 0 ? (
+              {/* Typing indicator */}
+              {typingUsers.length > 0 && (
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  {typingUsers.map((entry) => entry.fullName).join(", ")}{" "}
-                  {typingUsers.length === 1 ? "is" : "are"} typing...
+                  {typingUsers.map((e) => e.fullName).join(", ")}{" "}
+                  {typingUsers.length === 1 ? "is" : "are"} typing…
                 </p>
-              ) : null}
+              )}
 
-              {/* Compose — sticky on mobile */}
-              <div className="sticky bottom-0 -mx-5 -mb-5 bg-white/95 backdrop-blur-sm px-5 py-3 border-t border-[var(--color-border)] sm:static sm:mx-0 sm:mb-0 sm:bg-transparent sm:backdrop-blur-none sm:px-0 sm:py-0 sm:border-0">
+              {/* @mention dropdown */}
+              {showMentionDropdown && (
+                <div className="relative z-10">
+                  <div className="absolute bottom-2 left-0 w-64 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+                    <p className="border-b border-[var(--color-border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
+                      Tag a member
+                    </p>
+                    {mentionSuggestions.map((member) => (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // keep focus in textarea
+                          insertMention(member);
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[var(--color-sea-50)]"
+                      >
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[10px] font-bold text-[var(--color-sea-700)]">
+                          {initials(member.user.fullName)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                            {member.user.fullName}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-400)]">
+                            {member.status}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Compose */}
+              <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-[var(--color-border)] bg-white/95 px-5 py-3 backdrop-blur-sm sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
                 <div className="flex gap-3">
-                  <div className="flex-1">
+                  <div className="relative flex-1">
                     <Textarea
+                      ref={textareaRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setShowMentionDropdown(false);
+                        }
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault();
                           sendMessage();
                         }
                       }}
-                      placeholder="Type a message... (⌘Enter to send)"
+                      placeholder="Type a message… (⌘Enter to send, @ to mention)"
                       rows={2}
                       className="min-h-0"
                     />
                   </div>
-                  <div className="flex flex-col gap-2 self-end shrink-0">
+                  <div className="flex shrink-0 flex-col gap-2 self-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraft((d) => d + "@");
+                        textareaRef.current?.focus();
+                      }}
+                      title="Mention someone"
+                      className="flex size-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+                    >
+                      <AtSign className="size-4" />
+                    </button>
                     {isAgency && (
                       <Button
                         variant="soft"
@@ -579,7 +910,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                         className="flex items-center gap-1.5"
                       >
                         <Receipt className="size-4" />
-                        <span className="hidden sm:inline">Submit Offer</span>
+                        <span className="hidden sm:inline">Offer</span>
                       </Button>
                     )}
                     <Button onClick={sendMessage} disabled={isPending} size="icon">
@@ -591,9 +922,9 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
             </div>
           </Card>
 
-          {/* ── Inline Offer Cards (Phase 4) ── */}
+          {/* Offer cards */}
           {offers.length > 0 && (
-            <div id="offers-section" className="space-y-4 scroll-mt-6">
+            <div id="offers-section" className="scroll-mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg text-[var(--color-ink-950)]">
                   Offers ({offers.length})
@@ -619,15 +950,17 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* ── Sidebar ── */}
         <div className="space-y-5">
           <Card className="p-5">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="mb-4 flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
                 <Users className="size-5" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">Room</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                  Room
+                </p>
                 <p className="font-display text-lg text-[var(--color-ink-950)]">
                   {group?.currentSize ?? activeMembers.length} travelers
                 </p>
@@ -639,57 +972,70 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
                   key={member.id}
                   className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2.5"
                 >
-                  <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-xs font-bold text-[var(--color-sea-700)]">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-xs font-bold text-[var(--color-sea-700)]">
                     {initials(member.user.fullName)}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     {member.user.username ? (
-                      <Link href={`/profile/${member.user.username}`} className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+                      <Link
+                        href={`/profile/${member.user.username}`}
+                        className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]"
+                      >
                         {member.user.fullName}
                       </Link>
                     ) : (
-                      <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">{member.user.fullName}</p>
+                      <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                        {member.user.fullName}
+                      </p>
                     )}
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">{member.status}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">
+                      {member.status}
+                    </p>
                   </div>
+                  {/* @ shortcut */}
+                  <button
+                    type="button"
+                    title={`Mention ${member.user.fullName}`}
+                    onClick={() => {
+                      const mention = `@${member.user.fullName} `;
+                      setDraft((d) => {
+                        const trimmed = d.trimEnd();
+                        return trimmed ? `${trimmed} ${mention}` : mention;
+                      });
+                      textareaRef.current?.focus();
+                      // scroll chat into view
+                      document
+                        .querySelector("textarea")
+                        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    }}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+                  >
+                    <AtSign className="size-3.5" />
+                  </button>
                 </div>
               ))}
             </div>
           </Card>
 
           <CardInset className="flex items-start gap-3 p-4 text-sm text-[var(--color-ink-600)]">
-            <MessageSquareMore className="size-4 shrink-0 text-[var(--color-sea-600)] mt-0.5" />
-            <span>Messages and polls update live. Keep this tab open while coordinating.</span>
+            <MessageSquareMore className="mt-0.5 size-4 shrink-0 text-[var(--color-sea-600)]" />
+            <span>
+              Type <strong>@</strong> in the message box to tag a member, or click{" "}
+              <AtSign className="mb-0.5 inline size-3" /> next to their name.
+            </span>
           </CardInset>
         </div>
       </div>
 
-      {/* ── Poll modal ── */}
-      <Modal
+      {/* Poll modal */}
+      <PollModal
         open={pollOpen}
         onClose={() => setPollOpen(false)}
-        title="Start a quick poll"
-        description="Departure times, activity choices, or rooming decisions."
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Question</label>
-            <Input value={pollQuestion} onChange={(e) => setPollQuestion(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Options (one per line)</label>
-            <Textarea value={pollOptions} onChange={(e) => setPollOptions(e.target.value)} rows={4} />
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setPollOpen(false)}>Cancel</Button>
-            <Button onClick={createPoll} disabled={isPending}>
-              {isPending ? "Publishing..." : "Create poll"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onSubmit={createPoll}
+        isPending={isPending}
+      />
 
-      {/* ── Submit Offer modal (agency only) ── */}
+      {/* Submit Offer modal */}
       <SubmitOfferModal
         open={offerModalOpen}
         groupId={groupId}
@@ -699,7 +1045,7 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
         apiFetchWithAuth={apiFetchWithAuth}
       />
 
-      {/* ── Counter Offer sheet ── */}
+      {/* Counter Offer sheet */}
       <CounterOfferSheet
         open={counterSheetOfferId !== null}
         onClose={() => setCounterSheetOfferId(null)}
@@ -712,5 +1058,25 @@ export function GroupChat({ groupId, planId, planCreatorId }: {
         maxRounds={3}
       />
     </>
+  );
+}
+
+// ── Date divider helper ───────────────────────────────────────────────────────
+
+function DateDivider({ date }: { date: string }) {
+  const d = new Date(date);
+  const label = isToday(d)
+    ? "Today"
+    : isYesterday(d)
+    ? "Yesterday"
+    : format(d, "dd MMMM yyyy");
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <div className="flex-1 border-t border-[var(--color-border)]" />
+      <span className="rounded-full bg-[var(--color-surface-2)] px-3 py-0.5 text-[11px] text-[var(--color-ink-400)]">
+        {label}
+      </span>
+      <div className="flex-1 border-t border-[var(--color-border)]" />
+    </div>
   );
 }
