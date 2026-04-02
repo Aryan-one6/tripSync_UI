@@ -398,9 +398,52 @@ export async function createDirectConversation(
   });
 
   if (!targetUser) throw new NotFoundError('User');
+  const key = buildDirectConversationKey(userId, data.targetUserId);
+  const existing = await prisma.directConversation.findUnique({
+    where: { key },
+    include: {
+      participants: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              avatarUrl: true,
+              city: true,
+              verification: true,
+              avgRating: true,
+              completedTrips: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (existing) {
+    return serializeDirectConversation(existing, userId);
+  }
+
   await assertDirectConversationEligibility(userId, data.targetUserId);
 
-  const key = buildDirectConversationKey(userId, data.targetUserId);
   const conversation = await prisma.directConversation.upsert({
     where: { key },
     create: {
@@ -511,8 +554,6 @@ function serializeDirectConversation(
 }
 
 export async function listDirectConversations(userId: string) {
-  await assertUserEligibleForDirectMessages(userId);
-
   const conversations = await prisma.directConversation.findMany({
     where: {
       participants: {
@@ -562,7 +603,6 @@ export async function listDirectConversations(userId: string) {
 }
 
 export async function listDirectMessages(conversationId: string, userId: string, cursor?: string, limit = 30) {
-  await assertUserEligibleForDirectMessages(userId);
   await assertDirectConversationAccess(conversationId, userId);
 
   const messages = await prisma.directMessage.findMany({
@@ -599,7 +639,6 @@ export async function sendDirectMessage(
   userId: string,
   data: SendDirectMessageInput,
 ) {
-  await assertUserEligibleForDirectMessages(userId);
   const participant = await assertDirectConversationAccess(conversationId, userId);
   const content = normalizeContent(data.content);
 
@@ -668,7 +707,6 @@ export async function sendDirectMessage(
 }
 
 export async function markDirectConversationRead(conversationId: string, userId: string) {
-  await assertUserEligibleForDirectMessages(userId);
   const participant = await assertDirectConversationAccess(conversationId, userId);
 
   return prisma.directConversationParticipant.update({

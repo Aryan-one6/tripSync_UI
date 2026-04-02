@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus } from "lucide-react";
+import Link from "next/link";
+import { UserPlus, MessageSquareMore, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { GroupMember, MemberStatus } from "@/lib/api/types";
@@ -39,17 +40,6 @@ export function JoinTripButton({
   const joinedStatus = optimisticStatus ?? existingMembership?.status ?? null;
   const isCreator = existingMembership?.role === "CREATOR";
 
-  const joinedLabel =
-    isCreator
-      ? "You host this trip"
-      : joinedStatus === "INTERESTED"
-        ? "Request pending"
-        : joinedStatus === "COMMITTED"
-          ? "Trip confirmed"
-          : joinedStatus === "APPROVED"
-            ? "Already joined"
-            : label;
-
   if (!groupId) {
     return (
       <Button type="button" disabled className="gap-2">
@@ -58,11 +48,51 @@ export function JoinTripButton({
     );
   }
 
+  // ── Approved / Committed / Creator: redirect to group chat ──────────────
+  if (isCreator || joinedStatus === "APPROVED" || joinedStatus === "COMMITTED") {
+    const chatHref = `/dashboard/groups/${groupId}/chat`;
+    const heading = isCreator
+      ? "You are hosting this trip"
+      : joinedStatus === "COMMITTED"
+        ? "Trip confirmed — you're in!"
+        : "You're approved — start chatting!";
+    return (
+      <div className="space-y-2.5">
+        <p className="text-xs font-semibold text-[var(--color-sea-700)]">{heading}</p>
+        <Link href={chatHref} className="block">
+          <Button type="button" className="w-full gap-2">
+            <MessageSquareMore className="size-4" />
+            Go to Group Chat
+          </Button>
+        </Link>
+        {feedback && (
+          <p className="text-sm text-[var(--color-sea-700)]">{feedback}</p>
+        )}
+      </div>
+    );
+  }
+
+  // ── Pending approval ──────────────────────────────────────────────────────
+  if (joinedStatus === "INTERESTED") {
+    return (
+      <div className="space-y-2">
+        <Button type="button" disabled className="gap-2 w-full opacity-75">
+          <Clock className="size-4" />
+          Request pending approval
+        </Button>
+        <p className="text-xs text-[var(--color-ink-500)]">
+          The creator will approve you soon. You&apos;ll get group chat access once approved.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Default: join CTA ─────────────────────────────────────────────────────
   return (
     <div className="space-y-2">
       <Button
         type="button"
-        className="gap-2 whitespace-nowrap"
+        className="gap-2 whitespace-nowrap w-full"
         onClick={() =>
           startTransition(async () => {
             try {
@@ -75,7 +105,7 @@ export function JoinTripButton({
               setFeedback(
                 member.status === "INTERESTED"
                   ? "Join request sent. The creator will approve you soon."
-                  : "You have been added to the group.",
+                  : "You've been added to the group! Head to the group chat.",
               );
               router.refresh();
             } catch (error) {
@@ -83,10 +113,10 @@ export function JoinTripButton({
             }
           })
         }
-        disabled={isPending || !!joinedStatus}
+        disabled={isPending}
       >
         <UserPlus className="size-4" />
-        {isPending ? "Joining..." : joinedLabel}
+        {isPending ? "Joining..." : label}
       </Button>
       {feedback && (
         <p className={`text-sm ${feedback.includes("added") || feedback.includes("sent") ? "text-[var(--color-sea-700)]" : "text-[var(--color-sunset-700)]"}`}>

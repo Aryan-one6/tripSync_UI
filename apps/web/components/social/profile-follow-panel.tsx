@@ -10,12 +10,14 @@ import { FollowButton } from "@/components/social/follow-button";
 
 interface ProfileFollowPanelProps {
   handle: string;
+  messageTargetUserId?: string | null;
   followerCount: number;
   followingCount: number;
 }
 
 export function ProfileFollowPanel({
   handle,
+  messageTargetUserId = null,
   followerCount,
   followingCount,
 }: ProfileFollowPanelProps) {
@@ -82,8 +84,8 @@ export function ProfileFollowPanel({
         ) : (
           <>
             <FollowButton handle={handle} state={state} onChange={setState} size="sm" />
-            {status === "authenticated" && (
-              <Link href={`/inbox?with=${encodeURIComponent(handle)}`}>
+            {status === "authenticated" && messageTargetUserId && (
+              <Link href={`/dashboard/messages?userId=${encodeURIComponent(messageTargetUserId)}`}>
                 <Button variant="secondary" size="sm">
                   <MessageCircle className="size-4" />
                   Message

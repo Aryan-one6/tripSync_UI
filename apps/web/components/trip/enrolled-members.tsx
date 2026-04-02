@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ShieldCheck, BadgeCheck, Star, MapPin } from "lucide-react";
+import { ShieldCheck, BadgeCheck, Star, MapPin, MessageSquare } from "lucide-react";
 import type { GroupMember } from "@/lib/api/types";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -40,8 +40,8 @@ function MemberCard({ member }: { member: GroupMember }) {
             initials(user.fullName)
           )}
         </div>
-        {/* Online-ish indicator for committed members */}
-        {member.status === "COMMITTED" && (
+        {/* Active indicator for approved/committed members */}
+        {(member.status === "COMMITTED" || member.status === "APPROVED") && (
           <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[var(--color-surface-2)] bg-[var(--color-sea-400)]" />
         )}
       </div>
@@ -97,9 +97,20 @@ function MemberCard({ member }: { member: GroupMember }) {
             ? "Approved"
             : "Interested"}
       </span>
+      {/* DM button — visible for approved/committed members */}
+      {user.id && (member.status === "APPROVED" || member.status === "COMMITTED") && (
+        <Link
+          href={`/dashboard/messages?userId=${user.id}`}
+          title={`Message ${user.fullName}`}
+          className="shrink-0 rounded-full p-1.5 text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+        >
+          <MessageSquare className="size-3.5" />
+        </Link>
+      )}
     </div>
   );
 }
+
 
 export function EnrolledMembers({
   members,

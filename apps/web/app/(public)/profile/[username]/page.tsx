@@ -119,6 +119,9 @@ export default async function ProfilePage({
           <div className="shrink-0">
             <ProfileFollowPanel
               handle={profile.handle}
+              messageTargetUserId={
+                profile.profileType === "traveler" ? profile.id : profile.ownerId
+              }
               followerCount={profile.followerCount}
               followingCount={profile.followingCount}
             />

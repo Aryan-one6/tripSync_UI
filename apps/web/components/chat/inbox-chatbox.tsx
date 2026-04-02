@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { MessageSquare, Send, Users } from "lucide-react";
 import { Card, CardInset } from "@/components/ui/card";
@@ -11,7 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { formatCompactDate, formatDateRange, initials } from "@/lib/format";
-import type { DirectConversation, DirectMessage, TripMembership } from "@/lib/api/types";
+import type {
+  DirectConversation,
+  DirectMessage,
+  TripMembership,
+  UserSummary,
+} from "@/lib/api/types";
 
 function upsertDirectMessage(list: DirectMessage[], next: DirectMessage) {
   const existingIndex = list.findIndex((message) => message.id === next.id);
@@ -32,6 +37,19 @@ function previewLastMessage(content?: string | null) {
   return content.length > 60 ? `${content.slice(0, 57)}...` : content;
 }
 
+type GroupMembersResponse = {
+  group: { id: string };
+  members: Array<{
+    status: "INTERESTED" | "APPROVED" | "COMMITTED" | "LEFT" | "REMOVED";
+    user: UserSummary;
+  }>;
+};
+
+type MessageableContact = {
+  user: UserSummary;
+  sharedGroupIds: string[];
+};
+
 export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const searchParams = useSearchParams();
   const { session, apiFetchWithAuth } = useAuth();
@@ -44,10 +62,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [groupChannels, setGroupChannels] = useState<TripMembership[]>([]);
+  const [messageableContacts, setMessageableContacts] = useState<MessageableContact[]>([]);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
   const [draft, setDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -64,10 +84,51 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const activeGroupChannels = useMemo(
     () =>
       groupChannels.filter((trip) => {
-        const status = trip.group.plan?.status;
-        return trip.status === "COMMITTED" || status === "CONFIRMED" || status === "COMPLETED";
+        // Show group chat for approved or committed members in any active trip
+        const memberActive = trip.status === "APPROVED" || trip.status === "COMMITTED";
+        const tripStatus = trip.group.plan?.status ?? trip.group.package?.status;
+        const channelOpen = !tripStatus || (tripStatus !== "CANCELLED" && tripStatus !== "EXPIRED");
+        return memberActive && channelOpen;
       }),
     [groupChannels],
+  );
+
+  const conversationByCounterpartId = useMemo(() => {
+    const entries = conversations
+      .filter((conversation) => Boolean(conversation.counterpart?.id))
+      .map((conversation) => [conversation.counterpart!.id, conversation] as const);
+    return new Map(entries);
+  }, [conversations]);
+
+  const openOrCreateConversation = useCallback(
+    async (userId: string) => {
+      if (userId === session?.user.id) {
+        setFeedback("You cannot start a conversation with yourself.");
+        return;
+      }
+
+      const existing = conversations.find((conversation) => conversation.counterpart?.id === userId);
+      if (existing) {
+        setActiveConversationId(existing.id);
+        setFeedback(null);
+        return;
+      }
+
+      try {
+        const created = await apiFetchWithAuth<DirectConversation>("/chat/direct/conversations", {
+          method: "POST",
+          body: JSON.stringify({ targetUserId: userId }),
+        });
+        setConversations((current) => sortByUpdatedAtDesc([created, ...current]));
+        setActiveConversationId(created.id);
+        setFeedback(null);
+      } catch (error) {
+        setFeedback(
+          error instanceof Error ? error.message : "Unable to start a new conversation with this user.",
+        );
+      }
+    },
+    [apiFetchWithAuth, conversations, session?.user.id],
   );
 
   async function markConversationRead(conversationId: string) {
@@ -93,20 +154,88 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     void (async () => {
       try {
         setLoadingConversations(true);
-        const data = await apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations");
+        // Load DM conversations (returns [] gracefully if not yet eligible)
+        const data = await apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations").catch(() => [] as DirectConversation[]);
         setConversations(sortByUpdatedAtDesc(data));
-
-        if (variant === "user") {
-          const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
-          setGroupChannels(trips);
-        }
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Unable to load inbox conversations.");
       } finally {
+        // Always load group channels separately so a DM error doesn't block trips
+        if (variant === "user") {
+          try {
+            const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
+            setGroupChannels(trips);
+          } catch {
+            // non-fatal: group channels just won't show
+          }
+        }
         setLoadingConversations(false);
       }
     })();
   }, [apiFetchWithAuth, variant]);
+
+  useEffect(() => {
+    if (variant !== "user" || !session?.user.id) {
+      setMessageableContacts([]);
+      return;
+    }
+
+    if (activeGroupChannels.length === 0) {
+      setMessageableContacts([]);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        setLoadingContacts(true);
+        const groups = await Promise.all(
+          activeGroupChannels.map((trip) =>
+            apiFetchWithAuth<GroupMembersResponse>(`/groups/${trip.group.id}/members`).catch(
+              () => null,
+            ),
+          ),
+        );
+
+        if (cancelled) return;
+
+        const next = new Map<string, MessageableContact>();
+        for (const groupData of groups) {
+          if (!groupData) continue;
+          for (const member of groupData.members) {
+            if (member.status !== "APPROVED" && member.status !== "COMMITTED") continue;
+            if (!member.user.id || member.user.id === session.user.id) continue;
+
+            const current = next.get(member.user.id);
+            if (current) {
+              if (!current.sharedGroupIds.includes(groupData.group.id)) {
+                current.sharedGroupIds.push(groupData.group.id);
+              }
+            } else {
+              next.set(member.user.id, {
+                user: member.user,
+                sharedGroupIds: [groupData.group.id],
+              });
+            }
+          }
+        }
+
+        const sorted = Array.from(next.values()).sort((left, right) => {
+          if (right.sharedGroupIds.length !== left.sharedGroupIds.length) {
+            return right.sharedGroupIds.length - left.sharedGroupIds.length;
+          }
+          return left.user.fullName.localeCompare(right.user.fullName);
+        });
+        setMessageableContacts(sorted);
+      } finally {
+        if (!cancelled) {
+          setLoadingContacts(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeGroupChannels, apiFetchWithAuth, session?.user.id, variant]);
 
   useEffect(() => {
     if (loadingConversations || routeIntentHandledRef.current) return;
@@ -122,34 +251,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       }
 
       if (targetUserId) {
-        const existing = conversations.find((conversation) => conversation.counterpart?.id === targetUserId);
-        if (existing) {
-          setActiveConversationId(existing.id);
-          return;
-        }
-
-        try {
-          const created = await apiFetchWithAuth<DirectConversation>("/chat/direct/conversations", {
-            method: "POST",
-            body: JSON.stringify({ targetUserId }),
-          });
-          setConversations((current) => sortByUpdatedAtDesc([created, ...current]));
-          setActiveConversationId(created.id);
-          return;
-        } catch (error) {
-          setFeedback(
-            error instanceof Error
-              ? error.message
-              : "Unable to start a new conversation with this user.",
-          );
-        }
+        await openOrCreateConversation(targetUserId);
+        return;
       }
 
       if (conversations.length > 0) {
         setActiveConversationId(conversations[0].id);
       }
     })();
-  }, [apiFetchWithAuth, conversations, initialConversationId, loadingConversations, targetUserId]);
+  }, [conversations, initialConversationId, loadingConversations, openOrCreateConversation, targetUserId]);
 
   useEffect(() => {
     if (!activeConversationId || conversations.length === 0) return;
@@ -192,6 +302,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       if (!payload.conversationId || !payload.message) return;
       const conversationId = payload.conversationId;
       const message = payload.message;
+      const conversationKnown = conversations.some((conversation) => conversation.id === conversationId);
 
       setConversations((current) => {
         const next = current.map((conversation) => {
@@ -211,6 +322,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
         return sortByUpdatedAtDesc(next);
       });
+
+      if (!conversationKnown) {
+        void (async () => {
+          const refreshed = await apiFetchWithAuth<DirectConversation[]>(
+            "/chat/direct/conversations",
+          ).catch(() => [] as DirectConversation[]);
+          setConversations(sortByUpdatedAtDesc(refreshed));
+        })();
+      }
 
       if (conversationId === activeConversationId) {
         setMessages((current) => upsertDirectMessage(current, message));
@@ -250,7 +370,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       socket.off("direct:message_created", handleDirectMessageCreated);
       socket.off("direct:typing", handleDirectTyping);
     };
-  }, [activeConversationId, session?.user.id, socket]);
+  }, [activeConversationId, apiFetchWithAuth, conversations, session?.user.id, socket]);
 
   useEffect(() => {
     if (!socket || !activeConversationId) return;
@@ -377,7 +497,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
               })}
             </div>
           )}
-        </Card>
+          </Card>
 
         {variant === "user" ? (
           <Card className="p-5">
@@ -395,7 +515,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
             {activeGroupChannels.length === 0 ? (
               <p className="text-sm text-[var(--color-ink-500)]">
-                Join and confirm a trip to unlock group channels.
+                Join and get approved for a trip to access group channels.
               </p>
             ) : (
               <div className="space-y-2">
@@ -418,6 +538,48 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 })}
               </div>
             )}
+
+            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                Travelers You Can Message
+              </p>
+              {loadingContacts ? (
+                <p className="mt-2 text-sm text-[var(--color-ink-500)]">Loading travelers...</p>
+              ) : messageableContacts.length === 0 ? (
+                <p className="mt-2 text-sm text-[var(--color-ink-500)]">
+                  Once your trip has approved co-travelers, they will appear here for direct chat.
+                </p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {messageableContacts.map((contact) => {
+                    const conversation = conversationByCounterpartId.get(contact.user.id);
+                    return (
+                      <button
+                        key={contact.user.id}
+                        type="button"
+                        onClick={() => {
+                          void openOrCreateConversation(contact.user.id);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-2.5 text-left transition hover:border-[var(--color-sea-100)] hover:bg-[var(--color-surface-2)]"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                            {contact.user.fullName}
+                          </p>
+                          <p className="text-xs text-[var(--color-ink-500)]">
+                            Shared trip{contact.sharedGroupIds.length > 1 ? "s" : ""}:{" "}
+                            {contact.sharedGroupIds.length}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-[var(--color-sea-700)]">
+                          {conversation ? "Open chat" : "Start chat"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </Card>
         ) : null}
       </div>

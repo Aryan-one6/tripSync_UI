@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, CreditCard, MessageSquareMore, Star, ExternalLink } from "lucide-react";
+import { MapPin, CreditCard, MessageSquareMore, Star, ExternalLink, Users2 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -63,7 +63,13 @@ export default function TripsPage() {
             const destination = plan?.destination ?? pkg?.destination ?? "Unknown";
             const dateLabel = formatDateRange(plan?.startDate ?? pkg?.startDate, plan?.endDate ?? pkg?.endDate);
             const needsPayment = plan?.status === "CONFIRMING" && trip.status !== "COMMITTED";
-            const canChat = trip.status === "COMMITTED" || plan?.status === "CONFIRMED" || plan?.status === "COMPLETED";
+            // Chat unlocks as soon as you are approved — no need to wait for COMMITTED
+            const canChat =
+              trip.status === "APPROVED" ||
+              trip.status === "COMMITTED" ||
+              plan?.status === "CONFIRMED" ||
+              plan?.status === "COMPLETED";
+            const canDM = trip.status === "APPROVED" || trip.status === "COMMITTED";
             const canReview = plan?.status === "COMPLETED";
             const shareHref = buildWhatsAppShareHref(`Check this TravellersIn trip: ${title}`, href);
 
@@ -99,7 +105,15 @@ export default function TripsPage() {
                       <Link href={`/dashboard/groups/${trip.group.id}/chat`}>
                         <Button variant="soft" size="sm">
                           <MessageSquareMore className="size-3.5" />
-                          Chat
+                          Group Chat
+                        </Button>
+                      </Link>
+                    )}
+                    {canDM && (
+                      <Link href="/dashboard/messages">
+                        <Button variant="soft" size="sm">
+                          <Users2 className="size-3.5" />
+                          DM Travelers
                         </Button>
                       </Link>
                     )}

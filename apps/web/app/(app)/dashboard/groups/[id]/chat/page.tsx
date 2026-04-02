@@ -12,7 +12,7 @@ export default async function GroupChatPage({
     <DashboardShell
       variant="user"
       title="Group chat"
-      subtitle="Coordinate live with committed travelers, settle logistics, and use polls when the group needs a fast decision."
+      subtitle="Coordinate live with your approved trip group — message, share updates, and use polls to make group decisions together."
     >
       <GroupChat groupId={id} />
     </DashboardShell>
