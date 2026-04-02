@@ -98,6 +98,11 @@ export default function UserPlansPage() {
                 </CardInset>
 
                 <div className="flex flex-wrap items-center gap-3">
+                  <Link href={`/dashboard/plans/${plan.id}`} className="flex-1">
+                    <Button variant="secondary" size="sm" className="w-full">
+                      Manage plan
+                    </Button>
+                  </Link>
                   <WhatsAppShareButton
                     href={buildWhatsAppShareHref(`Check my TravellersIn plan: ${plan.title}`, `/plans/${plan.slug}`)}
                     label="Share"
