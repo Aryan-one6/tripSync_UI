@@ -583,7 +583,7 @@ export default function AgencyBidsPage() {
       ) : offers.length === 0 ? (
         <EmptyState
           title="No bids yet"
-          description="Click "New bid" above to find open trips and submit your first offer."
+          description='Click "New bid" above to find open trips and submit your first offer.'
           action={
             <Button onClick={() => setShowBrowse(true)}>
               <Gavel className="size-4" />
