@@ -194,6 +194,11 @@ export async function publish(packageId: string, userId: string) {
   if (pkg.status !== PlanStatus.DRAFT) {
     throw new BadRequestError('Can only publish DRAFT packages');
   }
+  const gallery = Array.isArray(pkg.galleryUrls) ? pkg.galleryUrls : [];
+  const hasRequiredImage = gallery.some((value) => typeof value === 'string' && value.length > 0);
+  if (!hasRequiredImage) {
+    throw new BadRequestError('Add at least one package image before publishing');
+  }
 
   return prisma.package.update({
     where: { id: packageId },

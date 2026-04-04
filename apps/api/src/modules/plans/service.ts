@@ -241,6 +241,14 @@ export async function publish(planId: string, userId: string) {
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan) throw new NotFoundError('Plan');
   if (plan.creatorId !== userId) throw new ForbiddenError('Only the creator can publish');
+  const gallery = Array.isArray(plan.galleryUrls) ? plan.galleryUrls : [];
+  const hasRequiredImage =
+    typeof plan.coverImageUrl === 'string' && plan.coverImageUrl.length > 0
+      ? true
+      : gallery.some((value) => typeof value === 'string' && value.length > 0);
+  if (!hasRequiredImage) {
+    throw new BadRequestError('Add at least one trip image before publishing');
+  }
 
   assertTransition(plan.status, PlanStatus.OPEN);
 

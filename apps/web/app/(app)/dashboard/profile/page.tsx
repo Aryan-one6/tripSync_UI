@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { CoverImageUpload } from "@/components/ui/image-upload";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { UserProfile } from "@/lib/api/types";
 
@@ -25,6 +26,7 @@ export default function ProfilePage() {
     dateOfBirth: session?.user.dateOfBirth?.slice(0, 10) ?? "",
     travelPreferences: session?.user.travelPreferences ?? "",
     bio: session?.user.bio ?? "",
+    avatarUrl: session?.user.avatarUrl ?? "",
   });
 
   return (
@@ -36,6 +38,12 @@ export default function ProfilePage() {
       <Card className="p-5 sm:p-6">
         <h2 className="font-display text-lg text-[var(--color-ink-950)]">Traveler profile</h2>
         <div className="mt-5 space-y-4">
+          <CoverImageUpload
+            label="Profile photo"
+            value={form.avatarUrl}
+            onChange={(avatarUrl) => setForm((current) => ({ ...current, avatarUrl }))}
+          />
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Full name</label>
@@ -125,6 +133,7 @@ export default function ProfilePage() {
                         : undefined,
                       travelPreferences: form.travelPreferences || undefined,
                       bio: form.bio || undefined,
+                      avatarUrl: form.avatarUrl || undefined,
                     });
                     const updated = await apiFetchWithAuth<UserProfile>("/auth/me", {
                       method: "PATCH",

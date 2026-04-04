@@ -30,7 +30,10 @@ const BasePlanSchema = z.object({
   activities: z.array(z.string()).optional(),
   description: z.string().max(2000).optional(),
   itinerary: z.array(ItineraryItemSchema).optional(),
-  galleryUrls: z.array(z.string().url()).max(8).optional(),
+  galleryUrls: z
+    .array(z.string().url())
+    .min(1, 'At least one trip image is required')
+    .max(8),
   coverImageUrl: z.string().url().optional(),
   autoApprove: z.boolean().default(true),
 });

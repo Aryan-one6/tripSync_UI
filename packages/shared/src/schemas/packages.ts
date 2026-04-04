@@ -50,7 +50,10 @@ const BasePackageSchema = z.object({
   accommodation: z.string().max(100).optional(),
   vibes: z.array(z.string()).optional(),
   activities: z.array(z.string()).optional(),
-  galleryUrls: z.array(z.string().url()).optional(),
+  galleryUrls: z
+    .array(z.string().url())
+    .min(1, 'At least one package image is required')
+    .max(8),
   cancellationPolicy: z.string().max(2000).optional(),
   cancellationRules: CancellationRulesSchema.optional(),
 });

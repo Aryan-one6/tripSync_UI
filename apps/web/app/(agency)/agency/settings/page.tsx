@@ -5,9 +5,10 @@ import { Building2, ShieldCheck, Save, FileCheck2, ExternalLink } from "lucide-r
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardInset } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CoverImageUpload } from "@/components/ui/image-upload";
 import { AgencyVerificationBadge, UserVerificationBadge } from "@/components/ui/verification-badge";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { AgencySummary, UserProfile } from "@/lib/api/types";
@@ -38,6 +39,7 @@ export default function AgencySettingsPage() {
     tourismLicense: agency?.tourismLicense ?? "",
     specializations: (agency?.specializations ?? []).join(", "),
     destinations: (agency?.destinations ?? []).join(", "),
+    logoUrl: agency?.logoUrl ?? "",
   });
 
   const ownerTier = session?.user.verification ?? "BASIC";
@@ -92,6 +94,12 @@ export default function AgencySettingsPage() {
         </div>
 
         <div className="mt-5 space-y-4">
+          <CoverImageUpload
+            label="Agency logo"
+            value={form.logoUrl}
+            onChange={(logoUrl) => setForm((current) => ({ ...current, logoUrl }))}
+          />
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Agency name</label>
@@ -239,6 +247,7 @@ export default function AgencySettingsPage() {
                     const payload = {
                       name: form.name,
                       description: form.description || undefined,
+                      logoUrl: form.logoUrl || undefined,
                       city: form.city || undefined,
                       state: form.state || undefined,
                       phone: form.phone || undefined,

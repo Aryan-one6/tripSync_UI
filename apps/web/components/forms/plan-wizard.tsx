@@ -149,6 +149,11 @@ export function PlanWizard() {
     }
 
     if (step === 4) {
+      if (values.galleryUrls.length === 0) {
+        setFeedback("Add at least one trip image. The first image is used as cover.");
+        return false;
+      }
+
       try {
         const itineraryResult = buildStructuredItineraryPayload(values.itineraryDays);
         if ("error" in itineraryResult) {
@@ -479,7 +484,7 @@ export function PlanWizard() {
                   max={8}
                 />
                 <p className="text-xs text-[var(--color-ink-500)]">
-                  The first image becomes the cover on discovery cards and the plan page.
+                  Add at least one image. The first image becomes the cover on discovery cards and the plan page.
                 </p>
               </div>
 

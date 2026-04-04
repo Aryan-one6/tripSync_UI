@@ -565,6 +565,86 @@ const planScenarios: PlanScenario[] = [
   },
 ];
 
+const DESTINATION_IMAGE_LIBRARY = [
+  '/destinations/andaman.jpg',
+  '/destinations/bir%20Billing.jpg',
+  '/destinations/chandrashila.jpg',
+  '/destinations/cooorg.jpg',
+  '/destinations/goa.webp',
+  '/destinations/jibhi.webp',
+  '/destinations/kerala.avif',
+  '/destinations/leh%20ladhak.jpg',
+  '/destinations/pravati-valley-kasol.webp',
+  '/destinations/rishikesh.webp',
+  '/destinations/shoja-.avif',
+  '/destinations/TirthanValley.jpg',
+  '/destinations/Rajasthan.jpg',
+] as const;
+
+const DESTINATION_IMAGE_BY_KEY: Record<string, string> = {
+  andaman: '/destinations/andaman.jpg',
+  auli: '/destinations/chandrashila.jpg',
+  birbilling: '/destinations/bir%20Billing.jpg',
+  coorg: '/destinations/cooorg.jpg',
+  cooorg: '/destinations/cooorg.jpg',
+  goa: '/destinations/goa.webp',
+  jibhi: '/destinations/jibhi.webp',
+  kasol: '/destinations/pravati-valley-kasol.webp',
+  kerala: '/destinations/kerala.avif',
+  lehladakh: '/destinations/leh%20ladhak.jpg',
+  lehladhak: '/destinations/leh%20ladhak.jpg',
+  manali: '/destinations/Rajasthan.jpg',
+  rajasthan: '/destinations/Rajasthan.jpg',
+  rishikesh: '/destinations/rishikesh.webp',
+  shoja: '/destinations/shoja-.avif',
+  spiti: '/destinations/leh%20ladhak.jpg',
+  tirthan: '/destinations/TirthanValley.jpg',
+  tirthanvalley: '/destinations/TirthanValley.jpg',
+};
+
+function normalizeMediaKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function hashText(value: string) {
+  return Array.from(value).reduce((total, char) => total + char.charCodeAt(0), 0);
+}
+
+function pickFallbackImage(seed: string, indexOffset = 0) {
+  const index = (hashText(seed) + indexOffset) % DESTINATION_IMAGE_LIBRARY.length;
+  return DESTINATION_IMAGE_LIBRARY[index];
+}
+
+function imageForDestination(destination: string, seed: string) {
+  const key = normalizeMediaKey(destination);
+  return DESTINATION_IMAGE_BY_KEY[key] ?? pickFallbackImage(seed);
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter((value) => value.length > 0)));
+}
+
+function galleryForDestination(destination: string, seed: string, count = 3) {
+  const primary = imageForDestination(destination, seed);
+  const gallery = [primary];
+  let offset = 1;
+
+  while (gallery.length < Math.max(1, count) && offset < DESTINATION_IMAGE_LIBRARY.length + 4) {
+    const candidate = pickFallbackImage(`${seed}:${offset}`, offset);
+    if (!gallery.includes(candidate)) {
+      gallery.push(candidate);
+    }
+    offset += 1;
+  }
+
+  return gallery.slice(0, Math.max(1, count));
+}
+
+function asStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+}
+
 function daysFromNow(days: number) {
   const date = new Date();
   date.setUTCHours(0, 0, 0, 0);
@@ -610,6 +690,8 @@ function genderCountsForUsers(
 }
 
 async function upsertUser(seed: SeedUser, passwordHash: string) {
+  const avatarUrl = pickFallbackImage(seed.key, 1);
+
   return prisma.user.upsert({
     where: { phone: seed.phone },
     update: {
@@ -625,6 +707,7 @@ async function upsertUser(seed: SeedUser, passwordHash: string) {
       dateOfBirth: new Date(`${seed.dateOfBirth}T00:00:00.000Z`),
       aadhaarHash: seed.verification === 'BASIC' ? null : `seed_hash_${seed.key}`,
       bio: seed.bio,
+      avatarUrl,
     },
     create: {
       phone: seed.phone,
@@ -640,11 +723,17 @@ async function upsertUser(seed: SeedUser, passwordHash: string) {
       dateOfBirth: new Date(`${seed.dateOfBirth}T00:00:00.000Z`),
       aadhaarHash: seed.verification === 'BASIC' ? null : `seed_hash_${seed.key}`,
       bio: seed.bio,
+      avatarUrl,
     },
   });
 }
 
 async function upsertAgency(agencySeed: SeedAgency, ownerId: string, ownerPhone: string) {
+  const logoUrl = imageForDestination(
+    agencySeed.destinations[0] ?? agencySeed.city,
+    agencySeed.slug,
+  );
+
   return prisma.agency.upsert({
     where: { ownerId },
     update: {
@@ -664,6 +753,7 @@ async function upsertAgency(agencySeed: SeedAgency, ownerId: string, ownerPhone:
       avgRating: 4.6,
       totalReviews: 12,
       totalTrips: 18,
+      logoUrl,
     },
     create: {
       ownerId,
@@ -683,6 +773,7 @@ async function upsertAgency(agencySeed: SeedAgency, ownerId: string, ownerPhone:
       avgRating: 4.6,
       totalReviews: 12,
       totalTrips: 18,
+      logoUrl,
     },
   });
 }
@@ -697,6 +788,7 @@ async function seedAgencyPackages(
     const startDate = daysFromNow(15 + index * 6);
     const endDate = daysFromNow(18 + index * 6);
     const slug = `${agencySlug}-${slugifySeed(blueprint.title)}`;
+    const packageGallery = galleryForDestination(blueprint.destination, slug, 3);
 
     const pkg = await prisma.package.upsert({
       where: { slug },
@@ -723,7 +815,7 @@ async function seedAgencyPackages(
           { day: 2, title: 'Core experience day', description: `Main ${blueprint.activities[0]} block plus social dinner.` },
           { day: 3, title: 'Scenic close-out', description: 'Photo stops and return transit.' },
         ],
-        galleryUrls: [`https://images.example.com/${slug}-cover.jpg`],
+        galleryUrls: packageGallery,
         status: 'OPEN',
       },
       create: {
@@ -750,7 +842,7 @@ async function seedAgencyPackages(
           { day: 2, title: 'Core experience day', description: `Main ${blueprint.activities[0]} block plus social dinner.` },
           { day: 3, title: 'Scenic close-out', description: 'Photo stops and return transit.' },
         ],
-        galleryUrls: [`https://images.example.com/${slug}-cover.jpg`],
+        galleryUrls: packageGallery,
         status: 'OPEN',
       },
     });
@@ -793,6 +885,7 @@ async function seedAgencyPackages(
 async function upsertScenarioPlan(creatorId: string, scenario: PlanScenario) {
   const startDate = daysFromNow(scenario.startOffset);
   const endDate = daysFromNow(scenario.endOffset);
+  const scenarioGallery = galleryForDestination(scenario.destination, scenario.slug, 3);
 
   const plan = await prisma.plan.upsert({
     where: { slug: scenario.slug },
@@ -818,8 +911,8 @@ async function upsertScenarioPlan(creatorId: string, scenario: PlanScenario) {
         { day: 2, title: 'Signature experience', description: `Main ${scenario.activities[0]} block and group time.` },
         { day: 3, title: 'Wrap and return', description: 'Slow close-out and departure.' },
       ],
-      galleryUrls: [`https://images.example.com/${scenario.slug}-cover.jpg`],
-      coverImageUrl: `https://images.example.com/${scenario.slug}-cover.jpg`,
+      galleryUrls: scenarioGallery,
+      coverImageUrl: scenarioGallery[0],
       autoApprove: scenario.autoApprove,
       status: scenario.status,
       expiresAt: daysFromNow(60),
@@ -848,8 +941,8 @@ async function upsertScenarioPlan(creatorId: string, scenario: PlanScenario) {
         { day: 2, title: 'Signature experience', description: `Main ${scenario.activities[0]} block and group time.` },
         { day: 3, title: 'Wrap and return', description: 'Slow close-out and departure.' },
       ],
-      galleryUrls: [`https://images.example.com/${scenario.slug}-cover.jpg`],
-      coverImageUrl: `https://images.example.com/${scenario.slug}-cover.jpg`,
+      galleryUrls: scenarioGallery,
+      coverImageUrl: scenarioGallery[0],
       autoApprove: scenario.autoApprove,
       status: scenario.status,
       expiresAt: daysFromNow(60),
@@ -1410,6 +1503,99 @@ async function seedPlanScenarios(
   return scenarios;
 }
 
+async function backfillExistingMedia() {
+  const plans = await prisma.plan.findMany({
+    select: {
+      id: true,
+      slug: true,
+      destination: true,
+      galleryUrls: true,
+      coverImageUrl: true,
+    },
+  });
+
+  for (const plan of plans) {
+    const existingGallery = asStringArray(plan.galleryUrls);
+    const fallbackGallery = galleryForDestination(plan.destination, plan.slug, 3);
+    const nextCover = plan.coverImageUrl ?? existingGallery[0] ?? fallbackGallery[0];
+    const nextGallery =
+      existingGallery.length > 0
+        ? uniqueStrings([nextCover, ...existingGallery].filter((value): value is string => Boolean(value)))
+        : uniqueStrings([nextCover, ...fallbackGallery].filter((value): value is string => Boolean(value)));
+
+    if (!nextCover) continue;
+
+    const needsUpdate =
+      plan.coverImageUrl !== nextCover ||
+      existingGallery.length === 0;
+
+    if (needsUpdate) {
+      await prisma.plan.update({
+        where: { id: plan.id },
+        data: {
+          coverImageUrl: nextCover,
+          galleryUrls: nextGallery,
+        },
+      });
+    }
+  }
+
+  const packages = await prisma.package.findMany({
+    select: {
+      id: true,
+      slug: true,
+      destination: true,
+      galleryUrls: true,
+    },
+  });
+
+  for (const pkg of packages) {
+    const existingGallery = asStringArray(pkg.galleryUrls);
+    if (existingGallery.length > 0) continue;
+
+    const nextGallery = galleryForDestination(pkg.destination, pkg.slug, 3);
+    await prisma.package.update({
+      where: { id: pkg.id },
+      data: { galleryUrls: nextGallery },
+    });
+  }
+
+  const usersWithoutAvatar = await prisma.user.findMany({
+    where: { avatarUrl: null },
+    select: { id: true, username: true },
+  });
+
+  for (const user of usersWithoutAvatar) {
+    const avatarUrl = pickFallbackImage(user.username ?? user.id, 2);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { avatarUrl },
+    });
+  }
+
+  const agenciesWithoutLogo = await prisma.agency.findMany({
+    where: { logoUrl: null },
+    select: {
+      id: true,
+      slug: true,
+      city: true,
+      destinations: true,
+      name: true,
+    },
+  });
+
+  for (const agency of agenciesWithoutLogo) {
+    const destinations = asStringArray(agency.destinations);
+    const seed = agency.slug || agency.id;
+    const source = destinations[0] ?? agency.city ?? agency.name;
+    const logoUrl = imageForDestination(source, seed);
+    await prisma.agency.update({
+      where: { id: agency.id },
+      data: { logoUrl },
+    });
+  }
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const userMap = new Map<string, Awaited<ReturnType<typeof upsertUser>>>();
@@ -1439,6 +1625,7 @@ async function main() {
   }
 
   await seedPlanScenarios(userMap, agencyMap);
+  await backfillExistingMedia();
 
   console.log(`TravellersIn QA seed complete. Shared password: ${DEMO_PASSWORD}`);
   console.log('Traveler logins:');

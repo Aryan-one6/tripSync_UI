@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import {
   MapPin,
@@ -771,11 +770,9 @@ export default async function PlanDetailPage({
             <div className="mt-3 flex items-center gap-3 sm:mt-4 sm:gap-4">
               <div className="flex size-12 items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] font-display text-base text-[var(--color-sea-800)] shadow-[var(--shadow-clay-sm)]">
                 {plan.creator.avatarUrl ? (
-                  <Image
+                  <img
                     src={plan.creator.avatarUrl}
                     alt={plan.creator.fullName}
-                    width={48}
-                    height={48}
                     className="size-full rounded-[var(--radius-lg)] object-cover"
                   />
                 ) : (

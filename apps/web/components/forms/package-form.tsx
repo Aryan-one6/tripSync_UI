@@ -127,6 +127,10 @@ export function PackageForm({
           setFeedback(itineraryResult.error ?? "Unable to build itinerary.");
           return;
         }
+        if (values.galleryUrls.length === 0) {
+          setFeedback("Add at least one package image before saving.");
+          return;
+        }
 
         const payload = CreatePackageSchema.parse({
           title: values.title,
@@ -326,6 +330,9 @@ export function PackageForm({
                 onChange={(urls) => setValues((c) => ({ ...c, galleryUrls: urls }))}
                 max={8}
               />
+              <p className="text-xs text-[var(--color-ink-500)]">
+                Add at least one image. The first image is used on discover cards.
+              </p>
 
               <Toggle
                 checked={values.publishNow}

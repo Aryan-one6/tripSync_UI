@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { MapPin, Route, Star, Ticket } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AgencyVerificationBadge, UserVerificationBadge } from "@/components/ui/verification-badge";
@@ -68,7 +67,7 @@ export default async function ProfilePage({
             {/* 96px avatar circle */}
             <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-200)] font-display text-2xl font-bold text-[var(--color-sea-800)] shadow-[var(--shadow-sm)]">
               {profile.avatarUrl ? (
-                <Image src={profile.avatarUrl} alt={profile.name} width={96} height={96} className="size-full object-cover" />
+                <img src={profile.avatarUrl} alt={profile.name} className="size-full object-cover" />
               ) : (
                 initials(profile.name)
               )}

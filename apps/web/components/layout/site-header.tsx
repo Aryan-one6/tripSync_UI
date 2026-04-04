@@ -66,10 +66,32 @@ const agencyNavSecondary = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function UserAvatar({ name, size = 9 }: { name: string; size?: number }) {
+function UserAvatar({
+  name,
+  avatarUrl,
+  size = 9,
+}: {
+  name: string;
+  avatarUrl?: string | null;
+  size?: number;
+}) {
+  const dimension = `${size * 0.25}rem`;
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: dimension, height: dimension }}
+      />
+    );
+  }
+
   return (
     <div
-      className={`flex size-${size} shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-xs font-bold text-white`}
+      className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-xs font-bold text-white"
+      style={{ width: dimension, height: dimension }}
     >
       {initials(name)}
     </div>
@@ -126,6 +148,7 @@ export function SiteHeader() {
   const settingsHref = isAgency ? "/agency/settings" : "/dashboard/settings";
   const inboxHref = isAgency ? "/agency/inbox" : "/dashboard/messages";
   const userName = session?.user?.fullName ?? session?.user?.username ?? "User";
+  const userAvatarUrl = session?.user?.avatarUrl;
   const userEmail = session?.user?.email ?? "";
   const { notifications, unreadCount, markAllRead, markRead } = useLiveNotifications();
 
@@ -300,7 +323,7 @@ export function SiteHeader() {
                     className="flex items-center rounded-full border border-[var(--color-border)] shadow-[var(--shadow-sm)] transition hover:shadow-[var(--shadow-md)]"
                     aria-label="Account menu"
                   >
-                    <UserAvatar name={userName} size={9} />
+                    <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={9} />
                   </button>
                   {avatarMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-white py-1.5 shadow-[var(--shadow-lg)] animate-scale-in">
@@ -402,7 +425,7 @@ export function SiteHeader() {
               <>
                 <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <UserAvatar name={userName} size={10} />
+                    <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={10} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-[var(--color-ink-950)]">{userName}</p>
                       <p className="truncate text-[11px] text-[var(--color-ink-500)]">{userEmail}</p>
