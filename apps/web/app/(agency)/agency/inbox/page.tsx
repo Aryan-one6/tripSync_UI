@@ -1,14 +1,11 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { InboxChatbox } from "@/components/chat/inbox-chatbox";
 
 export default function AgencyInboxPage() {
   return (
-    <DashboardShell
-      variant="agency"
-      title="Inbox"
-      subtitle="Chat with travelers in real time once offers are live. Typing indicators and delivery updates work instantly."
-    >
-      <InboxChatbox variant="agency" />
-    </DashboardShell>
+    <main className="mx-auto w-full max-w-screen-2xl px-0 md:px-6 md:py-6">
+      <div className="pb-mobile-nav md:pb-0">
+        <InboxChatbox variant="agency" />
+      </div>
+    </main>
   );
 }

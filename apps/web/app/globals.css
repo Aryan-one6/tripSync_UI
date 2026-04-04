@@ -210,6 +210,13 @@ a {
   width: 6px;
   height: 6px;
 }
+.footer-link {
+  transition: color 0.15s ease;
+  color: rgb(200, 200, 200);
+}
+.footer-link-title {
+  color: #0d9670;
+}
 
 ::-webkit-scrollbar-track {
   background: transparent;

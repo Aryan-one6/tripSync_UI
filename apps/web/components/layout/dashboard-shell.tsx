@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function DashboardShell({
@@ -18,82 +17,47 @@ export function DashboardShell({
   children: ReactNode;
   actions?: ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
     <div className="mx-auto w-full container px-4 py-4 md:px-6 md:py-8">
       <div className="grid gap-6 md:grid-cols-[260px_1fr] lg:grid-cols-[280px_1fr]">
-        {/* Mobile sidebar toggle */}
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)] md:hidden"
-        >
-          <Menu className="size-5 text-[var(--color-ink-600)]" />
-          <span className="text-sm font-medium text-[var(--color-ink-700)]">
-            {variant === "agency" ? "Agency Menu" : "Navigation"}
-          </span>
-        </button>
 
-        {/* Mobile sidebar overlay */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <div className="absolute inset-0 bg-[var(--color-ink-950)]/30 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-            <div className="absolute bottom-0 left-0 right-0 max-h-[80dvh] animate-slide-up overflow-y-auto rounded-t-[var(--radius-xl)] border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-lg)] safe-bottom">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="font-display text-lg text-[var(--color-ink-950)]">Navigation</p>
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex size-9 items-center justify-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-600)] shadow-[var(--shadow-sm)]"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-              <AppSidebar variant={variant} onNavigate={() => setSidebarOpen(false)} />
-            </div>
-          </div>
-        )}
-
-        {/* Desktop sidebar */}
+        {/* Desktop sidebar only — mobile nav is in the header sidebar */}
         <div className="hidden md:block">
-          <div className="sticky top-24">
+          <div className="sticky top-20">
             <AppSidebar variant={variant} />
           </div>
         </div>
 
         {/* Main content */}
         <div className="space-y-5 sm:space-y-6 pb-mobile-nav md:pb-0">
-          {/* Dashboard header */}
-          <header className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-md)] sm:p-7">
-            {/* Subtle pattern strip */}
+          {/* Dashboard page header */}
+          <header className="relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-sm)] sm:p-6">
+            {/* Accent stripe */}
             <div
               className={cn(
-                "absolute inset-x-0 top-0 h-1 rounded-t-[var(--radius-xl)]",
+                "absolute inset-x-0 top-0 h-1 rounded-t-xl",
                 variant === "agency"
                   ? "bg-gradient-to-r from-[var(--color-lavender-400)] via-[var(--color-lavender-500)] to-[var(--color-sea-500)]"
-                  : "bg-gradient-to-r from-[var(--color-sea-400)] via-[var(--color-sea-500)] to-[var(--color-sea-600)]",
+                  : "bg-gradient-to-r from-[var(--color-sea-400)] via-[var(--color-sea-500)] to-[var(--color-sea-600)]"
               )}
             />
-            {/* Decorative glow blob */}
-            <div className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-[var(--color-sea-50)] opacity-60 blur-2xl" />
             <div className="relative">
               <span
                 className={cn(
                   "inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] shadow-[var(--shadow-sm)]",
                   variant === "agency"
                     ? "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
-                    : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]",
+                    : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
                 )}
               >
                 {variant === "agency" ? "Agency Dashboard" : "Traveler Dashboard"}
               </span>
               <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h1 className="font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl capitalize">
+                  <h1 className="font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl capitalize">
                     {title}
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm text-[var(--color-ink-600)] leading-relaxed">
+                  <p className="mt-1.5 max-w-2xl text-sm text-[var(--color-ink-600)] leading-relaxed">
                     {subtitle}
                   </p>
                 </div>
@@ -101,6 +65,7 @@ export function DashboardShell({
               </div>
             </div>
           </header>
+
           {children}
         </div>
       </div>

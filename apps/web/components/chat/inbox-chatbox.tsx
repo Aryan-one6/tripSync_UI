@@ -7,7 +7,6 @@ import { format, isToday, isYesterday } from "date-fns";
 import {
   ArrowLeft,
   ChevronRight,
-  Gavel,
   MapPin,
   MessageSquarePlus,
   Search,
@@ -18,13 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  CounterOfferSheet,
-  type CounterOfferPayload,
-} from "@/components/chat/counter-offer-sheet";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useSocket } from "@/lib/realtime/use-socket";
-import { formatCurrency, formatDateRange, initials } from "@/lib/format";
+import { formatDateRange, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
   DirectConversation,
@@ -62,31 +57,6 @@ function previewText(content?: string | null) {
   return content.length > 55 ? `${content.slice(0, 52)}…` : content;
 }
 
-function agencyCanCounter(offer: Offer) {
-  if (offer.status !== "PENDING" && offer.status !== "COUNTERED") return false;
-  const roundsUsed = offer.negotiations?.length ?? 0;
-  if (roundsUsed >= 3) return false;
-  const lastSender = offer.negotiations?.[roundsUsed - 1]?.senderType;
-  return lastSender !== "agency";
-}
-
-function agencyHasActiveOfferStatus(status: Offer["status"]) {
-  return status === "PENDING" || status === "COUNTERED" || status === "ACCEPTED";
-}
-
-function offerStatusPillClasses(status: Offer["status"]) {
-  if (status === "COUNTERED") {
-    return "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]";
-  }
-  if (status === "ACCEPTED") {
-    return "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]";
-  }
-  if (status === "REJECTED" || status === "WITHDRAWN") {
-    return "bg-[var(--color-sunset-50)] text-[var(--color-sunset-700)]";
-  }
-  return "bg-[var(--color-surface-2)] text-[var(--color-ink-600)]";
-}
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type GroupMembersResponse = {
@@ -108,16 +78,6 @@ type AgencyOfferThread = {
   destination: string;
   creatorId: string;
   creatorName: string;
-  status: Offer["status"];
-  updatedAt: string;
-  needsResponse: boolean;
-};
-
-type AgencyGroupChannel = {
-  groupId: string;
-  planTitle: string;
-  destination: string;
-  status: Offer["status"];
   updatedAt: string;
 };
 
@@ -179,8 +139,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
-  const [loadingAgencyOffers, setLoadingAgencyOffers] = useState(false);
-  const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const routeIntentHandledRef = useRef(false);
@@ -193,18 +151,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     () => conversations.find((c) => c.id === activeConversationId) ?? null,
     [activeConversationId, conversations],
   );
-  const activeCounterpartId = activeConversation?.counterpart?.id ?? null;
-
-  const agencyConversationOffers = useMemo(() => {
-    if (variant !== "agency" || !activeCounterpartId) return [];
-    return agencyOffers
-      .filter((offer) => offer.plan?.creator?.id === activeCounterpartId)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  }, [activeCounterpartId, agencyOffers, variant]);
-
-  const counteringOffer = counterSheetOfferId
-    ? agencyOffers.find((offer) => offer.id === counterSheetOfferId) ?? null
-    : null;
 
   const activeGroupChannels = useMemo(
     () =>
@@ -256,18 +202,13 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         const destination = offer.plan?.destination ?? "Destination";
         const creatorId = offer.plan?.creator?.id ?? "";
         const creatorName = offer.plan?.creator?.fullName ?? "Traveler";
-        const needsResponse =
-          offer.status === "COUNTERED" &&
-          (offer.negotiations?.[offer.negotiations.length - 1]?.senderType ?? null) === "user";
         return {
           offerId: offer.id,
           planTitle,
           destination,
           creatorId,
           creatorName,
-          status: offer.status,
           updatedAt: offer.updatedAt,
-          needsResponse,
         };
       })
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -285,44 +226,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       );
     });
   }, [agencyOfferThreads, search, variant]);
-
-  const agencyGroupChannels = useMemo<AgencyGroupChannel[]>(() => {
-    if (variant !== "agency") return [];
-
-    const grouped = new Map<string, AgencyGroupChannel>();
-    for (const offer of agencyOffers) {
-      if (!agencyHasActiveOfferStatus(offer.status)) continue;
-      const groupId = offer.plan?.group?.id;
-      if (!groupId) continue;
-      const existing = grouped.get(groupId);
-      const channel: AgencyGroupChannel = {
-        groupId,
-        planTitle: offer.plan?.title ?? "Trip group",
-        destination: offer.plan?.destination ?? "Destination",
-        status: offer.status,
-        updatedAt: offer.updatedAt,
-      };
-      if (!existing || channel.updatedAt > existing.updatedAt) {
-        grouped.set(groupId, channel);
-      }
-    }
-
-    return Array.from(grouped.values()).sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
-    );
-  }, [agencyOffers, variant]);
-
-  const filteredAgencyGroupChannels = useMemo(() => {
-    if (variant !== "agency") return [];
-    if (!search) return agencyGroupChannels;
-    const q = search.toLowerCase();
-    return agencyGroupChannels.filter((channel) => {
-      return (
-        channel.planTitle.toLowerCase().includes(q) ||
-        channel.destination.toLowerCase().includes(q)
-      );
-    });
-  }, [agencyGroupChannels, search, variant]);
 
   const totalUnread = useMemo(
     () => conversations.reduce((sum, c) => sum + c.unreadCount, 0),
@@ -365,13 +268,8 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
   const loadAgencyOffers = useCallback(async () => {
     if (variant !== "agency") return;
-    try {
-      setLoadingAgencyOffers(true);
-      const data = await apiFetchWithAuth<Offer[]>("/offers/my").catch(() => [] as Offer[]);
-      setAgencyOffers(data);
-    } finally {
-      setLoadingAgencyOffers(false);
-    }
+    const data = await apiFetchWithAuth<Offer[]>("/offers/my").catch(() => [] as Offer[]);
+    setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
 
   async function markConversationRead(conversationId: string) {
@@ -410,37 +308,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         setFeedback(err instanceof Error ? err.message : "Unable to send message.");
       }
     });
-  }
-
-  async function handleAgencyCounterOffer(offerId: string, payload: CounterOfferPayload) {
-    try {
-      await apiFetchWithAuth(`/offers/${offerId}/counter`, {
-        method: "POST",
-        body: JSON.stringify({
-          price: payload.price,
-          message: payload.message || undefined,
-          inclusionsDelta: payload.requestedAdditions.length
-            ? { requestedAdditions: payload.requestedAdditions }
-            : undefined,
-        }),
-      });
-      setCounterSheetOfferId(null);
-      await loadAgencyOffers();
-      setFeedback("Counter offer sent.");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to send counter offer.");
-    }
-  }
-
-  async function handleAgencyWithdrawOffer(offerId: string) {
-    if (!confirm("Withdraw this offer? This cannot be undone.")) return;
-    try {
-      await apiFetchWithAuth(`/offers/${offerId}/withdraw`, { method: "POST" });
-      await loadAgencyOffers();
-      setFeedback("Offer withdrawn.");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to withdraw this offer.");
-    }
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -689,8 +556,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   return (
     <>
       <div
-        className="flex overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] shadow-[var(--shadow-md)]"
-        style={{ minHeight: "76vh" }}
+        className="flex min-h-[calc(100dvh-8rem)] overflow-hidden border-y border-[var(--color-border)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-md)]"
       >
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
@@ -922,48 +788,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </>
           )}
 
-          {!loadingConversations && variant === "agency" && filteredAgencyOfferThreads.length > 0 && (
-            <>
-              <div className="mx-4 my-1 border-t border-[var(--color-border)]" />
-              <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
-                Offer threads
-              </p>
-              {filteredAgencyOfferThreads.map((thread) => {
-                const hasConvo = conversationByCounterpartId.has(thread.creatorId);
-                return (
-                  <button
-                    key={thread.offerId}
-                    type="button"
-                    onClick={() => void openOrCreateConversation(thread.creatorId)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
-                  >
-                    <Avatar name={thread.creatorName} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
-                          {thread.creatorName}
-                        </p>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${offerStatusPillClasses(
-                            thread.status,
-                          )}`}
-                        >
-                          {thread.status.toLowerCase()}
-                        </span>
-                      </div>
-                      <p className="truncate text-xs text-[var(--color-ink-500)]">
-                        {thread.planTitle}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-[var(--color-sea-700)]">
-                      {thread.needsResponse ? "Reply" : hasConvo ? "Open" : "Start"}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
-
           {/* Group channels */}
           {!loadingConversations && filteredGroups.length > 0 && variant === "user" && (
             <>
@@ -1008,49 +832,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </>
           )}
 
-          {!loadingConversations && filteredAgencyGroupChannels.length > 0 && variant === "agency" && (
-            <>
-              <div className="mx-4 my-1 border-t border-[var(--color-border)]" />
-              <p className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
-                Group channels
-              </p>
-              {filteredAgencyGroupChannels.map((channel) => (
-                <Link
-                  key={channel.groupId}
-                  href={`/agency/groups/${channel.groupId}/chat`}
-                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-surface-2)]"
-                >
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)]">
-                    <Users className="size-4 text-[var(--color-lavender-500)]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
-                      {channel.planTitle}
-                    </p>
-                    <p className="flex items-center gap-1 truncate text-xs text-[var(--color-ink-500)]">
-                      <MapPin className="size-3 shrink-0" />
-                      {channel.destination}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${offerStatusPillClasses(
-                      channel.status,
-                    )}`}
-                  >
-                    {channel.status.toLowerCase()}
-                  </span>
-                </Link>
-              ))}
-            </>
-          )}
-
           {/* Empty state */}
           {!loadingConversations &&
             filteredConversations.length === 0 &&
             (variant === "user"
               ? filteredGroups.length === 0
-              : filteredAgencyOfferThreads.length === 0 &&
-                filteredAgencyGroupChannels.length === 0) &&
+              : filteredAgencyOfferThreads.length === 0) &&
             !showNewChat && (
               <div className="p-6">
                 <EmptyState
@@ -1134,78 +921,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 </p>
               </div>
             </div>
-
-            {variant === "agency" && (
-              <div className="border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-                    Offer flow
-                  </p>
-                  <Link
-                    href="/agency/bids"
-                    className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-ink-600)] transition hover:bg-[var(--color-sea-50)]"
-                  >
-                    <Gavel className="size-3" />
-                    Bid manager
-                  </Link>
-                </div>
-
-                {loadingAgencyOffers ? (
-                  <p className="text-xs text-[var(--color-ink-500)]">Loading offers…</p>
-                ) : agencyConversationOffers.length === 0 ? (
-                  <p className="text-xs text-[var(--color-ink-500)]">
-                    No offers with this traveler yet. Send one from the plan page or bid manager.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {agencyConversationOffers.slice(0, 3).map((offer) => {
-                      const canCounter = agencyCanCounter(offer);
-                      const statusLabel = offer.status.toLowerCase();
-                      return (
-                        <div
-                          key={offer.id}
-                          className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2.5"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold text-[var(--color-ink-900)]">
-                                {offer.plan?.title ?? "Trip plan"}
-                              </p>
-                              <p className="text-[11px] text-[var(--color-ink-500)]">
-                                {formatCurrency(offer.pricePerPerson)} / person
-                              </p>
-                            </div>
-                            <span className="rounded-full bg-[var(--color-surface-raised)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-ink-500)]">
-                              {statusLabel}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => setCounterSheetOfferId(offer.id)}
-                              disabled={!canCounter}
-                            >
-                              Counter
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void handleAgencyWithdrawOffer(offer.id)}
-                              disabled={offer.status === "ACCEPTED" || offer.status === "REJECTED"}
-                            >
-                              Withdraw
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Messages */}
             <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
@@ -1317,17 +1032,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         )}
       </div>
       </div>
-      <CounterOfferSheet
-        open={counterSheetOfferId !== null}
-        onClose={() => setCounterSheetOfferId(null)}
-        onSubmit={async (payload) => {
-          if (!counterSheetOfferId) return;
-          await handleAgencyCounterOffer(counterSheetOfferId, payload);
-        }}
-        currentPrice={counteringOffer?.pricePerPerson ?? 0}
-        counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
-        maxRounds={3}
-      />
     </>
   );
 }
