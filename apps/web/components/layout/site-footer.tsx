@@ -10,6 +10,7 @@ const footerNav = [
       { href: "/agencies", label: "Browse Agencies" },
       { href: "/signup/traveler", label: "Join as Traveler" },
       { href: "/signup/agency", label: "Register Agency" },
+      { href: "/fees", label: "Fees & Taxes" },
     ],
   },
   {
