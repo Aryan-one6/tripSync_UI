@@ -327,47 +327,7 @@ export default async function DiscoverPage({
           </Card>
 
           {/* Trending sidebar */}
-          <Card className="h-fit p-5">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-sm bg-(--color-sunset-50) text-(--color-sunset-700) shadow-(--shadow-sm)">
-                <TrendingUp className="size-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-(--color-ink-500)">
-                  Trending now
-                </p>
-                <p className="font-display text-lg text-(--color-ink-950)">Picking up momentum</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {trending.slice(0, 4).map((item) => (
-                <Link
-                  key={`${item.originType}-${item.id}`}
-                  href={item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`}
-                >
-                  <CardInset className="group space-y-1.5 transition-all hover:shadow-(--shadow-md) hover:-translate-y-0.5">
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant={item.originType === "plan" ? "sea" : "sunset"}>
-                        {item.originType === "plan" ? "Community plan" : "Agency package"}
-                      </Badge>
-                    </div>
-                    <p className="truncate font-display text-base text-(--color-ink-950)">{item.title}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--color-surface-raised)">
-                        <div
-                          className="h-full rounded-full bg-linear-to-r from-(--color-sea-400) to-(--color-sea-600)"
-                          style={{ width: `${Math.min(100, (item.joinedCount / item.groupSizeMax) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold text-(--color-sea-700)">
-                        {item.joinedCount}/{item.groupSizeMax}
-                      </span>
-                    </div>
-                  </CardInset>
-                </Link>
-              ))}
-            </div>
-          </Card>
+      
         </div>
       </div>
     </div>
