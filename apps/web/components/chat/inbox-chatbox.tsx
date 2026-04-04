@@ -11,12 +11,15 @@ import {
   MessageSquarePlus,
   Search,
   Send,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
+import { VIBE_OPTIONS } from "@/lib/constants";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { formatDateRange, initials } from "@/lib/format";
@@ -25,6 +28,7 @@ import type {
   DirectConversation,
   DirectMessage,
   Offer,
+  SocialProfile,
   TripMembership,
   UserSummary,
 } from "@/lib/api/types";
@@ -55,6 +59,30 @@ function chatTime(dateStr?: string | null): string {
 function previewText(content?: string | null) {
   if (!content) return "No messages yet";
   return content.length > 55 ? `${content.slice(0, 52)}…` : content;
+}
+
+const INTEREST_KEYWORDS: Record<string, string[]> = {
+  Adventure: ["adventure", "trek", "trekking", "camping", "rafting", "hiking"],
+  "Road Trip": ["road trip", "bike trip", "motorbike", "driving"],
+  Wellness: ["wellness", "yoga", "meditation", "retreat"],
+  Culture: ["culture", "heritage", "history", "local art", "festival"],
+  Workation: ["workation", "remote work", "digital nomad"],
+  Food: ["food", "cuisine", "cafe", "culinary", "street food"],
+  Mountains: ["mountain", "hills", "himachal", "uttarakhand"],
+  Beach: ["beach", "coast", "goa", "island"],
+};
+
+function extractInterestTags(text: string) {
+  const lower = text.toLowerCase();
+  return VIBE_OPTIONS.filter((label) =>
+    (INTEREST_KEYWORDS[label] ?? [label.toLowerCase()]).some((keyword) =>
+      lower.includes(keyword),
+    ),
+  );
+}
+
+function normalizeKey(value: string) {
+  return value.trim().toLowerCase();
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -138,6 +166,8 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [loadingCounterpartProfile, setLoadingCounterpartProfile] = useState(false);
+  const [counterpartProfile, setCounterpartProfile] = useState<SocialProfile | null>(null);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
   const [isPending, startTransition] = useTransition();
 
@@ -231,6 +261,104 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     () => conversations.reduce((sum, c) => sum + c.unreadCount, 0),
     [conversations],
   );
+
+  const activeCounterpartHandle = activeConversation?.counterpart?.username?.trim() ?? "";
+  const counterpartProfileHref = activeCounterpartHandle
+    ? `/profile/${encodeURIComponent(activeCounterpartHandle)}`
+    : null;
+
+  const sharedGroupTitles = useMemo(() => {
+    const counterpartId = activeConversation?.counterpart?.id;
+    if (!counterpartId) return [] as string[];
+
+    const contact = messageableContacts.find((entry) => entry.user.id === counterpartId);
+    if (!contact) return [] as string[];
+
+    const groupTitleById = new Map(
+      activeGroupChannels.map((trip) => [
+        trip.group.id,
+        trip.group.plan?.title ?? trip.group.package?.title ?? "Trip group",
+      ]),
+    );
+
+    return contact.sharedGroupIds
+      .map((groupId) => groupTitleById.get(groupId))
+      .filter((value): value is string => Boolean(value));
+  }, [activeConversation?.counterpart?.id, activeGroupChannels, messageableContacts]);
+
+  const myInterestTags = useMemo(() => {
+    const source = `${session?.user.travelPreferences ?? ""} ${session?.user.bio ?? ""}`;
+    return extractInterestTags(source);
+  }, [session?.user.bio, session?.user.travelPreferences]);
+
+  const counterpartInterestTags = useMemo(() => {
+    if (!counterpartProfile) return [] as string[];
+    if (counterpartProfile.profileType === "traveler") {
+      return extractInterestTags(
+        `${counterpartProfile.travelPreferences ?? ""} ${counterpartProfile.bio ?? ""}`,
+      );
+    }
+
+    const agencySignal = counterpartProfile.packages
+      .flatMap((pkg) => [pkg.title, pkg.destination])
+      .join(" ");
+    return extractInterestTags(`${counterpartProfile.bio ?? ""} ${agencySignal}`);
+  }, [counterpartProfile]);
+
+  const commonInterestTags = useMemo(() => {
+    if (myInterestTags.length === 0 || counterpartInterestTags.length === 0) {
+      return [] as string[];
+    }
+    const counterpartSet = new Set(counterpartInterestTags.map((item) => item.toLowerCase()));
+    return myInterestTags.filter((item) => counterpartSet.has(item.toLowerCase())).slice(0, 4);
+  }, [counterpartInterestTags, myInterestTags]);
+
+  const commonDestinations = useMemo(() => {
+    if (!counterpartProfile) return [] as string[];
+
+    const myDestinations = new Map<string, string>();
+    const addMine = (value?: string | null) => {
+      if (!value) return;
+      const key = normalizeKey(value);
+      if (!key) return;
+      myDestinations.set(key, value.trim());
+    };
+
+    addMine(session?.user.city);
+    for (const trip of activeGroupChannels) {
+      addMine(trip.group.plan?.destination);
+      addMine(trip.group.package?.destination);
+    }
+    for (const offer of agencyOffers) {
+      addMine(offer.plan?.destination);
+    }
+
+    const counterpartDestinations = new Map<string, string>();
+    const addCounterpart = (value?: string | null) => {
+      if (!value) return;
+      const key = normalizeKey(value);
+      if (!key) return;
+      counterpartDestinations.set(key, value.trim());
+    };
+
+    addCounterpart(counterpartProfile.location);
+    if (counterpartProfile.profileType === "traveler") {
+      counterpartProfile.travelMap.forEach((dest) => addCounterpart(dest));
+      counterpartProfile.plansCreated.forEach((trip) => addCounterpart(trip.destination));
+      counterpartProfile.tripsJoined.forEach((trip) => addCounterpart(trip.destination));
+    } else {
+      counterpartProfile.packages.forEach((pkg) => addCounterpart(pkg.destination));
+    }
+
+    const overlap: string[] = [];
+    for (const [key, label] of myDestinations.entries()) {
+      if (counterpartDestinations.has(key)) {
+        overlap.push(counterpartDestinations.get(key) ?? label);
+      }
+    }
+
+    return Array.from(new Set(overlap)).slice(0, 4);
+  }, [activeGroupChannels, agencyOffers, counterpartProfile, session?.user.city]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const openOrCreateConversation = useCallback(
@@ -451,6 +579,34 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId, apiFetchWithAuth, conversations.length]);
+
+  useEffect(() => {
+    if (!activeCounterpartHandle) {
+      setCounterpartProfile(null);
+      setLoadingCounterpartProfile(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingCounterpartProfile(true);
+
+    void apiFetchWithAuth<SocialProfile>(
+      `/social/profiles/${encodeURIComponent(activeCounterpartHandle)}`,
+    )
+      .then((profile) => {
+        if (!cancelled) setCounterpartProfile(profile);
+      })
+      .catch(() => {
+        if (!cancelled) setCounterpartProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCounterpartProfile(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCounterpartHandle, apiFetchWithAuth]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -911,16 +1067,100 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 size="md"
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-[var(--color-ink-950)]">
-                  {activeConversation.counterpart?.fullName ?? "Unknown"}
-                </p>
+                {counterpartProfileHref ? (
+                  <Link
+                    href={counterpartProfileHref}
+                    className="truncate font-semibold text-[var(--color-ink-950)] underline-offset-2 transition hover:text-[var(--color-sea-700)] hover:underline"
+                  >
+                    {activeConversation.counterpart?.fullName ?? "Unknown"}
+                  </Link>
+                ) : (
+                  <p className="truncate font-semibold text-[var(--color-ink-950)]">
+                    {activeConversation.counterpart?.fullName ?? "Unknown"}
+                  </p>
+                )}
                 <p className="text-xs text-[var(--color-ink-500)]">
                   {typingUsers.length > 0
                     ? `${typingUsers.map((e) => e.fullName).join(", ")} typing…`
                     : "Direct message"}
                 </p>
               </div>
+              {counterpartProfileHref && (
+                <Link
+                  href={counterpartProfileHref}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-white"
+                >
+                  View profile
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              )}
             </div>
+
+            {(counterpartProfileHref ||
+              loadingCounterpartProfile ||
+              sharedGroupTitles.length > 0 ||
+              commonInterestTags.length > 0 ||
+              commonDestinations.length > 0) && (
+              <div className="border-b border-[var(--color-sea-100)] bg-white/65 px-4 py-2.5 backdrop-blur-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  {loadingCounterpartProfile && (
+                    <Badge variant="outline" className="text-[11px]">
+                      Loading profile insights…
+                    </Badge>
+                  )}
+                  {sharedGroupTitles.length > 0 && (
+                    <Badge variant="sea" className="text-[11px]">
+                      {sharedGroupTitles.length} common group{sharedGroupTitles.length > 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                  {commonInterestTags.length > 0 && (
+                    <Badge variant="lavender" className="text-[11px]">
+                      {commonInterestTags.length} shared vibe{commonInterestTags.length > 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                  {commonDestinations.length > 0 && (
+                    <Badge variant="sunset" className="text-[11px]">
+                      {commonDestinations.length} shared destination{commonDestinations.length > 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </div>
+
+                {(sharedGroupTitles.length > 0 ||
+                  commonInterestTags.length > 0 ||
+                  commonDestinations.length > 0) && (
+                  <div className="mt-2 space-y-1">
+                    {sharedGroupTitles.length > 0 && (
+                      <p className="text-xs text-[var(--color-ink-600)]">
+                        <span className="font-semibold text-[var(--color-ink-700)]">Common groups:</span>{" "}
+                        {sharedGroupTitles.slice(0, 2).join(", ")}
+                        {sharedGroupTitles.length > 2 ? ` +${sharedGroupTitles.length - 2} more` : ""}
+                      </p>
+                    )}
+
+                    {commonInterestTags.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-ink-600)]">
+                          <Sparkles className="size-3.5 text-[var(--color-lavender-500)]" />
+                          Shared interests:
+                        </span>
+                        {commonInterestTags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="!px-2 !py-0.5 text-[11px]">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {commonDestinations.length > 0 && (
+                      <p className="inline-flex items-center gap-1.5 text-xs text-[var(--color-ink-600)]">
+                        <MapPin className="size-3.5 text-[var(--color-sunset-500)]" />
+                        Both active around {commonDestinations.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
