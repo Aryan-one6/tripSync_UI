@@ -15,7 +15,6 @@ import {
   Award,
   ChevronRight,
 } from "lucide-react";
-import type { FC } from "react";
 import { getTrendingItems } from "@/lib/api/public";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +22,54 @@ export const dynamic = "force-dynamic";
 // ─── Destinations strip ──────────────────────────────────────────────────────
 
 const DESTINATIONS = [
-  { name: "Manali", tag: "Adventure", emoji: "⛷️", color: "from-blue-500 to-cyan-400" },
-  { name: "Goa", tag: "Beach", emoji: "🏖️", color: "from-orange-400 to-yellow-300" },
-  { name: "Leh-Ladakh", tag: "Mountains", emoji: "🏔️", color: "from-slate-600 to-blue-500" },
-  { name: "Rishikesh", tag: "Spiritual", emoji: "🚣", color: "from-green-500 to-teal-400" },
-  { name: "Rajasthan", tag: "Culture", emoji: "🏰", color: "from-amber-500 to-orange-400" },
-  { name: "Kerala", tag: "Nature", emoji: "🌴", color: "from-emerald-500 to-green-400" },
-  { name: "Andaman", tag: "Island", emoji: "🐚", color: "from-cyan-500 to-blue-400" },
-  { name: "Coorg", tag: "Hills", emoji: "☕", color: "from-lime-600 to-green-500" },
+  {
+    name: "Manali",
+    tag: "Adventure",
+    image: "/destinations/manali",
+    tint: "from-sky-500/40 via-sky-700/25 to-indigo-900/70",
+  },
+  {
+    name: "Goa",
+    tag: "Beach",
+    image: "/destinations/goa.webp",
+    tint: "from-orange-300/45 via-amber-400/25 to-blue-900/60",
+  },
+  {
+    name: "Leh-Ladakh",
+    tag: "Mountains",
+    image: "/destinations/leh%20ladhak.jpg",
+    tint: "from-slate-400/35 via-blue-700/20 to-slate-950/70",
+  },
+  {
+    name: "Rishikesh",
+    tag: "Spiritual",
+    image: "/destinations/rishikesh.webp",
+    tint: "from-emerald-300/35 via-teal-600/20 to-slate-950/70",
+  },
+  {
+    name: "Rajasthan",
+    tag: "Culture",
+    image: "/destinations/Rajasthan.jpg",
+    tint: "from-amber-300/45 via-orange-500/25 to-zinc-950/65",
+  },
+  {
+    name: "Kerala",
+    tag: "Nature",
+    image: "/destinations/kerala.avif",
+    tint: "from-emerald-300/35 via-green-600/20 to-zinc-950/70",
+  },
+  {
+    name: "Andaman",
+    tag: "Island",
+    image: "/destinations/andaman.jpg",
+    tint: "from-cyan-300/35 via-sky-600/20 to-slate-950/70",
+  },
+  {
+    name: "Coorg",
+    tag: "Hills",
+    image: "/destinations/cooorg.jpg",
+    tint: "from-lime-300/35 via-green-600/20 to-zinc-950/70",
+  },
 ];
 
 function DestinationStrip() {
@@ -49,11 +88,15 @@ function DestinationStrip() {
               href={`/discover?destination=${encodeURIComponent(d.name)}`}
               className="shrink-0 group"
             >
-              <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${d.color} p-px shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5`}>
-                <div className="rounded-[calc(0.75rem-1px)] bg-white/10 backdrop-blur-sm px-4 py-3 text-center text-white">
-                  <div className="text-2xl mb-0.5">{d.emoji}</div>
+              <div className="relative overflow-hidden rounded-xl shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5">
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${d.image})` }}
+                />
+                <div className={`absolute inset-0 bg-gradient-to-br ${d.tint}`} />
+                <div className="relative min-w-[100px] px-4 py-4 text-center text-white">
                   <p className="font-display text-sm font-bold leading-tight">{d.name}</p>
-                  <p className="text-[9px] font-medium uppercase tracking-wider text-white/70">{d.tag}</p>
+                  <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-white/80">{d.tag}</p>
                 </div>
               </div>
             </Link>
