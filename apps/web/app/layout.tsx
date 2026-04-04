@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, Syne } from "next/font/google";
 import { Providers } from "@/app/providers";
 import { SITE_URL } from "@/lib/config";
@@ -39,6 +39,11 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,7 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${bodyFont.variable} ${displayFont.variable} h-full antialiased`}>
-      <body className="min-h-full bg-[var(--color-surface)] text-[var(--color-ink-900)]">
+      <body className="min-h-dvh bg-[var(--color-surface)] text-[var(--color-ink-900)]">
         <Providers>{children}</Providers>
       </body>
     </html>

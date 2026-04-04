@@ -40,7 +40,7 @@ export default async function LoginPage({
         : undefined;
 
   return (
-    <div className="min-h-[90vh] grid lg:grid-cols-[1fr_1fr]">
+    <div className="min-h-[90dvh] grid lg:grid-cols-[1fr_1fr]">
 
       {/* ── Left panel — visual/brand side ── */}
       <div className="hidden lg:flex flex-col relative overflow-hidden bg-gradient-to-br from-[var(--color-ink-950)] via-[var(--color-sea-900,#0a4536)] to-[#0d6350]">

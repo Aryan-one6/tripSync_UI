@@ -634,7 +634,7 @@ export default function AgencyBidsPage() {
               value={planSearch}
               onChange={(e) => setPlanSearch(e.target.value)}
               placeholder="Search by title or destination…"
-              className="w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-2)] py-2 pl-9 pr-3 text-sm focus:border-[var(--color-sea-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-400)]/20"
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-2)] py-2 pl-9 pr-3 text-base focus:border-[var(--color-sea-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-400)]/20 md:text-sm"
             />
           </div>
 

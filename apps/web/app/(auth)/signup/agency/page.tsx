@@ -27,7 +27,7 @@ export default async function AgencySignupPage({
       : "/agency/dashboard";
 
   return (
-    <div className="min-h-[90vh] grid lg:grid-cols-[1fr_1fr]">
+    <div className="min-h-[90dvh] grid lg:grid-cols-[1fr_1fr]">
 
       {/* ── Left: visual side ── */}
       <div className="hidden lg:flex flex-col relative overflow-hidden bg-gradient-to-br from-[var(--color-ink-950)] via-[#1a1a3e] to-[var(--color-lavender-900,#2d1a6e)]">

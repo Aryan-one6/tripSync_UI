@@ -96,8 +96,8 @@ function Avatar({
   const textClass = size === "sm" ? "text-[10px]" : "text-sm";
   const gradientClass =
     variant === "lavender"
-      ? "from-[var(--color-lavender-50)] to-[var(--color-lavender-100)] text-[var(--color-lavender-500)]"
-      : "from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[var(--color-sea-700)]";
+      ? "from-[var(--color-lavender-100)] to-[var(--color-lavender-300)] text-[var(--color-lavender-500)] ring-1 ring-[var(--color-lavender-200)]"
+      : "from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]";
   return (
     <div
       className={cn(
@@ -556,27 +556,27 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   return (
     <>
       <div
-        className="flex min-h-[calc(100dvh-8rem)] overflow-hidden border-y border-[var(--color-border)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-md)]"
+        className="flex min-h-[calc(100dvh-8rem)] overflow-hidden border-y border-[var(--color-sea-100)] bg-[var(--color-surface-raised)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]"
       >
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "flex w-full flex-col bg-[var(--color-surface-raised)] md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-border)]",
+          "flex w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)]",
           showMobileChat ? "hidden md:flex" : "flex",
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-4">
-          <h2 className="font-display text-xl text-[var(--color-ink-950)]">Chats</h2>
+        <div className="flex items-center justify-between border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f5fffa] px-4 py-4">
+          <h2 className="font-display text-xl text-[var(--color-sea-800)]">Chats</h2>
           <button
             type="button"
             onClick={() => setShowNewChat((v) => !v)}
             title="New chat"
             className={cn(
-              "flex size-9 items-center justify-center rounded-full transition",
+              "flex size-9 items-center justify-center rounded-full border border-transparent transition",
               showNewChat
-                ? "bg-[var(--color-sea-100)] text-[var(--color-sea-700)]"
-                : "text-[var(--color-ink-500)] hover:bg-[var(--color-surface-2)]",
+                ? "border-[var(--color-sea-200)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
+                : "text-[var(--color-sea-700)] hover:border-[var(--color-sea-200)] hover:bg-[var(--color-sea-50)]",
             )}
           >
             {showNewChat ? <X className="size-4" /> : <MessageSquarePlus className="size-5" />}
@@ -584,29 +584,29 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         </div>
 
         {/* Search bar */}
-        <div className="px-3 py-2">
+        <div className="px-3 py-2.5">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-400)]" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-sea-500)]" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search chats…"
-              className="w-full rounded-full bg-[var(--color-surface-2)] py-2 pl-9 pr-3 text-sm text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-300)]"
+              className="w-full rounded-full border border-[var(--color-sea-100)] bg-white/90 py-2 pl-9 pr-3 text-base text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] shadow-[var(--shadow-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-300)] md:text-sm"
             />
           </div>
         </div>
 
         {/* Filter pills */}
-        <div className="flex gap-2 px-3 pb-2">
+        <div className="flex gap-2 px-3 pb-2.5">
           <button
             type="button"
             onClick={() => setUnreadOnly(false)}
             className={cn(
-              "rounded-full px-3 py-1 text-xs font-semibold transition",
+              "rounded-full border px-3 py-1 text-xs font-semibold transition",
               !unreadOnly
-                ? "bg-[var(--color-sea-600)] text-white"
-                : "bg-[var(--color-surface-2)] text-[var(--color-ink-600)] hover:bg-[var(--color-sea-50)]",
+                ? "border-[var(--color-sea-500)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
+                : "border-[var(--color-sea-100)] bg-white/85 text-[var(--color-sea-700)] hover:bg-[var(--color-sea-50)]",
             )}
           >
             All
@@ -616,10 +616,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
               type="button"
               onClick={() => setUnreadOnly(true)}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-semibold transition",
+                "rounded-full border px-3 py-1 text-xs font-semibold transition",
                 unreadOnly
-                  ? "bg-[var(--color-sea-600)] text-white"
-                  : "bg-[var(--color-surface-2)] text-[var(--color-ink-600)] hover:bg-[var(--color-sea-50)]",
+                  ? "border-[var(--color-sea-500)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
+                  : "border-[var(--color-sea-100)] bg-white/85 text-[var(--color-sea-700)] hover:bg-[var(--color-sea-50)]",
               )}
             >
               Unread ({totalUnread})
@@ -651,7 +651,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                       key={contact.user.id}
                       type="button"
                       onClick={() => void openOrCreateConversation(contact.user.id)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-sea-50)]"
                     >
                       <Avatar name={contact.user.fullName} size="md" />
                       <div className="min-w-0 flex-1">
@@ -677,7 +677,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                       key={thread.offerId}
                       type="button"
                       onClick={() => void openOrCreateConversation(thread.creatorId)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-surface-2)]"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-sea-50)]"
                     >
                       <Avatar name={thread.creatorName} size="md" />
                       <div className="min-w-0 flex-1">
@@ -736,8 +736,8 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                     className={cn(
                       "flex w-full items-center gap-3 px-4 py-3 text-left transition",
                       isActive
-                        ? "bg-[var(--color-sea-50)]"
-                        : "hover:bg-[var(--color-surface-2)]",
+                        ? "border-l-2 border-[var(--color-sea-500)] bg-[var(--color-sea-50)]"
+                        : "hover:bg-[var(--color-sea-50)]",
                     )}
                   >
                     <Avatar name={name} size="md" />
@@ -810,7 +810,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   <Link
                     key={trip.id}
                     href={`/dashboard/groups/${trip.group.id}/chat`}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-surface-2)]"
+                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-sea-50)]"
                   >
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)]">
                       <Users className="size-4 text-[var(--color-lavender-500)]" />
@@ -858,20 +858,20 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex flex-1 flex-col bg-[var(--color-surface-2)]",
+          "flex flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)]",
           showMobileChat ? "flex" : "hidden md:flex",
         )}
       >
         {feedback && (
-          <div className="m-3 rounded-[var(--radius-md)] bg-[var(--color-sunset-50)] px-4 py-3 text-sm text-[var(--color-sunset-700)]">
+          <div className="m-3 rounded-[var(--radius-md)] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-4 py-3 text-sm text-[var(--color-sunset-700)] shadow-[var(--shadow-sm)]">
             {feedback}
           </div>
         )}
 
         {!activeConversation ? (
           /* Empty / select state */
-          <div className="flex flex-1 flex-col items-center justify-center gap-4">
-            <div className="flex size-16 items-center justify-center rounded-full bg-[var(--color-sea-50)] shadow-[var(--shadow-sm)]">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-b from-[#dcf8e8] to-[#c8f1dc] shadow-[var(--shadow-md)] ring-1 ring-[var(--color-sea-200)]">
               <svg
                 className="size-8 text-[var(--color-sea-600)]"
                 fill="none"
@@ -886,7 +886,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 />
               </svg>
             </div>
-            <div className="text-center">
+            <div className="rounded-[var(--radius-md)] border border-white/60 bg-white/55 px-5 py-4 shadow-[var(--shadow-sm)] backdrop-blur-sm">
               <p className="font-display text-lg text-[var(--color-ink-950)]">
                 Select a conversation
               </p>
@@ -898,11 +898,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         ) : (
           <>
             {/* Conversation header */}
-            <div className="flex items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-3">
+            <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
               <button
                 type="button"
                 onClick={() => setShowMobileChat(false)}
-                className="flex size-8 items-center justify-center rounded-full text-[var(--color-ink-600)] transition hover:bg-[var(--color-surface-2)] md:hidden"
+                className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition hover:bg-white/70 md:hidden"
               >
                 <ArrowLeft className="size-5" />
               </button>
@@ -965,10 +965,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                         >
                           <div
                             className={cn(
-                              "max-w-[72%] rounded-[18px] px-4 py-2.5 shadow-sm",
+                              "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
                               mine
-                                ? "rounded-tr-[4px] bg-[var(--color-sea-600)] text-white"
-                                : "rounded-tl-[4px] bg-white text-[var(--color-ink-900)]",
+                                ? "rounded-tr-[4px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
+                                : "rounded-tl-[4px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
                             )}
                           >
                             <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -977,7 +977,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                             <p
                               className={cn(
                                 "mt-0.5 text-right text-[10px]",
-                                mine ? "text-white/70" : "text-[var(--color-ink-400)]",
+                                mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
                               )}
                             >
                               {format(new Date(message.createdAt), "HH:mm")}
@@ -989,7 +989,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   })}
                   {typingUsers.length > 0 && (
                     <div className="flex justify-start">
-                      <div className="rounded-[18px] rounded-tl-[4px] bg-white px-4 py-3 shadow-sm">
+                      <div className="rounded-[18px] rounded-tl-[4px] border border-white/90 bg-white/95 px-4 py-3 shadow-sm">
                         <span className="flex gap-1">
                           <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
                           <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
@@ -1004,7 +1004,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Input bar */}
-            <div className="flex items-end gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-3">
+            <div className="flex items-end gap-2 border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa] px-3 py-3">
               <Textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -1016,14 +1016,14 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 }}
                 placeholder="Type a message…"
                 rows={1}
-                className="min-h-0 flex-1 resize-none rounded-[18px]"
+                className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
               />
               <Button
                 type="button"
                 size="icon"
                 onClick={sendDirectMessage}
                 disabled={isPending || !draft.trim()}
-                className="mb-0.5 size-10 shrink-0 rounded-full"
+                className="mb-0.5 size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
               >
                 <Send className="size-4" />
               </Button>

@@ -148,7 +148,7 @@ export default async function DiscoverPage({
               name="q"
               defaultValue={q}
               placeholder="Where next?"
-              className="h-12 w-full rounded-(--radius-full) border border-(--color-border-strong) bg-(--color-surface-raised) pl-11 pr-4 text-sm text-foreground shadow-(--shadow-sm) placeholder:text-(--color-ink-400) focus:border-(--color-sea-400) focus:outline-none focus:ring-3 focus:ring-(--color-sea-100)"
+              className="h-12 w-full rounded-(--radius-full) border border-(--color-border-strong) bg-(--color-surface-raised) pl-11 pr-4 text-base text-foreground shadow-(--shadow-sm) placeholder:text-(--color-ink-400) focus:border-(--color-sea-400) focus:outline-none focus:ring-3 focus:ring-(--color-sea-100) md:text-sm"
             />
           </div>
           <button

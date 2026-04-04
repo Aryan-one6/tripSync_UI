@@ -24,7 +24,7 @@ export default async function TravelerSignupPage({
       : "/dashboard/feed";
 
   return (
-    <div className="min-h-[90vh] grid lg:grid-cols-[1fr_1fr]">
+    <div className="min-h-[90dvh] grid lg:grid-cols-[1fr_1fr]">
 
       {/* ── Left: visual side ── */}
       <div className="hidden lg:flex flex-col relative overflow-hidden bg-gradient-to-br from-[var(--color-sea-700)] via-[var(--color-sea-600)] to-[var(--color-sea-500)]">

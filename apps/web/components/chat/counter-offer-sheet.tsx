@@ -193,7 +193,7 @@ export function CounterOfferSheet({
                 min={0}
                 step={PRICE_STEP}
                 onChange={(e) => setCounterPrice(Math.max(0, Number(e.target.value)))}
-                className="w-32 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2 text-center text-sm font-semibold text-[var(--color-ink-900)] focus:border-[var(--color-sea-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-400)]/20"
+                className="w-32 rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] px-3 py-2 text-center text-base font-semibold text-[var(--color-ink-900)] focus:border-[var(--color-sea-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-400)]/20 md:text-sm"
               />
               <p className="mt-1.5 text-[11px] text-[var(--color-ink-400)]">Or type a custom amount</p>
             </div>
