@@ -36,10 +36,28 @@ export default async function FeedPage({
       ? params.sort
       : "recent";
   const q = typeof params.q === "string" ? params.q : "";
+  const audience = params.audience === "agency" ? "agency" : "traveler";
+
+  function buildFeedHref(overrides: Record<string, string | undefined>) {
+    const nextParams = new URLSearchParams();
+    for (const [key, value] of Object.entries({
+      q: q || undefined,
+      audience,
+      destination: destination || undefined,
+      vibes: vibes || undefined,
+      originType,
+      sort,
+      ...overrides,
+    })) {
+      if (value) nextParams.set(key, value);
+    }
+    const qs = nextParams.toString();
+    return qs ? `/dashboard/feed?${qs}` : `/dashboard/feed?audience=${audience}`;
+  }
 
   const items = q
     ? await searchDiscover(q)
-    : await getDiscoverItems({ destination, vibes, originType, sort });
+    : await getDiscoverItems({ audience, destination, vibes, originType, sort });
 
   const trending = await getTrendingItems();
 
@@ -62,6 +80,8 @@ export default async function FeedPage({
             action="/dashboard/feed"
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]"
           >
+            <input type="hidden" name="audience" value={audience} />
+            {vibes ? <input type="hidden" name="vibes" value={vibes} /> : null}
             <Input name="q" defaultValue={q} placeholder="Search destination or trip title" />
             <Input name="destination" defaultValue={destination} placeholder="Destination" />
             <Select
@@ -87,7 +107,7 @@ export default async function FeedPage({
           </form>
           <div className="flex flex-wrap gap-2">
             {VIBE_OPTIONS.map((vibe) => (
-              <Link key={vibe} href={`/dashboard/feed?vibes=${encodeURIComponent(vibe)}`}>
+              <Link key={vibe} href={buildFeedHref({ vibes: vibe })}>
                 <Badge
                   variant={vibes === vibe ? "sea" : "default"}
                   className="cursor-pointer transition-all hover:shadow-[var(--shadow-clay-sm)] hover:-translate-y-0.5"

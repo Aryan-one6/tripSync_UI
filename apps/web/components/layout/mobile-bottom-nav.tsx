@@ -15,12 +15,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-context";
+import { useUnreadDirectCount } from "@/lib/realtime/use-unread-direct-count";
 
 // ─── Nav Items ─────────────────────────────────────────────────────────────────
 
 const USER_TABS = [
   { href: "/dashboard/feed", label: "Feed", icon: Home },
-  { href: "/discover", label: "Discover", icon: Compass },
+  { href: "/discover?audience=traveler", label: "Discover", icon: Compass },
   { href: "/dashboard/plans/new", label: "Create", icon: Plus, isPrimary: true },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },
@@ -42,12 +43,14 @@ function TabItem({
   icon: Icon,
   active,
   isPrimary = false,
+  badgeCount = 0,
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
   isPrimary?: boolean;
+  badgeCount?: number;
 }) {
   if (isPrimary) {
     return (
@@ -81,12 +84,19 @@ function TabItem({
           active && "bg-[var(--color-sea-50)]",
         )}
       >
-        <Icon
-          className={cn(
-            "size-5 transition-colors",
-            active ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-400)]",
+        <span className="relative">
+          <Icon
+            className={cn(
+              "size-5 transition-colors",
+              active ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-400)]",
+            )}
+          />
+          {badgeCount > 0 && (
+            <span className="absolute -right-2 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
+              {badgeCount > 9 ? "9+" : badgeCount}
+            </span>
           )}
-        />
+        </span>
       </div>
       <span
         className={cn(
@@ -105,6 +115,7 @@ function TabItem({
 export function MobileBottomNav() {
   const { session, status } = useAuth();
   const pathname = usePathname();
+  const { unreadDirectCount } = useUnreadDirectCount();
 
   // Only show for authenticated users on mobile
   if (status !== "authenticated" || !session) return null;
@@ -116,9 +127,10 @@ export function MobileBottomNav() {
   const activeHref = tabs
     .filter((t) => !t.isPrimary)
     .reduce<string | null>((best, tab) => {
-      if (!pathname.startsWith(tab.href)) return best;
-      if (!best) return tab.href;
-      return tab.href.length > best.length ? tab.href : best;
+      const tabPath = tab.href.split("?")[0] ?? tab.href;
+      if (!pathname.startsWith(tabPath)) return best;
+      if (!best) return tabPath;
+      return tabPath.length > best.length ? tabPath : best;
     }, null);
 
   return (
@@ -137,8 +149,13 @@ export function MobileBottomNav() {
           href={tab.href}
           label={tab.label}
           icon={tab.icon}
-          active={activeHref === tab.href}
+          active={activeHref === (tab.href.split("?")[0] ?? tab.href)}
           isPrimary={tab.isPrimary}
+          badgeCount={
+            tab.href === "/dashboard/messages" || tab.href === "/agency/inbox"
+              ? unreadDirectCount
+              : 0
+          }
         />
       ))}
     </nav>

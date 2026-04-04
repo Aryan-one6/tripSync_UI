@@ -4,6 +4,7 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '.
 import { assertTransition } from './state-machine.js';
 import type { CreatePlanInput, UpdatePlanInput } from '@tripsync/shared';
 import slugifyModule from 'slugify';
+import { notifyFollowersOfTravelerPost } from '../notifications/service.js';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 
@@ -238,7 +239,16 @@ export async function update(planId: string, userId: string, data: UpdatePlanInp
 }
 
 export async function publish(planId: string, userId: string) {
-  const plan = await prisma.plan.findUnique({ where: { id: planId } });
+  const plan = await prisma.plan.findUnique({
+    where: { id: planId },
+    select: {
+      id: true,
+      creatorId: true,
+      status: true,
+      coverImageUrl: true,
+      galleryUrls: true,
+    },
+  });
   if (!plan) throw new NotFoundError('Plan');
   if (plan.creatorId !== userId) throw new ForbiddenError('Only the creator can publish');
   const gallery = Array.isArray(plan.galleryUrls) ? plan.galleryUrls : [];
@@ -255,10 +265,65 @@ export async function publish(planId: string, userId: string) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30);
 
-  return prisma.plan.update({
+  const updated = await prisma.plan.update({
     where: { id: planId },
     data: { status: PlanStatus.OPEN, expiresAt },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      creatorId: true,
+      destination: true,
+      destinationState: true,
+      startDate: true,
+      endDate: true,
+      isDateFlexible: true,
+      budgetMin: true,
+      budgetMax: true,
+      groupSizeMin: true,
+      groupSizeMax: true,
+      vibes: true,
+      accommodation: true,
+      groupType: true,
+      genderPref: true,
+      ageRangeMin: true,
+      ageRangeMax: true,
+      activities: true,
+      description: true,
+      itinerary: true,
+      galleryUrls: true,
+      coverImageUrl: true,
+      autoApprove: true,
+      status: true,
+      expiresAt: true,
+      confirmedAt: true,
+      selectedOfferId: true,
+      createdAt: true,
+      updatedAt: true,
+      creator: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+          avatarUrl: true,
+          city: true,
+          verification: true,
+          avgRating: true,
+          completedTrips: true,
+        },
+      },
+    },
   });
+
+  await notifyFollowersOfTravelerPost({
+    creatorId: updated.creatorId,
+    creatorName: updated.creator.fullName,
+    postTitle: updated.title,
+    postHref: `/plans/${updated.slug}`,
+    postType: 'plan',
+  });
+
+  return updated;
 }
 
 export async function confirm(planId: string, userId: string, offerId: string) {

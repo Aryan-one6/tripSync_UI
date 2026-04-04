@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const userNavMain = [
-  { href: "/discover", label: "Discover", icon: Compass },
+  { href: "/discover?audience=traveler", label: "Discover", icon: Compass },
   { href: "/dashboard/plans", label: "My Plans", icon: Route },
   { href: "/dashboard/plans/new", label: "Create Plan", icon: FilePlus2 },
   { href: "/dashboard/trips", label: "My Trips", icon: Ticket },
@@ -65,7 +65,9 @@ function NavItem({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const active = pathname === href || (href !== "/discover" && pathname.startsWith(`${href}/`));
+  const activePath = href.split("?")[0] ?? href;
+  const active =
+    pathname === activePath || (activePath !== "/discover" && pathname.startsWith(`${activePath}/`));
   return (
     <Link
       href={href}

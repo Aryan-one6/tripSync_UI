@@ -1,6 +1,7 @@
 import { Prisma, type PlanStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, NotFoundError } from '../../lib/errors.js';
+import { createStoredNotification } from '../notifications/service.js';
 
 const ACTIVE_FEED_STATUSES: PlanStatus[] = ['OPEN', 'CONFIRMING', 'CONFIRMED'];
 
@@ -527,6 +528,11 @@ export async function getFollowState(handle: string, viewerUserId: string) {
 
 export async function followProfile(handle: string, viewerUserId: string) {
   const resolved = await resolveProfileHandle(handle);
+  const viewer = await prisma.user.findUnique({
+    where: { id: viewerUserId },
+    select: { id: true, username: true, fullName: true },
+  });
+  if (!viewer) throw new NotFoundError('User');
 
   if (resolved.kind === 'traveler') {
     if (resolved.user.id === viewerUserId) {
@@ -549,6 +555,19 @@ export async function followProfile(handle: string, viewerUserId: string) {
           targetUserId: resolved.user.id,
         },
       });
+      await createStoredNotification({
+        userId: resolved.user.id,
+        type: 'profile_followed',
+        title: `${viewer.fullName} started following you`,
+        body: 'Your profile gained a new follower.',
+        href: `/profile/${viewer.username ?? viewer.id}`,
+        metadata: {
+          viewerUserId: viewer.id,
+          viewerHandle: viewer.username ?? viewer.id,
+          targetType: 'traveler',
+          targetHandle: resolved.user.username ?? resolved.user.id,
+        },
+      });
     }
   } else {
     if (resolved.agency.ownerId === viewerUserId) {
@@ -568,6 +587,20 @@ export async function followProfile(handle: string, viewerUserId: string) {
         data: {
           followerUserId: viewerUserId,
           targetType: 'AGENCY',
+          targetAgencyId: resolved.agency.id,
+        },
+      });
+      await createStoredNotification({
+        userId: resolved.agency.ownerId,
+        type: 'profile_followed',
+        title: `${viewer.fullName} followed your agency`,
+        body: `${resolved.agency.name} gained a new follower.`,
+        href: `/profile/${viewer.username ?? viewer.id}`,
+        metadata: {
+          viewerUserId: viewer.id,
+          viewerHandle: viewer.username ?? viewer.id,
+          targetType: 'agency',
+          targetHandle: resolved.agency.slug,
           targetAgencyId: resolved.agency.id,
         },
       });
@@ -597,6 +630,77 @@ export async function unfollowProfile(handle: string, viewerUserId: string) {
   }
 
   return getFollowState(handle, viewerUserId);
+}
+
+export async function recordProfileView(handle: string, viewerUserId: string) {
+  const viewer = await prisma.user.findUnique({
+    where: { id: viewerUserId },
+    select: { id: true, username: true, fullName: true },
+  });
+  if (!viewer) throw new NotFoundError('User');
+
+  const resolved = await resolveProfileHandle(handle);
+
+  if (resolved.kind === 'traveler') {
+    if (resolved.user.id === viewerUserId) {
+      return { recorded: false };
+    }
+
+    await prisma.profileView.create({
+      data: {
+        viewerUserId,
+        targetOwnerUserId: resolved.user.id,
+        targetType: 'USER',
+        targetUserId: resolved.user.id,
+      },
+    });
+
+    await createStoredNotification({
+      userId: resolved.user.id,
+      type: 'profile_viewed',
+      title: `${viewer.fullName} viewed your profile`,
+      body: 'Someone checked your traveler profile.',
+      href: `/profile/${viewer.username ?? viewer.id}`,
+      metadata: {
+        viewerUserId: viewer.id,
+        viewerHandle: viewer.username ?? viewer.id,
+        targetType: 'traveler',
+        targetHandle: resolved.user.username ?? resolved.user.id,
+      },
+    });
+
+    return { recorded: true };
+  }
+
+  if (resolved.agency.ownerId === viewerUserId) {
+    return { recorded: false };
+  }
+
+  await prisma.profileView.create({
+    data: {
+      viewerUserId,
+      targetOwnerUserId: resolved.agency.ownerId,
+      targetType: 'AGENCY',
+      targetAgencyId: resolved.agency.id,
+    },
+  });
+
+  await createStoredNotification({
+    userId: resolved.agency.ownerId,
+    type: 'profile_viewed',
+    title: `${viewer.fullName} viewed your agency profile`,
+    body: `${resolved.agency.name} received a new profile view.`,
+    href: `/profile/${viewer.username ?? viewer.id}`,
+    metadata: {
+      viewerUserId: viewer.id,
+      viewerHandle: viewer.username ?? viewer.id,
+      targetType: 'agency',
+      targetHandle: resolved.agency.slug,
+      targetAgencyId: resolved.agency.id,
+    },
+  });
+
+  return { recorded: true };
 }
 
 // ─── Followers / Following Lists ─────────────────────────────────────────────
@@ -688,4 +792,3 @@ export async function getFollowingList(handle: string) {
     return null;
   }).filter(Boolean);
 }
-

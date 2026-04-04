@@ -12,6 +12,7 @@ import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors
 import { emitDirectConversationEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
+import { createStoredNotificationsBulk } from '../notifications/service.js';
 
 const CHAT_MEMBER_STATUSES = ['APPROVED', 'COMMITTED'] as const;
 
@@ -397,6 +398,22 @@ async function getNotificationRecipients(groupId: string, excludeUserId?: string
   return members.map((member) => member.userId);
 }
 
+async function getRoleAwareInboxHrefMap(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, string>();
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: {
+      id: true,
+      agency: { select: { id: true } },
+    },
+  });
+
+  return new Map(
+    users.map((user) => [user.id, user.agency?.id ? '/agency/inbox' : '/dashboard/messages']),
+  );
+}
+
 export async function listMessages(groupId: string, userId: string, cursor?: string, limit = 30) {
   await assertChatAccess(groupId, userId);
 
@@ -477,6 +494,7 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
 
   const recipients = await getNotificationRecipients(groupId, userId);
   if (recipients.length > 0) {
+    const hrefByUserId = await getRoleAwareInboxHrefMap(recipients);
     await queueNotification({
       type: 'chat_message',
       title: `${membership.user.fullName} posted in your trip chat`,
@@ -485,6 +503,19 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
       ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${groupId}/chat`,
       metadata: { groupId, messageId: message.id },
     });
+    await createStoredNotificationsBulk(
+      recipients.map((recipientId) => ({
+        userId: recipientId,
+        type: 'chat_message',
+        title: `${membership.user.fullName} posted in your trip chat`,
+        body: sanitized.sanitized.slice(0, 160),
+        href:
+          hrefByUserId.get(recipientId) === '/agency/inbox'
+            ? `/agency/groups/${groupId}/chat`
+            : `/dashboard/groups/${groupId}/chat`,
+        metadata: { groupId, messageId: message.id },
+      })),
+    );
   }
 
   return message;
@@ -524,6 +555,7 @@ export async function createPoll(groupId: string, userId: string, data: CreatePo
 
   const recipients = await getNotificationRecipients(groupId, userId);
   if (recipients.length > 0) {
+    const hrefByUserId = await getRoleAwareInboxHrefMap(recipients);
     await queueNotification({
       type: 'chat_poll',
       title: `${membership.user.fullName} started a trip poll`,
@@ -532,6 +564,19 @@ export async function createPoll(groupId: string, userId: string, data: CreatePo
       ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${groupId}/chat`,
       metadata: { groupId, messageId: message.id },
     });
+    await createStoredNotificationsBulk(
+      recipients.map((recipientId) => ({
+        userId: recipientId,
+        type: 'chat_poll',
+        title: `${membership.user.fullName} started a trip poll`,
+        body: message.content.slice(0, 160),
+        href:
+          hrefByUserId.get(recipientId) === '/agency/inbox'
+            ? `/agency/groups/${groupId}/chat`
+            : `/dashboard/groups/${groupId}/chat`,
+        metadata: { groupId, messageId: message.id },
+      })),
+    );
   }
 
   return message;
@@ -923,6 +968,7 @@ export async function sendDirectMessage(
   emitDirectConversationEvent(conversationId, 'direct:message_created', { conversationId, message });
 
   if (recipientIds.length > 0) {
+    const hrefByUserId = await getRoleAwareInboxHrefMap(recipientIds);
     await queueNotification({
       type: 'direct_message',
       title: `${message.sender?.fullName ?? 'A traveler'} sent you a message`,
@@ -931,6 +977,23 @@ export async function sendDirectMessage(
       ctaUrl: `${env.FRONTEND_URL}/dashboard/messages`,
       metadata: { conversationId, messageId: message.id },
     });
+    await createStoredNotificationsBulk(
+      recipientIds.map((recipientId) => {
+        const inboxHref =
+          hrefByUserId.get(recipientId) === '/agency/inbox'
+            ? '/agency/inbox'
+            : '/dashboard/messages';
+
+        return {
+          userId: recipientId,
+          type: 'direct_message',
+          title: `${message.sender?.fullName ?? 'A traveler'} sent you a message`,
+          body: sanitized.sanitized.slice(0, 160),
+          href: `${inboxHref}?conversationId=${conversationId}`,
+          metadata: { conversationId, messageId: message.id },
+        };
+      }),
+    );
   }
 
   return message;

@@ -36,7 +36,9 @@ const mocks = vi.hoisted(() => ({
     groupMember:      { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
     plan:             { findUnique: vi.fn() },
     agency:           { findUnique: vi.fn() },
+    agencyMember:     { findUnique: vi.fn(), findFirst: vi.fn() },
     user:             { findUnique: vi.fn() },
+    notification:     { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   },
   acceptOfferForPlan: vi.fn(),
   createSystemMessage: vi.fn(),
@@ -63,6 +65,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.acceptOfferForPlan.mockResolvedValue({ offer: baseOffer({ status: 'ACCEPTED' }) });
   mocks.createSystemMessage.mockResolvedValue({});
+  mocks.prisma.notification.create.mockResolvedValue({
+    id: 'notif-unit-1',
+    type: 'offer_updated',
+    title: 'Test',
+    body: 'Test',
+    href: null,
+    metadata: null,
+    createdAt: new Date(),
+    readAt: null,
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

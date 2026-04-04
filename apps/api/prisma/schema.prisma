@@ -67,6 +67,11 @@ enum FollowTargetType {
   AGENCY
 }
 
+enum ProfileViewTargetType {
+  USER
+  AGENCY
+}
+
 enum PaymentSource {
   PLAN_OFFER
   PACKAGE
@@ -149,6 +154,10 @@ model User {
   directMessagesSent DirectMessage[] @relation("DirectMessageSender")
   following       Follow[]         @relation("FollowFollowerRel")
   followers       Follow[]         @relation("FollowTargetUserRel")
+  notifications   Notification[]
+  profileViewsMade ProfileView[]   @relation("ProfileViewViewerRel")
+  profileViewsOwned ProfileView[]  @relation("ProfileViewOwnerRel")
+  profileViewsAsTarget ProfileView[] @relation("ProfileViewTargetUserRel")
   agencyMemberships AgencyMember[]
   disputesCreated Dispute[]        @relation("DisputeCreatorRel")
   disputesUpdated Dispute[]        @relation("DisputeResolverRel")
@@ -197,6 +206,7 @@ model Agency {
   customers       AgencyCustomer[]
   campaigns       AgencyCampaign[]
   riskFlags       FraudRiskFlag[]
+  profileViews    ProfileView[]    @relation("ProfileViewTargetAgencyRel")
 
   @@map("agencies")
 }
@@ -370,6 +380,45 @@ model Follow {
   @@index([targetUserId])
   @@index([targetAgencyId])
   @@map("follows")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  href      String?
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model ProfileView {
+  id                String                @id @default(uuid())
+  viewerUserId      String
+  targetOwnerUserId String
+  targetType        ProfileViewTargetType
+  targetUserId      String?
+  targetAgencyId    String?
+  createdAt         DateTime              @default(now())
+
+  viewer            User                  @relation("ProfileViewViewerRel", fields: [viewerUserId], references: [id], onDelete: Cascade)
+  targetOwner       User                  @relation("ProfileViewOwnerRel", fields: [targetOwnerUserId], references: [id], onDelete: Cascade)
+  targetUser        User?                 @relation("ProfileViewTargetUserRel", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetAgency      Agency?               @relation("ProfileViewTargetAgencyRel", fields: [targetAgencyId], references: [id], onDelete: SetNull)
+
+  @@index([targetOwnerUserId, createdAt(sort: Desc)])
+  @@index([viewerUserId, createdAt(sort: Desc)])
+  @@index([targetUserId])
+  @@index([targetAgencyId])
+  @@map("profile_views")
 }
 
 model OfferNegotiation {

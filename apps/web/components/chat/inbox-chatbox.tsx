@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth/auth-context";
+import { CONVERSATION_READ_EVENT } from "@/lib/realtime/use-live-notifications";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { formatDateRange, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -288,6 +289,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           : c,
       ),
     );
+    window.dispatchEvent(
+      new CustomEvent(CONVERSATION_READ_EVENT, {
+        detail: { conversationId },
+      }),
+    );
   }
 
   const emitDirectTyping = (isTyping: boolean) => {
@@ -423,9 +429,6 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       if (targetUserId) {
         await openOrCreateConversation(targetUserId);
         return;
-      }
-      if (conversations.length > 0) {
-        setActiveConversationId(conversations[0].id);
       }
     })();
   }, [

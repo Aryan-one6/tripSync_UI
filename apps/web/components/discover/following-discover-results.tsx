@@ -11,6 +11,7 @@ import type { DiscoverItem } from "@/lib/api/types";
 interface FollowingDiscoverResultsProps {
   query: {
     q?: string;
+    audience?: "traveler" | "agency";
     destination?: string;
     vibes?: string;
     originType?: "plan" | "package";
@@ -34,6 +35,7 @@ export function FollowingDiscoverResults({ query }: FollowingDiscoverResultsProp
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({
       q: query.q,
+      audience: query.audience,
       destination: query.destination,
       vibes: query.vibes,
       originType: query.originType,
@@ -56,7 +58,7 @@ export function FollowingDiscoverResults({ query }: FollowingDiscoverResultsProp
           setHasLoaded(true);
         });
     });
-  }, [apiFetchWithAuth, query.destination, query.originType, query.q, query.sort, query.vibes, status]);
+  }, [apiFetchWithAuth, query.audience, query.destination, query.originType, query.q, query.sort, query.vibes, status]);
 
   if (status !== "authenticated") {
     return (

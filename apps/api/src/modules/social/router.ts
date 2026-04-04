@@ -64,6 +64,15 @@ socialRouter.delete(
   }),
 );
 
+socialRouter.post(
+  '/profiles/:handle/view',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await socialService.recordProfileView(param(req.params.handle), req.userId!);
+    res.status(201).json({ data: result });
+  }),
+);
+
 socialRouter.get(
   '/profiles/:handle/followers',
   asyncHandler(async (req, res) => {

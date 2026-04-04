@@ -5,6 +5,7 @@ import { queueNotification } from '../../lib/queue.js';
 import { emitAgencyEvent, emitUserEvent } from '../../lib/socket.js';
 import { env } from '../../lib/env.js';
 import { syncUserVerificationTier } from '../../lib/verification.js';
+import { createStoredNotification } from '../notifications/service.js';
 
 async function assertReviewWindow(groupId: string) {
   const group = await prisma.group.findUnique({
@@ -187,6 +188,14 @@ export async function createReview(reviewerId: string, data: CreateReviewInput) 
       ctaUrl: `${env.FRONTEND_URL}/agency/dashboard`,
       metadata: { reviewId: review.id, groupId: data.groupId },
     });
+    await createStoredNotification({
+      userId: agency.ownerId,
+      type: 'review_created',
+      title: `New agency review for ${agency.name}`,
+      body: `${review.reviewer.fullName} shared a ${review.overallRating}/5 review.`,
+      href: '/agency/storefront',
+      metadata: { reviewId: review.id, groupId: data.groupId },
+    });
 
     return review;
   }
@@ -229,6 +238,14 @@ export async function createReview(reviewerId: string, data: CreateReviewInput) 
     body: `${review.reviewer.fullName} shared a ${review.overallRating}/5 review.`,
     userIds: [targetMember.userId],
     ctaUrl: `${env.FRONTEND_URL}/dashboard/settings`,
+    metadata: { reviewId: review.id, groupId: data.groupId },
+  });
+  await createStoredNotification({
+    userId: targetMember.userId,
+    type: 'review_created',
+    title: 'New co-traveler review',
+    body: `${review.reviewer.fullName} shared a ${review.overallRating}/5 review.`,
+    href: '/dashboard/settings',
     metadata: { reviewId: review.id, groupId: data.groupId },
   });
 

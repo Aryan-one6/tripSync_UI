@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { AgencyVerificationBadge, UserVerificationBadge } from "@/components/ui/verification-badge";
 import { ProfileFollowPanel } from "@/components/social/profile-follow-panel";
 import { ProfileCommonContext } from "@/components/social/profile-common-context";
+import { ProfileViewTracker } from "@/components/social/profile-view-tracker";
 import { ProfileTabs } from "@/components/social/profile-tabs";
 import { getPublicProfile } from "@/lib/api/public";
 import type { SocialProfile } from "@/lib/api/types";
@@ -60,6 +61,8 @@ export default async function ProfilePage({
 
   return (
     <div className="page-shell space-y-6 py-8">
+      <ProfileViewTracker handle={profile.handle} />
+
       {/* Profile header */}
       <div className="rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-6 shadow-[var(--shadow-sm)] sm:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">

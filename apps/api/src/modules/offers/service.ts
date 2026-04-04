@@ -7,6 +7,7 @@ import { emitAgencyEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket
 import { queueNotification, scheduleConfirmingWindow } from '../../lib/queue.js';
 import { createDirectConversation, createSystemMessage, sendDirectMessage } from '../chat/service.js';
 import { env } from '../../lib/env.js';
+import { createStoredNotification } from '../notifications/service.js';
 
 const MAX_NEGOTIATION_ROUNDS = 3;
 
@@ -119,6 +120,15 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
       `We updated our offer for "${plan.title}" to ₹${updated.pricePerPerson.toLocaleString('en-IN')}/person.`,
     );
 
+    await createStoredNotification({
+      userId: plan.creatorId,
+      type: 'offer_submitted',
+      title: `${agency.name} updated an offer`,
+      body: `${agency.name} revised pricing for ${plan.title}.`,
+      href: '/dashboard/plans',
+      metadata: { offerId: updated.id, planId: plan.id },
+    });
+
     return updated;
   }
 
@@ -159,6 +169,15 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
     body: `${agency.name} quoted a new price for ${plan.title}.`,
     userIds: [plan.creatorId],
     ctaUrl: `${env.FRONTEND_URL}/dashboard/plans`,
+    metadata: { offerId: offer.id, planId: plan.id },
+  });
+
+  await createStoredNotification({
+    userId: plan.creatorId,
+    type: 'offer_submitted',
+    title: `${agency.name} sent a new offer`,
+    body: `${agency.name} quoted a new price for ${plan.title}.`,
+    href: '/dashboard/plans',
     metadata: { offerId: offer.id, planId: plan.id },
   });
 
@@ -265,17 +284,18 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
 
   const isCreator = offer.plan.creatorId === userId;
   const isAgencyOwner = offer.agency.ownerId === userId;
-  const agencyMember = !isAgencyOwner
-    ? await prisma.agencyMember.findUnique({
-        where: {
-          agencyId_userId: {
-            agencyId: offer.agencyId,
-            userId,
+  const agencyMember =
+    !isCreator && !isAgencyOwner
+      ? await prisma.agencyMember.findUnique({
+          where: {
+            agencyId_userId: {
+              agencyId: offer.agencyId,
+              userId,
+            },
           },
-        },
-        select: { role: true, isActive: true },
-      })
-    : null;
+          select: { role: true, isActive: true },
+        })
+      : null;
   const isAgency =
     isAgencyOwner ||
     Boolean(
@@ -354,6 +374,20 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
     `${senderLabel} countered "${offer.plan.title}" at ${counterPrice}.`,
   );
 
+  await createStoredNotification({
+    userId: recipientUserId,
+    type: 'offer_countered',
+    title: `${senderLabel} countered an offer`,
+    body: `${offer.plan.title} now has a new counter at ${counterPrice}.`,
+    href: senderType === 'user' ? '/agency/bids' : '/dashboard/plans',
+    metadata: {
+      offerId,
+      planId: offer.planId,
+      round: currentRound,
+      senderType,
+    },
+  });
+
   return negotiation;
 }
 
@@ -411,6 +445,19 @@ export async function accept(offerId: string, userId: string) {
       acceptedAgency.ownerId,
       `Offer accepted for "${offer.plan.title}". Payment collection is now open.`,
     );
+
+    await createStoredNotification({
+      userId: acceptedAgency.ownerId,
+      type: 'offer_updated',
+      title: 'Offer accepted',
+      body: `Your offer for ${offer.plan.title} was accepted.`,
+      href: '/agency/bids',
+      metadata: {
+        offerId,
+        planId: offer.planId,
+        status: 'ACCEPTED',
+      },
+    });
   }
 
   return result.offer;
@@ -463,6 +510,19 @@ export async function reject(offerId: string, userId: string) {
       rejectedAgency.ownerId,
       `Offer declined for "${offer.plan.title}".`,
     );
+
+    await createStoredNotification({
+      userId: rejectedAgency.ownerId,
+      type: 'offer_updated',
+      title: 'Offer declined',
+      body: `Your offer for ${offer.plan.title} was declined.`,
+      href: '/agency/bids',
+      metadata: {
+        offerId,
+        planId: offer.planId,
+        status: 'REJECTED',
+      },
+    });
   }
 
   return rejected;
@@ -511,6 +571,19 @@ export async function withdraw(offerId: string, userId: string) {
     offer.plan.creatorId,
     `We withdrew our offer for "${offer.plan.title}".`,
   );
+
+  await createStoredNotification({
+    userId: offer.plan.creatorId,
+    type: 'offer_updated',
+    title: 'Offer withdrawn',
+    body: `An offer for ${offer.plan.title} was withdrawn.`,
+    href: '/dashboard/plans',
+    metadata: {
+      offerId,
+      planId: offer.planId,
+      status: 'WITHDRAWN',
+    },
+  });
 
   return withdrawn;
 }

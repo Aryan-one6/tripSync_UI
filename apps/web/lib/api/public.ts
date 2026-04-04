@@ -11,6 +11,7 @@ import type {
 } from "@/lib/api/types";
 
 interface DiscoverQuery extends QueryParams {
+  audience?: "traveler" | "agency";
   destination?: string;
   budgetMin?: number;
   budgetMax?: number;

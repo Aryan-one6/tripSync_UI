@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../lib/errors.js';
 import type { CreatePackageInput, UpdatePackageInput } from '@tripsync/shared';
 import slugifyModule from 'slugify';
+import { notifyFollowersOfAgencyPost } from '../notifications/service.js';
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 
 function generateSlug(title: string): string {
@@ -200,10 +201,29 @@ export async function publish(packageId: string, userId: string) {
     throw new BadRequestError('Add at least one package image before publishing');
   }
 
-  return prisma.package.update({
+  const updated = await prisma.package.update({
     where: { id: packageId },
     data: { status: PlanStatus.OPEN },
+    include: {
+      agency: {
+        select: {
+          id: true,
+          ownerId: true,
+          name: true,
+        },
+      },
+    },
   });
+
+  await notifyFollowersOfAgencyPost({
+    agencyId: updated.agency.id,
+    agencyName: updated.agency.name,
+    postTitle: updated.title,
+    postHref: `/packages/${updated.slug}`,
+    postType: 'package',
+  });
+
+  return updated;
 }
 
 export async function listAgencyPackages(userId: string) {

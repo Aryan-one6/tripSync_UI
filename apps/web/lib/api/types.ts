@@ -579,3 +579,29 @@ export interface FollowState {
   followerCount: number;
   followingCount: number;
 }
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  href?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  readAt?: string | null;
+  read: boolean;
+}
+
+export interface RecentProfileViewerItem {
+  id: string;
+  createdAt: string;
+  targetType: "traveler" | "agency";
+  targetHandle: string;
+  targetName: string;
+  viewer: {
+    id: string;
+    handle: string;
+    fullName: string;
+    avatarUrl?: string | null;
+  };
+}

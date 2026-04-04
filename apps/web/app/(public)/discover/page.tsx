@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const QUICK_FILTERS = [
-  { id: "all", label: "All Plans", originType: undefined, vibes: undefined },
+  { id: "all", label: "All", originType: undefined, vibes: undefined },
   { id: "adventure", label: "Adventure", originType: undefined, vibes: "Adventure" },
   { id: "beach", label: "Beach", originType: undefined, vibes: "Beach" },
   { id: "mountains", label: "Mountains", originType: undefined, vibes: "Mountains" },
@@ -40,13 +40,14 @@ export default async function DiscoverPage({
       ? params.sort
       : "recent";
   const q = typeof params.q === "string" ? params.q : "";
+  const audience = params.audience === "agency" ? "agency" : "traveler";
   const rail =
     params.rail === "following" || params.rail === "trending" || params.rail === "for-you"
       ? params.rail
       : "for-you";
 
   const [forYouItems, trending] = await Promise.all([
-    q ? searchDiscover(q) : getDiscoverItems({ destination, vibes, originType, sort }),
+    q ? searchDiscover(q) : getDiscoverItems({ audience, destination, vibes, originType, sort }),
     getTrendingItems(),
   ]);
 
@@ -77,6 +78,7 @@ export default async function DiscoverPage({
     const nextParams = new URLSearchParams();
     for (const [key, value] of Object.entries({
       q: q || undefined,
+      audience,
       destination: destination || undefined,
       vibes: vibes || undefined,
       originType,
@@ -87,7 +89,7 @@ export default async function DiscoverPage({
       if (value) nextParams.set(key, value);
     }
     const qs = nextParams.toString();
-    return qs ? `/discover?${qs}` : "/discover";
+    return qs ? `/discover?${qs}` : `/discover?audience=${audience}`;
   }
 
   function buildQuickFilterHref(filter: (typeof QUICK_FILTERS)[number]) {
@@ -141,6 +143,11 @@ export default async function DiscoverPage({
       {/* ── Search bar ── */}
       <form className="mb-5">
         <input type="hidden" name="rail" value={rail} />
+        <input type="hidden" name="audience" value={audience} />
+        {destination ? <input type="hidden" name="destination" value={destination} /> : null}
+        {vibes ? <input type="hidden" name="vibes" value={vibes} /> : null}
+        {originType ? <input type="hidden" name="originType" value={originType} /> : null}
+        {sort ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-(--color-ink-400)" />
@@ -193,7 +200,7 @@ export default async function DiscoverPage({
                 Popular Plans
               </h2>
               <Link
-                href="/discover"
+                href={buildDiscoverHref({ rail: "for-you", q: undefined })}
                 className="text-[11px] font-bold uppercase tracking-[0.18em] text-(--color-sea-600) transition hover:text-(--color-sea-500)"
               >
                 See All
@@ -204,6 +211,7 @@ export default async function DiscoverPage({
               <FollowingDiscoverResults
                 query={{
                   q: q || undefined,
+                  audience,
                   destination: destination || undefined,
                   vibes: vibes || undefined,
                   originType,

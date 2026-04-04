@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
 import { useLiveNotifications } from "@/lib/realtime/use-live-notifications";
+import { useUnreadDirectCount } from "@/lib/realtime/use-unread-direct-count";
 
 // ─── Shared nav config (mirrors app-sidebar) ─────────────────────────────────
 
@@ -111,9 +112,10 @@ function SidebarNavItem({
   pathname: string;
   onClick: () => void;
 }) {
+  const activePath = href.split("?")[0] ?? href;
   const active =
-    pathname === href ||
-    (href !== "/discover" && pathname.startsWith(`${href}/`));
+    pathname === activePath ||
+    (activePath !== "/discover" && pathname.startsWith(`${activePath}/`));
   return (
     <Link
       href={href}
@@ -144,6 +146,7 @@ export function SiteHeader() {
   const notificationRef = useRef<HTMLDivElement>(null);
 
   const isAgency = session?.role === "agency_admin";
+  const discoverHref = `/discover?audience=${isAgency ? "agency" : "traveler"}`;
   const dashboardHref = isAgency ? "/agency/dashboard" : "/dashboard/plans";
   const settingsHref = isAgency ? "/agency/settings" : "/dashboard/settings";
   const inboxHref = isAgency ? "/agency/inbox" : "/dashboard/messages";
@@ -151,9 +154,10 @@ export function SiteHeader() {
   const userAvatarUrl = session?.user?.avatarUrl;
   const userEmail = session?.user?.email ?? "";
   const { notifications, unreadCount, markAllRead, markRead } = useLiveNotifications();
+  const { unreadDirectCount } = useUnreadDirectCount();
 
   const publicNavLinks = [
-    { href: "/discover", label: "Home" },
+    { href: discoverHref, label: "Home" },
     { href: "/agencies", label: "Agencies" },
   ];
 
@@ -218,9 +222,10 @@ export function SiteHeader() {
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 md:flex">
             {publicNavLinks.map((link) => {
+              const activePath = link.href.split("?")[0] ?? link.href;
               const active =
-                pathname === link.href ||
-                pathname.startsWith(`${link.href}/`);
+                pathname === activePath ||
+                pathname.startsWith(`${activePath}/`);
               return (
                 <Link
                   key={link.href}
@@ -238,13 +243,80 @@ export function SiteHeader() {
             })}
           </nav>
 
-          {/* Desktop right actions */}
-          <div className="hidden items-center gap-2 md:flex">
-            {status === "authenticated" && session ? (
-              <div ref={avatarRef} className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {status === "authenticated" && session && (
+              <div className="relative" ref={notificationRef}>
+                <button
+                  type="button"
+                  onClick={() => setNotificationMenuOpen((v) => !v)}
+                  className="relative flex size-9 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
+                  aria-label="Notifications"
+                >
+                  <Bell className="size-4.5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {notificationMenuOpen && (
+                  <div className="absolute right-0 top-full z-[60] mt-2 w-80 rounded-xl border border-[var(--color-border)] bg-white py-2 shadow-[var(--shadow-lg)] animate-scale-in">
+                    <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 pb-2">
+                      <p className="text-xs font-semibold text-[var(--color-ink-900)]">Notifications</p>
+                      {unreadCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={markAllRead}
+                          className="text-[11px] font-medium text-[var(--color-sea-700)] hover:text-[var(--color-sea-600)]"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-96 overflow-y-auto py-1">
+                      {notifications.length === 0 ? (
+                        <p className="px-4 py-5 text-center text-xs text-[var(--color-ink-500)]">
+                          No notifications yet.
+                        </p>
+                      ) : (
+                        notifications.slice(0, 12).map((item) => (
+                          <Link
+                            key={item.id}
+                            href={item.href}
+                            onClick={() => { markRead(item.id); setNotificationMenuOpen(false); }}
+                            className={cn(
+                              "block border-b border-[var(--color-border)] px-4 py-2.5 last:border-b-0 transition hover:bg-[var(--color-surface-2)]",
+                              item.read ? "" : "bg-[var(--color-sea-50)]/60"
+                            )}
+                          >
+                            <p className="text-xs font-semibold text-[var(--color-ink-900)]">{item.title}</p>
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--color-ink-600)]">{item.body}</p>
+                            <p className="mt-1 text-[10px] text-[var(--color-ink-400)]">
+                              {new Date(item.createdAt).toLocaleString()}
+                            </p>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Desktop right actions */}
+            <div className="hidden items-center gap-2 md:flex">
+              {status === "authenticated" && session ? (
+                <div ref={avatarRef} className="flex items-center gap-2">
                 <Link href={inboxHref}>
                   <Button type="button" variant="ghost" size="sm">
-                    <Inbox className="size-4" />
+                    <span className="relative">
+                      <Inbox className="size-4" />
+                      {unreadDirectCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
+                          {unreadDirectCount > 9 ? "9+" : unreadDirectCount}
+                        </span>
+                      )}
+                    </span>
                     Inbox
                   </Button>
                 </Link>
@@ -256,64 +328,6 @@ export function SiteHeader() {
                     </Button>
                   </Link>
                 )}
-
-                {/* Notification bell */}
-                <div className="relative" ref={notificationRef}>
-                  <button
-                    type="button"
-                    onClick={() => setNotificationMenuOpen((v) => !v)}
-                    className="relative flex size-9 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
-                    aria-label="Notifications"
-                  >
-                    <Bell className="size-4.5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                  </button>
-                  {notificationMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-[var(--color-border)] bg-white py-2 shadow-[var(--shadow-lg)] animate-scale-in">
-                      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 pb-2">
-                        <p className="text-xs font-semibold text-[var(--color-ink-900)]">Notifications</p>
-                        {unreadCount > 0 && (
-                          <button
-                            type="button"
-                            onClick={markAllRead}
-                            className="text-[11px] font-medium text-[var(--color-sea-700)] hover:text-[var(--color-sea-600)]"
-                          >
-                            Mark all read
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-96 overflow-y-auto py-1">
-                        {notifications.length === 0 ? (
-                          <p className="px-4 py-5 text-center text-xs text-[var(--color-ink-500)]">
-                            No notifications yet.
-                          </p>
-                        ) : (
-                          notifications.slice(0, 12).map((item) => (
-                            <Link
-                              key={item.id}
-                              href={item.href}
-                              onClick={() => { markRead(item.id); setNotificationMenuOpen(false); }}
-                              className={cn(
-                                "block border-b border-[var(--color-border)] px-4 py-2.5 last:border-b-0 transition hover:bg-[var(--color-surface-2)]",
-                                item.read ? "" : "bg-[var(--color-sea-50)]/60"
-                              )}
-                            >
-                              <p className="text-xs font-semibold text-[var(--color-ink-900)]">{item.title}</p>
-                              <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--color-ink-600)]">{item.body}</p>
-                              <p className="mt-1 text-[10px] text-[var(--color-ink-400)]">
-                                {new Date(item.createdAt).toLocaleString()}
-                              </p>
-                            </Link>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 {/* Avatar dropdown */}
                 <div className="relative">
@@ -365,17 +379,18 @@ export function SiteHeader() {
                 </Link>
               </>
             )}
-          </div>
+            </div>
 
-          {/* Mobile: hamburger */}
-          <button
-            type="button"
-            className="flex size-10 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-2)] md:hidden"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="size-5" />
-          </button>
+            {/* Mobile: hamburger */}
+            <button
+              type="button"
+              className="flex size-10 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-2)] md:hidden"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="size-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -450,7 +465,9 @@ export function SiteHeader() {
                 {mainNav.map((item) => (
                   <SidebarNavItem
                     key={item.href}
-                    {...item}
+                    href={item.href === "/discover" ? discoverHref : item.href}
+                    label={item.label}
+                    icon={item.icon}
                     pathname={pathname}
                     onClick={() => setSidebarOpen(false)}
                   />
@@ -473,9 +490,10 @@ export function SiteHeader() {
                 <div className="my-2 border-t border-[var(--color-border)]" />
 
                 {publicNavLinks.map((link) => {
+                  const activePath = link.href.split("?")[0] ?? link.href;
                   const active =
-                    pathname === link.href ||
-                    pathname.startsWith(`${link.href}/`);
+                    pathname === activePath ||
+                    pathname.startsWith(`${activePath}/`);
                   return (
                     <Link
                       key={link.href}

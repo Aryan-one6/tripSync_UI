@@ -9,3 +9,4 @@ export * from './groups.js';
 export * from './chat.js';
 export * from './payments.js';
 export * from './reviews.js';
+export * from './notifications.js';

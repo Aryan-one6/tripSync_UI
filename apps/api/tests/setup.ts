@@ -30,4 +30,5 @@ vi.mock('../src/lib/socket.js', () => ({
 // ─── 3. Stub BullMQ notification queue ──────────────────────────────────────
 vi.mock('../src/lib/queue.js', () => ({
   queueNotification: vi.fn().mockResolvedValue(undefined),
+  scheduleConfirmingWindow: vi.fn().mockResolvedValue(undefined),
 }));

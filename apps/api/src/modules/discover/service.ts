@@ -30,6 +30,7 @@ interface CursorRow {
   slug: string;
   createdAt: Date;
   sortValue: number | null;
+  originRank: number | null;
 }
 
 const DISCOVER_VIEW = Prisma.sql`
@@ -64,6 +65,39 @@ function parseVibes(vibes?: string): string[] {
     .filter(Boolean);
 }
 
+function getAudience(query: DiscoverQuery): 'traveler' | 'agency' {
+  return query.audience ?? 'traveler';
+}
+
+function shouldPrioritizePackages(query: DiscoverQuery): boolean {
+  return getAudience(query) === 'traveler' && !query.originType && query.sort === 'recent';
+}
+
+function resolveDiscoverQueryDefaults(query: DiscoverQuery): DiscoverQuery {
+  if (getAudience(query) === 'agency' && !query.originType) {
+    return {
+      ...query,
+      originType: 'plan',
+    };
+  }
+
+  return query;
+}
+
+function getDiscoverOriginRankExpression(query: DiscoverQuery): Prisma.Sql {
+  if (!shouldPrioritizePackages(query)) {
+    return Prisma.sql`NULL`;
+  }
+
+  return Prisma.sql`
+    CASE
+      WHEN "originType" = 'package' THEN 0
+      WHEN "originType" = 'plan' THEN 1
+      ELSE 2
+    END
+  `;
+}
+
 function getDiscoverSortExpression(sort: DiscoverQuery['sort']): Prisma.Sql {
   switch (sort) {
     case 'price_low':
@@ -77,7 +111,18 @@ function getDiscoverSortExpression(sort: DiscoverQuery['sort']): Prisma.Sql {
   }
 }
 
-function getDiscoverOrderBy(sort: DiscoverQuery['sort']): Prisma.Sql {
+function getDiscoverOrderBy(
+  sort: DiscoverQuery['sort'],
+  query?: DiscoverQuery,
+): Prisma.Sql {
+  if (query && shouldPrioritizePackages(query)) {
+    return Prisma.sql`
+      ${getDiscoverOriginRankExpression(query)} ASC,
+      "createdAt" DESC,
+      id DESC
+    `;
+  }
+
   switch (sort) {
     case 'price_low':
       return Prisma.sql`COALESCE("priceLow", 2147483647) ASC, id ASC`;
@@ -148,7 +193,23 @@ function buildWhereClause(filters: Prisma.Sql[]): Prisma.Sql {
 function getDiscoverCursorFilter(
   sort: DiscoverQuery['sort'],
   cursor: CursorRow,
+  query?: DiscoverQuery,
 ): Prisma.Sql {
+  if (query && shouldPrioritizePackages(query)) {
+    return Prisma.sql`
+      (
+        ${getDiscoverOriginRankExpression(query)} > ${cursor.originRank}
+        OR (
+          ${getDiscoverOriginRankExpression(query)} = ${cursor.originRank}
+          AND (
+            "createdAt" < ${cursor.createdAt}
+            OR ("createdAt" = ${cursor.createdAt} AND id < ${cursor.id})
+          )
+        )
+      )
+    `;
+  }
+
   switch (sort) {
     case 'price_low':
       return Prisma.sql`
@@ -196,13 +257,15 @@ function getDiscoverCursorFilter(
 async function getDiscoverCursorRow(
   cursorId: string,
   sort: DiscoverQuery['sort'],
+  query?: DiscoverQuery,
 ): Promise<CursorRow | null> {
   const rows = await prisma.$queryRaw<CursorRow[]>(Prisma.sql`
     SELECT
       id,
       slug,
       "createdAt",
-      ${getDiscoverSortExpression(sort)} AS "sortValue"
+      ${getDiscoverSortExpression(sort)} AS "sortValue",
+      ${query ? getDiscoverOriginRankExpression(query) : Prisma.sql`NULL`} AS "originRank"
     FROM discover_feed
     WHERE id = ${cursorId}
     LIMIT 1
@@ -253,25 +316,30 @@ async function getSearchCursorRow(cursorId: string, term: string): Promise<Curso
 }
 
 export async function getDiscoverFeed(query: DiscoverQuery) {
-  const filters = getDiscoverFilters(query);
+  const resolvedQuery = resolveDiscoverQueryDefaults(query);
+  const filters = getDiscoverFilters(resolvedQuery);
 
-  if (query.cursor) {
-    const cursorRow = await getDiscoverCursorRow(query.cursor, query.sort);
+  if (resolvedQuery.cursor) {
+    const cursorRow = await getDiscoverCursorRow(
+      resolvedQuery.cursor,
+      resolvedQuery.sort,
+      resolvedQuery,
+    );
     if (cursorRow) {
-      filters.push(getDiscoverCursorFilter(query.sort, cursorRow));
+      filters.push(getDiscoverCursorFilter(resolvedQuery.sort, cursorRow, resolvedQuery));
     }
   }
 
   const items = await prisma.$queryRaw<DiscoverItem[]>(Prisma.sql`
     ${DISCOVER_VIEW}
     ${buildWhereClause(filters)}
-    ORDER BY ${getDiscoverOrderBy(query.sort)}
-    LIMIT ${query.limit}
+    ORDER BY ${getDiscoverOrderBy(resolvedQuery.sort, resolvedQuery)}
+    LIMIT ${resolvedQuery.limit}
   `);
 
   return {
     items,
-    cursor: items.length === query.limit ? items[items.length - 1]?.id ?? null : null,
+    cursor: items.length === resolvedQuery.limit ? items[items.length - 1]?.id ?? null : null,
   };
 }
 

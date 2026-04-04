@@ -50,7 +50,9 @@ const mocks = vi.hoisted(() => ({
     groupMember:      { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
     plan:             { findUnique: vi.fn() },
     agency:           { findUnique: vi.fn() },
+    agencyMember:     { findUnique: vi.fn(), findFirst: vi.fn() },
     user:             { findUnique: vi.fn() },
+    notification:     { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     directConversationParticipant: { findUnique: vi.fn(), update: vi.fn() },
     directConversation: { findUnique: vi.fn(), findMany: vi.fn(), upsert: vi.fn(), update: vi.fn() },
     directMessage: { findMany: vi.fn(), create: vi.fn() },
@@ -75,6 +77,16 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mocks.acceptOfferForPlan.mockResolvedValue({ offer: baseOffer({ status: 'ACCEPTED' }) });
   mocks.createSystemMessage.mockResolvedValue({});
+  mocks.prisma.notification.create.mockResolvedValue({
+    id: 'notif-int-1',
+    type: 'offer_updated',
+    title: 'Test',
+    body: 'Test',
+    href: null,
+    metadata: null,
+    createdAt: new Date(),
+    readAt: null,
+  });
 
   [agencyToken, travelerAToken, travelerBToken] = await Promise.all([
     makeToken({ userId: AGENCY_OWNER_ID, role: 'agency_admin', agencyId: AGENCY_ID }),

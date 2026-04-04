@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const DiscoverQueryBaseSchema = z.object({
+  audience: z.enum(['traveler', 'agency']).default('traveler'),
   destination: z.string().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
