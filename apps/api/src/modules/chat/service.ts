@@ -313,7 +313,8 @@ async function assertChatAccess(groupId: string, userId: string) {
       },
     });
 
-    if (group?.planId && group.plan && [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED].includes(group.plan.status as PlanStatus)) {
+    const planStatuses: string[] = [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED];
+    if (group?.planId && group.plan && planStatuses.includes(group.plan.status)) {
       const activeOffer = await prisma.offer.findFirst({
         where: {
           planId: group.planId,
@@ -347,9 +348,10 @@ async function assertChatAccess(groupId: string, userId: string) {
       }
     }
 
+    const pkgStatuses: string[] = [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED];
     if (
       group?.package &&
-      [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED].includes(group.package.status as PlanStatus) &&
+      pkgStatuses.includes(group.package.status) &&
       group.package.agency.ownerId === userId
     ) {
       const agencyUser = await prisma.user.findUnique({
