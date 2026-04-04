@@ -1,4 +1,5 @@
 import sanitizeHtml from 'sanitize-html';
+import { PlanStatus } from '@prisma/client';
 import type {
   CreateDirectConversationInput,
   CreatePollInput,
@@ -21,6 +22,92 @@ type PollMetadata = {
     votes: string[];
   }>;
 };
+
+type SanitizeResult = {
+  sanitized: string;
+  flagged: boolean;
+  originalContent?: string;
+  policyTags: string[];
+};
+
+const PHONE_REGEX = /(?:\+?91[\s-]?)?[6-9]\d{9}/g;
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const UPI_REGEX = /\b[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}\b/g;
+const IFSC_REGEX = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
+const BYPASS_KEYWORDS = /\b(whatsapp|telegram|signal|gpay|phonepe|paytm)\b/i;
+
+function sanitizeChatContent(content: string): SanitizeResult {
+  let flagged = false;
+  const tags = new Set<string>();
+  let sanitized = content;
+
+  sanitized = sanitized.replace(PHONE_REGEX, (match) => {
+    flagged = true;
+    tags.add('PHONE');
+    const numbersOnly = match.replace(/[^\d]/g, '');
+    if (numbersOnly.length < 6) return '[Contact shared via platform]';
+    return `${numbersOnly.slice(0, 2)}****${numbersOnly.slice(-3)} [Contact shared via platform]`;
+  });
+
+  sanitized = sanitized.replace(EMAIL_REGEX, (match) => {
+    flagged = true;
+    tags.add('EMAIL');
+    const [local, domain] = match.split('@');
+    return `${local[0] ?? 'u'}****@${domain} [Contact shared via platform]`;
+  });
+
+  sanitized = sanitized.replace(UPI_REGEX, (match) => {
+    if (match.includes('****')) return match;
+    flagged = true;
+    tags.add('UPI');
+    const [local, domain] = match.split('@');
+    return `${local[0] ?? 'u'}****@${domain} [Payment request detected]`;
+  });
+
+  sanitized = sanitized.replace(IFSC_REGEX, (match) => {
+    flagged = true;
+    tags.add('BANK');
+    return `${match.slice(0, 4)}****${match.slice(-3)} [Bank details detected]`;
+  });
+
+  if (BYPASS_KEYWORDS.test(sanitized)) {
+    flagged = true;
+    tags.add('OFF_PLATFORM_COORDINATION');
+    sanitized = `${sanitized} [Use platform chat for safety]`;
+  }
+
+  return {
+    sanitized,
+    flagged,
+    originalContent: flagged ? content : undefined,
+    policyTags: Array.from(tags),
+  };
+}
+
+function buildSafetyWarningMessage() {
+  return 'For your safety, keep payments and coordination on TravellersIn. External payments are not covered by escrow protection or refund policy.';
+}
+
+async function logContactRiskFlag(input: {
+  userId: string;
+  groupId?: string;
+  messageId?: string;
+  policyTags: string[];
+}) {
+  await prisma.fraudRiskFlag.create({
+    data: {
+      userId: input.userId,
+      groupId: input.groupId,
+      messageId: input.messageId,
+      type: 'CONTACT_SHARING',
+      severity: 'medium',
+      details: {
+        policyTags: input.policyTags,
+      } as any,
+      raisedByUserId: input.userId,
+    },
+  });
+}
 
 function buildDirectConversationKey(leftUserId: string, rightUserId: string) {
   return [leftUserId, rightUserId].sort().join(':');
@@ -98,9 +185,26 @@ async function assertDirectConversationEligibility(leftUserId: string, rightUser
     });
 
     if (!relatedOffer) {
-      throw new ForbiddenError(
-        'Agency and traveler direct chat starts only after an offer exists between them',
-      );
+      const packageContext = await prisma.groupMember.findFirst({
+        where: {
+          userId: travelerUserId,
+          status: { in: ['INTERESTED', 'APPROVED', 'COMMITTED'] },
+          group: {
+            package: {
+              agency: {
+                ownerId: agencyOwnerId,
+              },
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!packageContext) {
+        throw new ForbiddenError(
+          'Agency and traveler direct chat starts only after an offer exists or traveler joins an agency package',
+        );
+      }
     }
 
     return;
@@ -189,15 +293,32 @@ async function assertChatAccess(groupId: string, userId: string) {
   if (agency) {
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { planId: true },
+      select: {
+        planId: true,
+        plan: {
+          select: {
+            status: true,
+          },
+        },
+        package: {
+          select: {
+            status: true,
+            agency: {
+              select: {
+                ownerId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (group?.planId) {
+    if (group?.planId && group.plan && [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED].includes(group.plan.status as PlanStatus)) {
       const activeOffer = await prisma.offer.findFirst({
         where: {
           planId: group.planId,
           agencyId: agency.id,
-          status: { in: ['PENDING', 'COUNTERED', 'ACCEPTED'] },
+          status: { in: ['ACCEPTED'] },
         },
         select: { id: true },
       });
@@ -224,6 +345,33 @@ async function assertChatAccess(groupId: string, userId: string) {
           user: agencyUser,
         };
       }
+    }
+
+    if (
+      group?.package &&
+      [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED].includes(group.package.status as PlanStatus) &&
+      group.package.agency.ownerId === userId
+    ) {
+      const agencyUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, fullName: true, avatarUrl: true },
+      });
+
+      if (!agencyUser) {
+        throw new NotFoundError('User');
+      }
+
+      return {
+        id: `agency:${groupId}:${userId}`,
+        groupId,
+        userId,
+        role: 'MEMBER',
+        status: 'APPROVED',
+        joinedAt: new Date(),
+        committedAt: null,
+        leftAt: null,
+        user: agencyUser,
+      };
     }
   }
 
@@ -282,12 +430,21 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
     throw new BadRequestError('Message cannot be empty');
   }
 
+  const sanitized = sanitizeChatContent(content);
+
   const message = await prisma.chatMessage.create({
     data: {
       groupId,
       senderId: userId,
       messageType: 'text',
-      content,
+      content: sanitized.sanitized,
+      metadata: sanitized.flagged
+        ? ({
+            flagged: true,
+            policyTags: sanitized.policyTags,
+            originalContent: sanitized.originalContent,
+          } as any)
+        : undefined,
     },
     include: {
       sender: {
@@ -302,12 +459,26 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
 
   emitGroupEvent(groupId, 'chat:message_created', message);
 
+  if (sanitized.flagged) {
+    await createSystemMessage(groupId, buildSafetyWarningMessage(), {
+      action: 'safety_warning',
+      policyTags: sanitized.policyTags,
+      flaggedMessageId: message.id,
+    });
+    await logContactRiskFlag({
+      userId,
+      groupId,
+      messageId: message.id,
+      policyTags: sanitized.policyTags,
+    });
+  }
+
   const recipients = await getNotificationRecipients(groupId, userId);
   if (recipients.length > 0) {
     await queueNotification({
       type: 'chat_message',
       title: `${membership.user.fullName} posted in your trip chat`,
-      body: content.slice(0, 160),
+      body: sanitized.sanitized.slice(0, 160),
       userIds: recipients,
       ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${groupId}/chat`,
       metadata: { groupId, messageId: message.id },
@@ -701,12 +872,14 @@ export async function sendDirectMessage(
     throw new BadRequestError('Message cannot be empty');
   }
 
+  const sanitized = sanitizeChatContent(content);
+
   const message = await prisma.$transaction(async (tx) => {
     const created = await tx.directMessage.create({
       data: {
         conversationId,
         senderId: userId,
-        content,
+        content: sanitized.sanitized,
       },
       include: {
         sender: {
@@ -751,7 +924,7 @@ export async function sendDirectMessage(
     await queueNotification({
       type: 'direct_message',
       title: `${message.sender?.fullName ?? 'A traveler'} sent you a message`,
-      body: content.slice(0, 160),
+      body: sanitized.sanitized.slice(0, 160),
       userIds: recipientIds,
       ctaUrl: `${env.FRONTEND_URL}/dashboard/messages`,
       metadata: { conversationId, messageId: message.id },

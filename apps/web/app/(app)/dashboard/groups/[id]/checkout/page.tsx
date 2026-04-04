@@ -12,7 +12,7 @@ export default async function GroupCheckoutPage({
     <DashboardShell
       variant="user"
       title="Trip checkout"
-      subtitle="Capture traveler payments while the plan is confirming, keep the escrow state explicit, and let confirmation happen only after the whole approved group commits."
+      subtitle="Complete your payment to confirm your spot. Your payment is held in escrow and released to the agency only when your trip milestones are completed."
     >
       <GroupPaymentCard groupId={id} />
     </DashboardShell>

@@ -22,6 +22,17 @@ const InclusionsSchema = z.object({
   accommodation: z.boolean().optional(),
 });
 
+const CancellationRuleItemSchema = z.object({
+  daysBeforeTrip: z.number().int().min(0),
+  refundPercent: z.number().int().min(0).max(100),
+});
+
+const CancellationRulesSchema = z.object({
+  rules: z.array(CancellationRuleItemSchema).min(1),
+  convenienceFeeRefundable: z.boolean().default(false),
+  agencyCancelFullRefund: z.boolean().default(true),
+});
+
 const BasePackageSchema = z.object({
   title: z.string().min(3).max(150),
   destination: z.string().min(2).max(100),
@@ -41,6 +52,7 @@ const BasePackageSchema = z.object({
   activities: z.array(z.string()).optional(),
   galleryUrls: z.array(z.string().url()).optional(),
   cancellationPolicy: z.string().max(2000).optional(),
+  cancellationRules: CancellationRulesSchema.optional(),
 });
 
 function validatePackageRanges(

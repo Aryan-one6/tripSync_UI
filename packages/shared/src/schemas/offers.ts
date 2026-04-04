@@ -26,6 +26,17 @@ const InclusionsSchema = z.object({
   activities: z.array(z.string()).optional(),
 });
 
+const CancellationRuleItemSchema = z.object({
+  daysBeforeTrip: z.number().int().min(0),
+  refundPercent: z.number().int().min(0).max(100),
+});
+
+export const CancellationRulesSchema = z.object({
+  rules: z.array(CancellationRuleItemSchema).min(1),
+  convenienceFeeRefundable: z.boolean().default(false),
+  agencyCancelFullRefund: z.boolean().default(true),
+});
+
 export const CreateOfferSchema = z.object({
   planId: z.string().uuid(),
   pricePerPerson: z.number().int().min(0),
@@ -33,6 +44,7 @@ export const CreateOfferSchema = z.object({
   inclusions: InclusionsSchema.optional(),
   itinerary: z.array(ItineraryItemSchema).optional(),
   cancellationPolicy: z.string().max(2000).optional(),
+  cancellationRules: CancellationRulesSchema.optional(),
   validUntil: z.string().datetime().optional(),
 });
 
@@ -43,6 +55,7 @@ export const SubmitOfferViaGroupSchema = z.object({
   inclusions: InclusionsSchema.optional(),
   itinerary: z.array(ItineraryItemSchema).optional(),
   cancellationPolicy: z.string().max(2000).optional(),
+  cancellationRules: CancellationRulesSchema.optional(),
   validUntil: z.string().datetime().optional(),
   message: z.string().max(1000).optional(),
 });

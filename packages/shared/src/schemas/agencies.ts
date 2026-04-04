@@ -42,6 +42,20 @@ export const BrowseAgenciesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+export const AgencyMemberRoleSchema = z.enum(['ADMIN', 'MANAGER', 'AGENT', 'FINANCE']);
+
+export const InviteAgencyMemberSchema = z.object({
+  userId: z.string().uuid(),
+  role: AgencyMemberRoleSchema.default('AGENT'),
+});
+
+export const UpdateAgencyMemberSchema = z.object({
+  role: AgencyMemberRoleSchema.optional(),
+  isActive: z.boolean().optional(),
+});
+
 export type RegisterAgencyInput = z.infer<typeof RegisterAgencySchema>;
 export type UpdateAgencyInput = z.infer<typeof UpdateAgencySchema>;
 export type SubmitAgencyVerificationInput = z.infer<typeof SubmitAgencyVerificationSchema>;
+export type InviteAgencyMemberInput = z.infer<typeof InviteAgencyMemberSchema>;
+export type UpdateAgencyMemberInput = z.infer<typeof UpdateAgencyMemberSchema>;

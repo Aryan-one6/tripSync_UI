@@ -17,6 +17,10 @@ export interface EscrowReleaseJob {
   tranche: 'tranche1' | 'tranche2';
 }
 
+export interface ConfirmingWindowJob {
+  groupId: string;
+}
+
 export function getRedisConnection(): ConnectionOptions {
   if (!env.REDIS_URL) {
     throw new Error('REDIS_URL is required to create a BullMQ connection');
@@ -45,6 +49,10 @@ export const notificationQueue = connection
 
 export const escrowReleaseQueue = connection
   ? new Queue<EscrowReleaseJob>('escrow-release', { connection })
+  : null;
+
+export const confirmingWindowQueue = connection
+  ? new Queue<ConfirmingWindowJob>('confirming-window', { connection })
   : null;
 
 export async function queueNotification(job: NotificationJob) {
@@ -77,6 +85,26 @@ export async function scheduleEscrowRelease(
     {
       delay,
       jobId: `${paymentId}__${tranche}`,
+      removeOnComplete: 200,
+      removeOnFail: 200,
+    },
+  );
+}
+
+export async function scheduleConfirmingWindow(groupId: string, runAt: Date) {
+  if (!confirmingWindowQueue) {
+    console.log('[queue:confirming-window:disabled]', { groupId, runAt });
+    return;
+  }
+
+  const delay = Math.max(0, runAt.getTime() - Date.now());
+
+  await confirmingWindowQueue.add(
+    'payment-window-expiry',
+    { groupId },
+    {
+      delay,
+      jobId: `confirming-window:${groupId}`,
       removeOnComplete: 200,
       removeOnFail: 200,
     },

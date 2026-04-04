@@ -108,15 +108,34 @@ export default async function DiscoverPage({
     <div className="page-shell pb-mobile-nav">
 
       {/* ── Hero Header ── */}
-      <section className="pt-7 pb-5 sm:pt-12 sm:pb-7">
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.22em] text-(--color-sea-600)">
-          TripSync
-        </p>
-        <h1 className="font-display text-[2.6rem] font-black leading-[1.05] tracking-tight text-(--color-ink-950) sm:text-6xl md:text-7xl">
-          Discover
-          <br />
-          <em className="not-italic text-(--color-sea-700)">Adventure.</em>
-        </h1>
+      <section className="relative overflow-hidden rounded-[var(--radius-2xl)] mb-8 mt-4 bg-gradient-to-br from-[var(--color-sea-700)] via-[var(--color-sea-600)] to-[var(--color-sea-500)] p-8 text-white shadow-[var(--shadow-xl)] sm:p-12">
+        {/* Decorative blobs */}
+        <div className="pointer-events-none absolute -right-12 -top-12 size-48 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-8 left-1/3 size-32 rounded-full bg-white/5 blur-xl" />
+
+        <div className="relative">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-white/70">
+            TravellersIn
+          </p>
+          <h1 className="font-display text-[2.6rem] font-black leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
+            Discover
+            <br />
+            <em className="not-italic text-[var(--color-sea-200)]">Adventure.</em>
+          </h1>
+          <p className="mt-4 max-w-xl text-white/80 sm:text-lg">
+            Browse live community plans and agency packages. Filter by destination, budget, dates, or vibe.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {["Escrow protected", "Verified agencies", "Live group chat"].map((pill) => (
+              <span
+                key={pill}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm"
+              >
+                ✓ {pill}
+              </span>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Search bar ── */}

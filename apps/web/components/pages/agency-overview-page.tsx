@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { AgencyVerificationBadge } from "@/components/ui/verification-badge";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatCompactDate } from "@/lib/format";
-import type { Offer } from "@/lib/api/types";
+import type { AgencyWalletSummary, Offer } from "@/lib/api/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,6 +223,7 @@ export function AgencyOverviewPage() {
   const { session, apiFetchWithAuth } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [packages, setPackages] = useState<AgencyPackage[]>([]);
+  const [wallet, setWallet] = useState<AgencyWalletSummary | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -232,6 +233,10 @@ export function AgencyOverviewPage() {
       ]);
       setOffers(offerData);
       setPackages(packageData);
+      const walletData = await apiFetchWithAuth<AgencyWalletSummary>("/payments/wallet/summary").catch(
+        () => null,
+      );
+      setWallet(walletData);
     })();
   }, [apiFetchWithAuth]);
 
@@ -338,9 +343,9 @@ export function AgencyOverviewPage() {
           icon={<Handshake className="size-5" />}
         />
         <StatCard
-          label="Price signal"
-          value={`₹${revenuePotential.toLocaleString("en-IN")}`}
-          note="Combined offer value across current bids."
+          label="Available balance"
+          value={`₹${((wallet?.availableBalance ?? 0) / 100).toLocaleString("en-IN")}`}
+          note={`Pending: ₹${((wallet?.pendingBalance ?? 0) / 100).toLocaleString("en-IN")} · Mode: ${wallet?.payoutMode ?? "TRUST"}`}
           icon={<Landmark className="size-5" />}
         />
       </div>

@@ -13,6 +13,7 @@ export type MemberStatus = "INTERESTED" | "APPROVED" | "COMMITTED" | "LEFT" | "R
 export type MemberRole = "CREATOR" | "MEMBER";
 export type PaymentStatus = "PENDING" | "AUTHORIZED" | "CAPTURED" | "REFUNDED" | "FAILED";
 export type EscrowStatus = "HELD" | "PARTIAL_RELEASE" | "RELEASED" | "REFUNDED";
+export type PaymentSource = "PLAN_OFFER" | "PACKAGE";
 
 export interface ApiErrorPayload {
   code?: string;
@@ -87,6 +88,11 @@ export interface Offer {
   inclusions?: Record<string, unknown> | null;
   itinerary?: ItineraryItem[] | null;
   cancellationPolicy?: string | null;
+  cancellationRules?: {
+    rules: Array<{ daysBeforeTrip: number; refundPercent: number }>;
+    convenienceFeeRefundable?: boolean;
+    agencyCancelFullRefund?: boolean;
+  } | null;
   validUntil?: string | null;
   status: OfferStatus;
   isReferred?: boolean;
@@ -210,6 +216,11 @@ export interface PackageDetails {
   activities?: string[] | null;
   galleryUrls?: string[] | null;
   cancellationPolicy?: string | null;
+  cancellationRules?: {
+    rules: Array<{ daysBeforeTrip: number; refundPercent: number }>;
+    convenienceFeeRefundable?: boolean;
+    agencyCancelFullRefund?: boolean;
+  } | null;
   status: PlanStatus;
   agency: AgencySummary;
   group?: Group | null;
@@ -322,19 +333,34 @@ export interface PaymentRecord {
 
 export interface GroupPaymentState {
   groupId: string;
-  plan: {
+  agencyName: string;
+  paymentSource: PaymentSource;
+  plan?: {
     id: string;
     title: string;
     slug: string;
     status: PlanStatus;
-  };
-  offer: {
+  } | null;
+  package?: {
+    id: string;
+    title: string;
+    slug: string;
+    status: PlanStatus;
+  } | null;
+  offer?: {
     id: string;
     agencyName: string;
     pricePerPerson: number;
-  };
+  } | null;
   payment?: PaymentRecord | null;
   amount: number;
+  breakdown: {
+    tripAmount: number;
+    platformFeeAmount: number;
+    feeGstAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+  };
   currency: string;
   committedCount: number;
   travelerCount: number;
@@ -345,10 +371,38 @@ export interface GroupPaymentState {
 export interface GroupPaymentOrder {
   payment: PaymentRecord;
   amount: number;
+  breakdown: {
+    tripAmount: number;
+    platformFeeAmount: number;
+    feeGstAmount: number;
+    commissionAmount: number;
+    totalAmount: number;
+  };
+  paymentSource: PaymentSource;
   currency: string;
   checkoutMode: "razorpay" | "mock" | "captured";
   razorpayKeyId?: string | null;
   description?: string;
+}
+
+export interface AgencyWalletSummary {
+  pendingBalance: number;
+  availableBalance: number;
+  totalEarned: number;
+  totalCommission: number;
+  securityDeposit: number;
+  payoutMode: "TRUST" | "PRO";
+}
+
+export interface AgencyWalletTransaction {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  groupId?: string | null;
+  paymentId?: string | null;
+  razorpayTransferId?: string | null;
+  createdAt: string;
 }
 
 export interface ReviewRecord {

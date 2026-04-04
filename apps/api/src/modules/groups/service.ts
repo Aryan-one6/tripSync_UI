@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { createSystemMessage } from '../chat/service.js';
-import { queueNotification } from '../../lib/queue.js';
+import { queueNotification, scheduleConfirmingWindow } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
 
 function getGenderCounterDelta(
@@ -81,10 +81,26 @@ export async function joinGroup(groupId: string, userId: string) {
         },
       });
 
+      const nextSize = group.currentSize + 1;
+      const packageMovedToConfirming =
+        Boolean(
+          group.package &&
+            group.package.status === 'OPEN' &&
+            nextSize >= (group.package.groupSizeMin ?? 1),
+        );
+
+      if (packageMovedToConfirming && group.package) {
+        await tx.package.update({
+          where: { id: group.package.id },
+          data: { status: 'CONFIRMING' },
+        });
+      }
+
       return {
         member,
         group,
         user,
+        packageMovedToConfirming,
       };
     },
     {
@@ -104,6 +120,17 @@ export async function joinGroup(groupId: string, userId: string) {
     userId,
     action: 'joined',
   });
+
+  if (result.packageMovedToConfirming && result.group.packageId) {
+    const runAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    await scheduleConfirmingWindow(groupId, runAt);
+
+    await createSystemMessage(
+      groupId,
+      'Minimum group size reached. Payment window is now open for 48 hours.',
+      { groupId, action: 'payment_window_opened' },
+    );
+  }
 
   if (result.group.plan?.creatorId && result.group.plan.creatorId !== userId) {
     emitUserEvent(result.group.plan.creatorId, 'group:member_updated', {

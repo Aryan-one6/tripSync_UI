@@ -11,9 +11,31 @@ function generateSlug(title: string): string {
   return `${base}-${suffix}`;
 }
 
+async function resolveAgencyActor(
+  userId: string,
+  allowedRoles: Array<'ADMIN' | 'MANAGER' | 'AGENT' | 'FINANCE'>,
+) {
+  const owned = await prisma.agency.findUnique({
+    where: { ownerId: userId },
+  });
+  if (owned) return owned;
+
+  const member = await prisma.agencyMember.findFirst({
+    where: {
+      userId,
+      isActive: true,
+      role: { in: allowedRoles },
+    },
+    include: {
+      agency: true,
+    },
+  });
+  if (!member) throw new ForbiddenError('Agency access required');
+  return member.agency;
+}
+
 export async function create(userId: string, data: CreatePackageInput) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('You must be an agency owner');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT']);
 
   const slug = generateSlug(data.title);
 
@@ -39,6 +61,7 @@ export async function create(userId: string, data: CreatePackageInput) {
       activities: data.activities,
       galleryUrls: data.galleryUrls,
       cancellationPolicy: data.cancellationPolicy,
+      cancellationRules: data.cancellationRules as any,
       status: PlanStatus.DRAFT,
     },
   });
@@ -138,8 +161,7 @@ export async function getBySlug(slug: string) {
 }
 
 export async function update(packageId: string, userId: string, data: UpdatePackageInput) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('Agency access required');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT']);
 
   const pkg = await prisma.package.findUnique({ where: { id: packageId } });
   if (!pkg) throw new NotFoundError('Package');
@@ -158,13 +180,13 @@ export async function update(packageId: string, userId: string, data: UpdatePack
       departureDates: data.departureDates as any,
       pricingTiers: data.pricingTiers as any,
       inclusions: data.inclusions as any,
+      cancellationRules: data.cancellationRules as any,
     },
   });
 }
 
 export async function publish(packageId: string, userId: string) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('Agency access required');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT']);
 
   const pkg = await prisma.package.findUnique({ where: { id: packageId } });
   if (!pkg) throw new NotFoundError('Package');
@@ -180,8 +202,7 @@ export async function publish(packageId: string, userId: string) {
 }
 
 export async function listAgencyPackages(userId: string) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('Agency access required');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT', 'FINANCE']);
 
   return prisma.package.findMany({
     where: { agencyId: agency.id },

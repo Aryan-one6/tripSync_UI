@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { CreditCard, ShieldCheck, Sparkles, MessageSquareMore, ArrowRight, Wallet } from "lucide-react";
+import { CreditCard, ShieldCheck, Sparkles, MessageSquareMore, ArrowRight, Wallet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -165,6 +165,8 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
   const commitProgress = state.travelerCount > 0
     ? Math.round((state.committedCount / state.travelerCount) * 100)
     : 0;
+  const tripTitle = state.plan?.title ?? state.package?.title ?? "Trip checkout";
+  const sourceLabel = state.paymentSource === "PACKAGE" ? "Agency package" : "Negotiated plan";
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.9fr]">
@@ -176,13 +178,13 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
-                Phase 3 checkout
+                🔒 Secure Checkout
               </span>
               <h2 className="mt-2 font-display text-xl text-[var(--color-ink-950)] sm:text-2xl">
-                {state.plan.title}
+                {tripTitle}
               </h2>
               <p className="mt-1 text-sm text-[var(--color-ink-600)]">
-                Accepted offer with {state.offer.agencyName}
+                {sourceLabel} with {state.agencyName}
               </p>
             </div>
             <div className="shrink-0 rounded-[var(--radius-lg)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] px-5 py-3 text-right shadow-[var(--shadow-clay-sm)]">
@@ -190,6 +192,30 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
               <p className="font-display text-2xl text-[var(--color-sea-800)]">
                 {formatCurrency(state.amount / 100)}
               </p>
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white/70 p-3 text-sm">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+              Payment breakdown
+            </p>
+            <div className="space-y-1 text-[var(--color-ink-700)]">
+              <div className="flex items-center justify-between">
+                <span>Trip amount</span>
+                <span>{formatCurrency(state.breakdown.tripAmount / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Platform fee</span>
+                <span>{formatCurrency(state.breakdown.platformFeeAmount / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>GST on fee (18%)</span>
+                <span>{formatCurrency(state.breakdown.feeGstAmount / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold text-[var(--color-ink-900)]">
+                <span>Total payable</span>
+                <span>{formatCurrency(state.breakdown.totalAmount / 100)}</span>
+              </div>
             </div>
           </div>
 
@@ -278,6 +304,15 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
                 Open group chat
               </Button>
             </Link>
+            {captured && state?.payment?.id && (
+              <a
+                href={`/dashboard/groups/${groupId}/checkout?invoice=1`}
+                className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition hover:bg-[var(--color-surface-2)]"
+              >
+                <FileText className="size-4 text-[var(--color-sea-600)]" />
+                Download invoice
+              </a>
+            )}
           </div>
         </div>
       </Card>
@@ -298,9 +333,9 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
           </div>
           <div className="space-y-3">
             {[
-              "Payments are collected while the plan is in the CONFIRMING state.",
-              "Once every approved traveler pays, the plan flips to CONFIRMED and the group can coordinate in chat.",
-              "Escrow release is scheduled in tranches against trip dates.",
+              "Pay now to confirm your seat in the group.",
+              "Once all approved travellers have paid, the trip is confirmed and group coordination unlocks.",
+              "Your money is held safely in escrow and released to the agency only as trip milestones complete.",
             ].map((text, i) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-sea-50)] text-[10px] font-bold text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">

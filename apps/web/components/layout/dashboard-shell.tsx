@@ -66,13 +66,31 @@ export function DashboardShell({
         <div className="space-y-5 sm:space-y-6 pb-mobile-nav md:pb-0">
           {/* Dashboard header */}
           <header className="relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-[var(--shadow-md)] sm:p-7">
+            {/* Subtle pattern strip */}
+            <div
+              className={cn(
+                "absolute inset-x-0 top-0 h-1 rounded-t-[var(--radius-xl)]",
+                variant === "agency"
+                  ? "bg-gradient-to-r from-[var(--color-lavender-400)] via-[var(--color-lavender-500)] to-[var(--color-sea-500)]"
+                  : "bg-gradient-to-r from-[var(--color-sea-400)] via-[var(--color-sea-500)] to-[var(--color-sea-600)]",
+              )}
+            />
+            {/* Decorative glow blob */}
+            <div className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-[var(--color-sea-50)] opacity-60 blur-2xl" />
             <div className="relative">
-              <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] shadow-[var(--shadow-sm)]",
+                  variant === "agency"
+                    ? "bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
+                    : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]",
+                )}
+              >
                 {variant === "agency" ? "Agency Dashboard" : "Traveler Dashboard"}
               </span>
               <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h1 className="font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl">
+                  <h1 className="font-display text-2xl text-[var(--color-ink-950)] sm:text-3xl md:text-4xl capitalize">
                     {title}
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm text-[var(--color-ink-600)] leading-relaxed">

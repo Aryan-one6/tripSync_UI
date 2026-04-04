@@ -335,3 +335,169 @@ a {
 .pb-mobile-nav {
   padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom)));
 }
+
+/* ─── Premium gradients & shine ─── */
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(200%) skewX(-12deg); }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes blob {
+  0%, 100% { border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%; }
+  25% { border-radius: 45% 55% 40% 60% / 60% 45% 55% 40%; }
+  50% { border-radius: 55% 45% 60% 40% / 40% 55% 45% 60%; }
+  75% { border-radius: 40% 60% 50% 50% / 55% 40% 60% 45%; }
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out both;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-blob {
+  animation: blob 8s ease-in-out infinite;
+}
+
+/* Shine effect on hover (use on .group) */
+.shine-on-hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transform: skewX(-12deg);
+}
+
+.group:hover .shine-on-hover::after {
+  animation: shine 0.6s ease-out;
+}
+
+/* ─── Card upgrades ─── */
+
+.clay-card {
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.clay-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+}
+
+/* ─── Focus ring improvements ─── */
+
+:focus-visible {
+  outline: 2px solid var(--color-sea-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Gradient text utility ─── */
+
+.gradient-text-sea {
+  background: linear-gradient(135deg, var(--color-sea-500), var(--color-sea-700));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-sunset {
+  background: linear-gradient(135deg, var(--color-sunset-500), var(--color-sunset-700));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Loading skeleton ─── */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ─── Button press effect ─── */
+
+button:active, a:active {
+  transform: scale(0.98);
+}
+
+/* Override for links that shouldn't scale */
+a.no-press:active {
+  transform: none;
+}
+
+/* ─── Staggered animation delays (extended) ─── */
+
+.delay-75  { animation-delay: 0.075s; }
+.delay-100 { animation-delay: 0.1s; }
+.delay-150 { animation-delay: 0.15s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-700 { animation-delay: 0.7s; }
+
+/* ─── Responsive type scale ─── */
+
+@media (max-width: 640px) {
+  .font-display {
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ─── Improved link hover transitions ─── */
+
+nav a {
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+

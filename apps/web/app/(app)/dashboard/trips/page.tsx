@@ -62,7 +62,7 @@ export default function TripsPage() {
             const title = plan?.title ?? pkg?.title ?? "Trip";
             const destination = plan?.destination ?? pkg?.destination ?? "Unknown";
             const dateLabel = formatDateRange(plan?.startDate ?? pkg?.startDate, plan?.endDate ?? pkg?.endDate);
-            const needsPayment = plan?.status === "CONFIRMING" && trip.status !== "COMMITTED";
+            const needsPayment = (plan?.status === "CONFIRMING" || pkg?.status === "CONFIRMING") && trip.status !== "COMMITTED";
             // Chat unlocks as soon as you are approved — no need to wait for COMMITTED
             const canChat =
               trip.status === "APPROVED" ||
@@ -70,21 +70,59 @@ export default function TripsPage() {
               plan?.status === "CONFIRMED" ||
               plan?.status === "COMPLETED";
             const canDM = trip.status === "APPROVED" || trip.status === "COMMITTED";
-            const canReview = plan?.status === "COMPLETED";
+            const canReview = plan?.status === "COMPLETED" || pkg?.status === "COMPLETED";
+            const isPaid = trip.status === "COMMITTED";
             const shareHref = buildWhatsAppShareHref(`Check this TravellersIn trip: ${title}`, href);
+            const tripStatus = plan?.status ?? pkg?.status;
+            const packagePrice = pkg?.basePrice;
+
+            // Visual strip color per status
+            const stripColor =
+              trip.status === "COMMITTED"
+                ? "bg-[var(--color-sea-500)]"
+                : trip.status === "APPROVED"
+                ? "bg-[var(--color-lavender-400)]"
+                : "bg-[var(--color-ink-300)]";
 
             return (
-              <Card key={trip.id} className="relative overflow-hidden p-5">
-                <div className="relative space-y-3">
-                  <Badge variant={trip.status === "COMMITTED" ? "sea" : trip.status === "APPROVED" ? "lavender" : "default"}>
-                    {trip.status}
-                  </Badge>
-                  <h2 className="truncate font-display text-lg text-[var(--color-ink-950)]">{title}</h2>
-                  <div className="flex items-center gap-2 text-sm text-[var(--color-ink-600)]">
-                    <MapPin className="size-3.5" />
-                    {destination}
+              <Card key={trip.id} className="relative overflow-hidden p-0">
+                {/* Status colour strip */}
+                <div className={`h-1.5 w-full ${stripColor} rounded-t-[var(--radius-lg)]`} />
+
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant={trip.status === "COMMITTED" ? "sea" : trip.status === "APPROVED" ? "lavender" : "default"}>
+                      {trip.status}
+                    </Badge>
+                    {tripStatus && (
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
+                        {tripStatus}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-[var(--color-ink-500)]">{dateLabel}</p>
+
+                  <div>
+                    <h2 className="truncate font-display text-lg text-[var(--color-ink-950)]">{title}</h2>
+                    <div className="mt-1 flex items-center gap-2 text-sm text-[var(--color-ink-600)]">
+                      <MapPin className="size-3.5" />
+                      {destination}
+                    </div>
+                    {dateLabel && (
+                      <p className="mt-0.5 text-sm text-[var(--color-ink-500)]">{dateLabel}</p>
+                    )}
+                    {packagePrice && (
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-sea-700)]">
+                        ₹{packagePrice.toLocaleString("en-IN")} / person
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Payment progress bar */}
+                  {needsPayment && (
+                    <div className="rounded-[var(--radius-md)] bg-[var(--color-sunset-50)] border border-[var(--color-sunset-200)] px-3 py-2 text-xs text-[var(--color-sunset-700)] font-medium">
+                      ⚡ Payment required to confirm your seat
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Link href={href}>
@@ -127,6 +165,19 @@ export default function TripsPage() {
                     )}
                     <WhatsAppShareButton href={shareHref} label="Share" size="sm" />
                   </div>
+
+                  {/* Cancellation request link — only for paid trips not yet completed */}
+                  {isPaid && tripStatus !== "COMPLETED" && tripStatus !== "CANCELLED" && (
+                    <p className="pt-1 text-[11px] text-[var(--color-ink-400)]">
+                      Need to cancel?{" "}
+                      <a
+                        href={`/dashboard/groups/${trip.group.id}/chat`}
+                        className="font-medium text-[var(--color-sunset-600)] underline decoration-dotted hover:text-[var(--color-sunset-500)]"
+                      >
+                        Contact agency in group chat
+                      </a>
+                    </p>
+                  )}
                 </div>
               </Card>
             );

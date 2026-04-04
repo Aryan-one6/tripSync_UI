@@ -317,7 +317,7 @@ export async function acceptOfferForPlan(
 
       await tx.group.updateMany({
         where: { planId },
-        data: { isLocked: true },
+        data: { isLocked: false },
       });
 
       return {

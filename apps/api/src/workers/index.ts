@@ -2,9 +2,10 @@ import { Worker } from 'bullmq';
 import { prisma } from '../lib/prisma.js';
 import { env } from '../lib/env.js';
 import { getRedisConnection } from '../lib/queue.js';
-import { releaseEscrow } from '../modules/payments/service.js';
+import { releaseEscrow, reconcilePendingPayments, resolveConfirmingWindow } from '../modules/payments/service.js';
 import { sendWhatsAppMessage } from '../lib/whatsapp.js';
 import { syncUserVerificationTier } from '../lib/verification.js';
+import { evaluateAgencyTrustProfiles } from '../modules/agencies/service.js';
 
 const connection = getRedisConnection();
 
@@ -100,7 +101,17 @@ const escrowReleaseWorker = new Worker(
   { connection },
 );
 
+const confirmingWindowWorker = new Worker(
+  'confirming-window',
+  async (job) => {
+    return resolveConfirmingWindow(job.data.groupId, 'worker');
+  },
+  { connection },
+);
+
 let housekeepingTimer: NodeJS.Timeout | null = null;
+let paymentReconciliationTimer: NodeJS.Timeout | null = null;
+let trustEvaluationTimer: NodeJS.Timeout | null = null;
 
 async function runHousekeeping() {
   const now = new Date();
@@ -196,7 +207,7 @@ async function runHousekeeping() {
   }
 }
 
-for (const worker of [planExpiryWorker, offerExpiryWorker, notificationWorker, escrowReleaseWorker]) {
+for (const worker of [planExpiryWorker, offerExpiryWorker, notificationWorker, escrowReleaseWorker, confirmingWindowWorker]) {
   worker.on('completed', (job, result) => {
     console.log(`[worker:${worker.name}] job ${job.id} completed`, result);
   });
@@ -210,11 +221,18 @@ async function shutdown() {
   if (housekeepingTimer) {
     clearInterval(housekeepingTimer);
   }
+  if (paymentReconciliationTimer) {
+    clearInterval(paymentReconciliationTimer);
+  }
+  if (trustEvaluationTimer) {
+    clearInterval(trustEvaluationTimer);
+  }
   await Promise.all([
     planExpiryWorker.close(),
     offerExpiryWorker.close(),
     notificationWorker.close(),
     escrowReleaseWorker.close(),
+    confirmingWindowWorker.close(),
   ]);
   await prisma.$disconnect();
 }
@@ -231,8 +249,32 @@ process.on('SIGTERM', async () => {
 
 console.log('TravellersIn workers started: plan-expiry-check, offer-expiry');
 void runHousekeeping();
+void reconcilePendingPayments(100).catch((error) => {
+  console.error('[worker:payment-reconciliation:init] failed', error);
+});
+void evaluateAgencyTrustProfiles().catch((error) => {
+  console.error('[worker:agency-trust:init] failed', error);
+});
 housekeepingTimer = setInterval(() => {
   void runHousekeeping().catch((error) => {
     console.error('[worker:housekeeping] failed', error);
   });
 }, env.NODE_ENV === 'development' ? 30_000 : 300_000);
+
+paymentReconciliationTimer = setInterval(
+  () => {
+    void reconcilePendingPayments(100).catch((error) => {
+      console.error('[worker:payment-reconciliation] failed', error);
+    });
+  },
+  env.NODE_ENV === 'development' ? 60_000 : 6 * 60 * 60 * 1000,
+);
+
+trustEvaluationTimer = setInterval(
+  () => {
+    void evaluateAgencyTrustProfiles().catch((error) => {
+      console.error('[worker:agency-trust] failed', error);
+    });
+  },
+  env.NODE_ENV === 'development' ? 10 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000,
+);

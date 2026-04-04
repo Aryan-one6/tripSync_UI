@@ -4,11 +4,32 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '.
 import type { CounterOfferInput, CreateOfferInput } from '@tripsync/shared';
 import { acceptOfferForPlan } from '../plans/service.js';
 import { emitAgencyEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
-import { queueNotification } from '../../lib/queue.js';
+import { queueNotification, scheduleConfirmingWindow } from '../../lib/queue.js';
 import { createDirectConversation, createSystemMessage, sendDirectMessage } from '../chat/service.js';
 import { env } from '../../lib/env.js';
 
 const MAX_NEGOTIATION_ROUNDS = 3;
+
+async function resolveAgencyActor(
+  userId: string,
+  allowedRoles: Array<'ADMIN' | 'MANAGER' | 'AGENT' | 'FINANCE'>,
+) {
+  const owned = await prisma.agency.findUnique({ where: { ownerId: userId } });
+  if (owned) return owned;
+
+  const member = await prisma.agencyMember.findFirst({
+    where: {
+      userId,
+      isActive: true,
+      role: { in: allowedRoles },
+    },
+    include: {
+      agency: true,
+    },
+  });
+  if (!member) throw new ForbiddenError('Agency access required');
+  return member.agency;
+}
 
 async function postOfferUpdateToDirectChat(
   senderUserId: string,
@@ -32,8 +53,7 @@ async function postOfferUpdateToDirectChat(
 }
 
 export async function submitOffer(userId: string, data: CreateOfferInput) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('Agency access required');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT']);
 
   const plan = await prisma.plan.findUnique({ where: { id: data.planId } });
   if (!plan) throw new NotFoundError('Plan');
@@ -55,6 +75,7 @@ export async function submitOffer(userId: string, data: CreateOfferInput) {
     inclusions: data.inclusions as any,
     itinerary: data.itinerary as any,
     cancellationPolicy: data.cancellationPolicy,
+    cancellationRules: data.cancellationRules as any,
     validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
     status: OfferStatus.PENDING,
   };
@@ -182,8 +203,7 @@ export async function getById(id: string, userId: string) {
 }
 
 export async function listAgencyOffers(userId: string) {
-  const agency = await prisma.agency.findUnique({ where: { ownerId: userId } });
-  if (!agency) throw new ForbiddenError('Agency access required');
+  const agency = await resolveAgencyActor(userId, ['ADMIN', 'MANAGER', 'AGENT', 'FINANCE']);
 
   return prisma.offer.findMany({
     where: { agencyId: agency.id },
@@ -244,7 +264,25 @@ export async function counterOffer(offerId: string, userId: string, data: Counte
   }
 
   const isCreator = offer.plan.creatorId === userId;
-  const isAgency = offer.agency.ownerId === userId;
+  const isAgencyOwner = offer.agency.ownerId === userId;
+  const agencyMember = !isAgencyOwner
+    ? await prisma.agencyMember.findUnique({
+        where: {
+          agencyId_userId: {
+            agencyId: offer.agencyId,
+            userId,
+          },
+        },
+        select: { role: true, isActive: true },
+      })
+    : null;
+  const isAgency =
+    isAgencyOwner ||
+    Boolean(
+      agencyMember &&
+        agencyMember.isActive &&
+        (agencyMember.role === 'ADMIN' || agencyMember.role === 'MANAGER'),
+    );
   if (!isCreator && !isAgency) throw new ForbiddenError('Not authorized to negotiate this offer');
 
   const senderType = isCreator ? 'user' : 'agency';
@@ -342,8 +380,11 @@ export async function accept(offerId: string, userId: string) {
     await createSystemMessage(
       group.id,
       'An agency offer was accepted. Payment collection is now open for approved travelers.',
-      { planId: offer.planId, offerId },
+      { planId: offer.planId, offerId, action: 'payment_window_opened' },
     );
+
+    const windowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    await scheduleConfirmingWindow(group.id, windowEnd);
 
     emitGroupEvent(group.id, 'offer:updated', {
       action: 'accepted',
@@ -434,7 +475,21 @@ export async function withdraw(offerId: string, userId: string) {
   });
 
   if (!offer) throw new NotFoundError('Offer');
-  if (offer.agency.ownerId !== userId) throw new ForbiddenError('Only the agency can withdraw');
+  const isAgencyOwner = offer.agency.ownerId === userId;
+  if (!isAgencyOwner) {
+    const member = await prisma.agencyMember.findUnique({
+      where: {
+        agencyId_userId: {
+          agencyId: offer.agencyId,
+          userId,
+        },
+      },
+      select: { role: true, isActive: true },
+    });
+    if (!member || !member.isActive || (member.role !== 'ADMIN' && member.role !== 'MANAGER')) {
+      throw new ForbiddenError('Only agency admins/managers can withdraw');
+    }
+  }
   if (offer.status === 'ACCEPTED' || offer.status === 'REJECTED') {
     throw new BadRequestError('Cannot withdraw a finalized offer');
   }

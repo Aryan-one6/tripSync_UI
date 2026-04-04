@@ -67,6 +67,53 @@ enum FollowTargetType {
   AGENCY
 }
 
+enum PaymentSource {
+  PLAN_OFFER
+  PACKAGE
+}
+
+enum TransferStatus {
+  QUEUED
+  PROCESSING
+  SETTLED
+  FAILED
+  MANUAL
+}
+
+enum WalletPayoutMode {
+  TRUST
+  PRO
+}
+
+enum AgencyMemberRole {
+  ADMIN
+  MANAGER
+  AGENT
+  FINANCE
+}
+
+enum DisputeStatus {
+  OPEN
+  EVIDENCE_REQUIRED
+  RESOLVED
+  REJECTED
+  SPLIT_REFUND
+}
+
+enum DisputeResolution {
+  USER_FAVOR
+  AGENCY_FAVOR
+  SPLIT
+}
+
+enum RiskFlagType {
+  CONTACT_SHARING
+  PAYMENT_BYPASS
+  CANCELLATION_ABUSE
+  PAYMENT_ANOMALY
+  AGENCY_INACTIVITY
+}
+
 // ─── User & Agency ──────────────────────────────────────
 
 model User {
@@ -102,6 +149,11 @@ model User {
   directMessagesSent DirectMessage[] @relation("DirectMessageSender")
   following       Follow[]         @relation("FollowFollowerRel")
   followers       Follow[]         @relation("FollowTargetUserRel")
+  agencyMemberships AgencyMember[]
+  disputesCreated Dispute[]        @relation("DisputeCreatorRel")
+  disputesUpdated Dispute[]        @relation("DisputeResolverRel")
+  crmProfiles     AgencyCustomer[]
+  riskFlagsRaised FraudRiskFlag[]  @relation("RiskFlagRaisedByRel")
 
   @@map("users")
 }
@@ -136,6 +188,15 @@ model Agency {
   offers          Offer[]
   reviewsReceived Review[] @relation("TargetAgencyRel")
   followers       Follow[]
+  members         AgencyMember[]
+  wallet          AgencyWallet?
+  invoices        Invoice[]
+  disputes        Dispute[]
+  trustProfile    AgencyTrustProfile?
+  insuranceQuotes InsuranceQuote[]
+  customers       AgencyCustomer[]
+  campaigns       AgencyCampaign[]
+  riskFlags       FraudRiskFlag[]
 
   @@map("agencies")
 }
@@ -209,6 +270,7 @@ model Package {
   activities         Json?
   galleryUrls        Json?      // ["url1","url2"]
   cancellationPolicy String?
+  cancellationRules  Json?
   status             PlanStatus @default(DRAFT)
   expiresAt          DateTime?
   createdAt          DateTime   @default(now())
@@ -241,6 +303,8 @@ model Group {
   payments    Payment[]
   reviews     Review[]
   messages    ChatMessage[]
+  disputes    Dispute[]
+  invoices    Invoice[]
 
   @@map("groups")
 }
@@ -272,6 +336,7 @@ model Offer {
   inclusions         Json?
   itinerary          Json?
   cancellationPolicy String?
+  cancellationRules  Json?
   validUntil         DateTime?
   status             OfferStatus @default(PENDING)
   isReferred         Boolean     @default(false)
@@ -330,15 +395,26 @@ model Payment {
   user               User          @relation(fields: [userId], references: [id])
   group              Group         @relation(fields: [groupId], references: [id])
   amount             Int           // in paise (100 paise = 1 INR)
+  tripAmount         Int           @default(0)
+  platformFeeAmount  Int           @default(0)
+  feeGstAmount       Int           @default(0)
+  commissionAmount   Int           @default(0)
   currency           String        @default("INR")
+  source             PaymentSource @default(PLAN_OFFER)
   razorpayOrderId    String?
   razorpayPaymentId  String?
   status             PaymentStatus @default(PENDING)
   escrowStatus       EscrowStatus  @default(HELD)
+  transferStatus     TransferStatus @default(QUEUED)
+  transferReference  String?
   tranche1Released   Boolean       @default(false)
   tranche2Released   Boolean       @default(false)
+  paidAt             DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+
+  invoice            Invoice?
+  dispute            Dispute?
 
   @@map("payments")
 }
@@ -419,4 +495,207 @@ model DirectMessage {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("direct_messages")
+}
+
+model AgencyMember {
+  id         String           @id @default(uuid())
+  agencyId   String
+  userId     String
+  role       AgencyMemberRole @default(AGENT)
+  isActive   Boolean          @default(true)
+  invitedBy  String?
+  joinedAt   DateTime         @default(now())
+
+  agency     Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, userId])
+  @@index([agencyId, role, isActive])
+  @@map("agency_members")
+}
+
+model AgencyWallet {
+  id               String           @id @default(uuid())
+  agencyId         String           @unique
+  pendingBalance   Int              @default(0)
+  availableBalance Int              @default(0)
+  totalEarned      Int              @default(0)
+  totalCommission  Int              @default(0)
+  securityDeposit  Int              @default(0)
+  payoutMode       WalletPayoutMode @default(TRUST)
+  updatedAt        DateTime         @updatedAt
+
+  agency           Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  transactions     AgencyTransaction[]
+
+  @@map("agency_wallets")
+}
+
+model AgencyTransaction {
+  id                 String       @id @default(uuid())
+  walletId           String
+  type               String
+  amount             Int
+  description        String
+  groupId            String?
+  paymentId          String?
+  razorpayTransferId String?
+  createdAt          DateTime     @default(now())
+
+  wallet             AgencyWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([paymentId])
+  @@map("agency_transactions")
+}
+
+model Invoice {
+  id                String   @id @default(uuid())
+  groupId           String
+  paymentId         String   @unique
+  agencyId          String
+  userId            String
+  invoiceNumber     String   @unique
+  amount            Int
+  platformFeeAmount Int      @default(0)
+  feeGstAmount      Int      @default(0)
+  commissionAmount  Int      @default(0)
+  totalAmount       Int
+  currency          String   @default("INR")
+  status            String   @default("issued")
+  pdfUrl            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  group             Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payment           Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  agency            Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("invoices")
+}
+
+model Dispute {
+  id               String            @id @default(uuid())
+  groupId          String
+  paymentId        String            @unique
+  agencyId         String
+  createdByUserId  String
+  reason           String
+  status           DisputeStatus     @default(OPEN)
+  resolution       DisputeResolution?
+  resolutionNotes  String?
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  group            Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payment          Payment           @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  agency           Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdBy        User              @relation("DisputeCreatorRel", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  resolvedBy       User?             @relation("DisputeResolverRel", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, status, createdAt(sort: Desc)])
+  @@index([createdByUserId, createdAt(sort: Desc)])
+  @@map("disputes")
+}
+
+model AgencyTrustProfile {
+  id                    String   @id @default(uuid())
+  agencyId              String   @unique
+  trustScore            Int      @default(0)
+  eligibleForPro        Boolean  @default(false)
+  completedTripsCount   Int      @default(0)
+  averageRatingSnapshot Float    @default(0)
+  recentDisputesCount   Int      @default(0)
+  lastEvaluatedAt       DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  agency                Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("agency_trust_profiles")
+}
+
+model InsuranceQuote {
+  id         String   @id @default(uuid())
+  agencyId   String
+  groupId    String?
+  userId     String
+  provider   String
+  planCode   String?
+  premium    Int?
+  coverage   Int?
+  status     String   @default("draft")
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  agency     Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("insurance_quotes")
+}
+
+model AgencyCustomer {
+  id         String   @id @default(uuid())
+  agencyId   String
+  userId     String
+  tags       Json?
+  notes      String?
+  lastTripAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  agency     Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, userId])
+  @@index([agencyId, createdAt(sort: Desc)])
+  @@map("agency_customers")
+}
+
+model AgencyCampaign {
+  id          String   @id @default(uuid())
+  agencyId    String
+  name        String
+  description String?
+  status      String   @default("draft")
+  targetTags  Json?
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, status, createdAt(sort: Desc)])
+  @@map("agency_campaigns")
+}
+
+model FraudRiskFlag {
+  id              String       @id @default(uuid())
+  agencyId        String?
+  userId          String?
+  groupId         String?
+  paymentId       String?
+  messageId       String?
+  type            RiskFlagType
+  severity        String       @default("medium")
+  details         Json?
+  raisedByUserId  String?
+  createdAt       DateTime     @default(now())
+  resolvedAt      DateTime?
+  resolutionNotes String?
+
+  agency          Agency?      @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  raisedBy        User?        @relation("RiskFlagRaisedByRel", fields: [raisedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, type, createdAt(sort: Desc)])
+  @@index([userId, type, createdAt(sort: Desc)])
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("fraud_risk_flags")
 }

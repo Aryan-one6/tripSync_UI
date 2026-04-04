@@ -92,6 +92,7 @@ groupsRouter.post(
       inclusions: req.body.inclusions,
       itinerary: req.body.itinerary,
       cancellationPolicy: req.body.cancellationPolicy,
+      cancellationRules: req.body.cancellationRules,
       validUntil: req.body.validUntil,
     });
 
