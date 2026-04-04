@@ -64,9 +64,17 @@ export function initSocket(server: HttpServer) {
   });
 
   if (isRedisConfigured) {
-    io.adapter(createAdapter(redis.duplicate(), redisSub.duplicate()));
+    const adapterPub = redis.duplicate();
+    const adapterSub = redisSub.duplicate();
+    adapterPub.on('error', (err: Error) =>
+      console.error('Redis adapter publisher error:', err),
+    );
+    adapterSub.on('error', (err: Error) =>
+      console.error('Redis adapter subscriber error:', err),
+    );
+    io.adapter(createAdapter(adapterPub, adapterSub));
   } else {
-    console.warn('Socket.IO Redis adapter is disabled because REDIS_URL is not configured.');
+    console.warn('Socket.IO Redis adapter is disabled because Redis is unavailable in this runtime.');
   }
 
   io.use(async (socket, next) => {

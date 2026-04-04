@@ -303,19 +303,21 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   };
 
   function sendDirectMessage() {
-    if (!activeConversationId) return;
+    if (!activeConversationId || isPending) return;
     const content = draft.trim();
     if (!content) return;
+    const previousDraft = draft;
+    setDraft("");
     startTransition(async () => {
       try {
         await apiFetchWithAuth(
           `/chat/direct/conversations/${activeConversationId}/messages`,
           { method: "POST", body: JSON.stringify({ content }) },
         );
-        setDraft("");
         setFeedback(null);
         emitDirectTyping(false);
       } catch (err) {
+        setDraft(previousDraft);
         setFeedback(err instanceof Error ? err.message : "Unable to send message.");
       }
     });
