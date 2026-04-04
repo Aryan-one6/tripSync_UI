@@ -281,7 +281,7 @@ export default async function DiscoverPage({
         </div>
 
         {/* ── Desktop sidebar ── */}
-        <div className="hidden xl:block space-y-5">
+        <div className="hidden xl:block xl:sticky xl:top-24 self-start xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto hide-scrollbar space-y-5">
           {/* Feed type selector */}
           <Card className="h-fit p-5">
             <div className="mb-4 flex items-center gap-3">

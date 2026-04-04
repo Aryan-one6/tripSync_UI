@@ -3,6 +3,7 @@ import { MapPin, Route, Star, Ticket } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AgencyVerificationBadge, UserVerificationBadge } from "@/components/ui/verification-badge";
 import { ProfileFollowPanel } from "@/components/social/profile-follow-panel";
+import { ProfileCommonContext } from "@/components/social/profile-common-context";
 import { ProfileTabs } from "@/components/social/profile-tabs";
 import { getPublicProfile } from "@/lib/api/public";
 import type { SocialProfile } from "@/lib/api/types";
@@ -127,6 +128,8 @@ export default async function ProfilePage({
           </div>
         </div>
       </div>
+
+      <ProfileCommonContext profile={profile} />
 
       {/* Tabbed sections: Trips / Reviews / About */}
       <ProfileTabs profile={profile} />
