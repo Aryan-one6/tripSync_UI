@@ -74,29 +74,33 @@ const DESTINATIONS = [
 
 function DestinationStrip() {
   return (
-    <section className="py-7 overflow-hidden">
-      <p className="mb-4 text-center text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-sea-600)]">
+    <section className="overflow-hidden py-8 sm:py-10">
+      <p className="mb-5 text-center text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--color-sea-600)] sm:mb-6">
         Popular destinations
       </p>
       <div className="relative">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-[var(--color-surface)] to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-[var(--color-surface)] to-transparent" />
-        <div className="flex gap-2.5 overflow-x-auto hide-scrollbar pb-1 px-3">
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[var(--color-surface)] to-transparent sm:w-14" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[var(--color-surface)] to-transparent sm:w-14" />
+        <div className="hide-scrollbar flex gap-3 overflow-x-auto px-3 pb-2 sm:gap-4 sm:px-4">
           {DESTINATIONS.map((d) => (
             <Link
               key={d.name}
               href={`/discover?destination=${encodeURIComponent(d.name)}`}
               className="shrink-0 group"
             >
-              <div className="relative overflow-hidden rounded-xl shadow-[var(--shadow-sm)] transition-all hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5">
+              <div className="relative h-20 w-32 overflow-hidden rounded-2xl shadow-[var(--shadow-sm)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] sm:h-24 sm:w-40 md:h-28 md:w-44">
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
                   style={{ backgroundImage: `url(${d.image})` }}
                 />
                 <div className={`absolute inset-0 bg-gradient-to-br ${d.tint}`} />
-                <div className="relative min-w-[100px] px-4 py-4 text-center text-white">
-                  <p className="font-display text-sm font-bold leading-tight">{d.name}</p>
-                  <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-white/80">{d.tag}</p>
+                <div className="relative flex h-full flex-col justify-end px-3 py-2.5 text-center text-white sm:px-4 sm:py-3">
+                  <p className="font-display text-base font-bold leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)] sm:text-lg">
+                    {d.name}
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/90 sm:text-[11px]">
+                    {d.tag}
+                  </p>
                 </div>
               </div>
             </Link>
@@ -437,7 +441,7 @@ function ValueProps() {
   ];
 
   return (
-    <section className="py-10 sm:py-14">
+    <section className="py-10 sm:py-14 max-w-7xl mx-auto ">
       <div className="mb-8 text-center">
         <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-sea-600)]">
           Honest pricing
@@ -494,9 +498,9 @@ function AgencyCTA() {
 
   return (
     <section className="py-10 sm:py-14">
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-gradient-to-r from-[var(--color-ink-950)] via-[var(--color-ink-900)] to-[var(--color-ink-800)] p-7 text-white shadow-[var(--shadow-xl)] sm:p-10">
-        <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-white/3 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/3 size-40 rounded-full bg-[var(--color-sea-500)]/8 blur-2xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-ink-900)] p-7 text-white shadow-[var(--shadow-xl)] sm:p-10">
+        {/* <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-white/3 blur-3xl" /> */}
+        {/* <div className="pointer-events-none absolute bottom-0 left-1/3 size-40 rounded-full bg-[var(--color-sea-500)]/8 blur-2xl" /> */}
 
         <div className="relative grid gap-7 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
@@ -734,7 +738,7 @@ function FinalCTA() {
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link
               href="/discover"
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-[var(--color-sea-700)] shadow-[var(--shadow-md)] transition-all hover:shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:-translate-y-0.5"
+              className="group inline-flex items-center gap-2 rounded-full  px-6 py-3 text-sm font-bold text-[var(--color-sea-700)] shadow-[var(--shadow-md)] transition-all hover:shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:-translate-y-0.5"
             >
               Browse trips
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
