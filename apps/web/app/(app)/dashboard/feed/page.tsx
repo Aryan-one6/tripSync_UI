@@ -118,52 +118,7 @@ export default async function FeedPage({
         </div>
 
         {/* Trending sidebar */}
-        <Card className="h-fit p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-[var(--color-sunset-50)] to-[var(--color-sunset-100)] text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)]">
-              <TrendingUp className="size-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">Trending now</p>
-              <p className="font-display text-lg text-[var(--color-ink-950)]">Picking up momentum</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {trending.slice(0, 4).map((item) => (
-              <Link
-                key={`${item.originType}-${item.id}`}
-                href={item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`}
-              >
-                <CardInset className="group space-y-1.5 transition-all hover:shadow-[var(--shadow-clay)] hover:-translate-y-0.5">
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant={item.originType === "plan" ? "sea" : "sunset"}>
-                      {item.originType === "plan" ? "Community plan" : "Agency package"}
-                    </Badge>
-                    <Badge variant="outline">
-                      {item.originType === "plan" ? "Traveler-created" : "Agency-created"}
-                    </Badge>
-                  </div>
-                  <p className="truncate font-display text-base text-[var(--color-ink-950)]">{item.title}</p>
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-ink-600)]">
-                    <MapPin className="size-3" />
-                    {item.destination}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[var(--color-sea-400)] to-[var(--color-sea-600)]"
-                        style={{ width: `${Math.min(100, (item.joinedCount / item.groupSizeMax) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-[var(--color-sea-700)]">
-                      {item.joinedCount}/{item.groupSizeMax}
-                    </span>
-                  </div>
-                </CardInset>
-              </Link>
-            ))}
-          </div>
-        </Card>
+  
       </div>
     </DashboardShell>
   );
