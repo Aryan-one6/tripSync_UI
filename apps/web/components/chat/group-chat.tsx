@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   ArrowLeft,
   AtSign,
   BarChart3,
+  CreditCard,
+  Eye,
+  LogOut,
   MessageSquareMore,
   Minus,
+  MoreVertical,
   Plus,
   Receipt,
   Send,
@@ -343,6 +348,7 @@ export function GroupChat({
   embedded?: boolean;
   onBack?: () => void;
 }) {
+  const router = useRouter();
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
 
@@ -361,11 +367,15 @@ export function GroupChat({
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showAllOffers, setShowAllOffers] = useState(false);
+  const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
 
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const isAgency = session?.role === "agency_admin";
   const userId = session?.user.id;
@@ -395,6 +405,17 @@ export function GroupChat({
   useEffect(() => {
     setShowMentionDropdown(mentionQuery !== null && mentionSuggestions.length > 0);
   }, [mentionQuery, mentionSuggestions.length]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
 
   function insertMention(member: GroupMember) {
     const newDraft = draft.replace(/@([^@\n]*)$/, `@${member.user.fullName} `);
@@ -672,11 +693,63 @@ export function GroupChat({
     }
   }
 
+  async function handleLeaveGroup() {
+    if (isAgency) {
+      setFeedback("Agency accounts cannot leave traveler groups.");
+      setMenuOpen(false);
+      return;
+    }
+
+    try {
+      await apiFetchWithAuth(`/groups/${groupId}/leave`, { method: "POST" });
+      setMenuOpen(false);
+      if (embedded && onBack) onBack();
+      router.push("/dashboard/trips");
+      router.refresh();
+    } catch (err) {
+      setFeedback(
+        err instanceof Error ? err.message : "Unable to leave this group right now.",
+      );
+      setMenuOpen(false);
+    }
+  }
+
+  function handleShowAllOffers() {
+    if (offers.length === 0) {
+      setFeedback("No offers are available in this group yet.");
+      setMenuOpen(false);
+      return;
+    }
+    setShowAllOffers(true);
+    setMenuOpen(false);
+    document.getElementById("offers-section")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function handlePayNow() {
+    if (isAgency) {
+      setFeedback("Pay now is available only for travelers.");
+      setMenuOpen(false);
+      return;
+    }
+    setMenuOpen(false);
+    router.push(checkoutHref);
+  }
+
   const counteringOffer = counterSheetOfferId
     ? offers.find((o) => o.id === counterSheetOfferId)
     : null;
   const creatorUserId = planCreatorId ?? members.find((member) => member.role === "CREATOR")?.user.id;
   const isCreator = creatorUserId ? userId === creatorUserId : false;
+  const groupTitle = group?.plan?.title ?? group?.package?.title ?? "Trip group";
+  const groupDestination = group?.plan?.destination ?? group?.package?.destination ?? "";
+  const groupMembersLabel = `${group?.currentSize ?? activeMembers.length} travelers`;
+  const detailsHref = group?.plan?.slug
+    ? `/plans/${group.plan.slug}`
+    : group?.package?.slug
+    ? `/packages/${group.package.slug}`
+    : "/dashboard/trips";
+  const checkoutHref = `/dashboard/groups/${groupId}/checkout`;
+  const visibleOffers = showAllOffers ? offers : offers.slice(0, 2);
 
   // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
@@ -713,40 +786,81 @@ export function GroupChat({
           Back to chats
         </button>
       )}
-      <div className={cn("grid gap-5 xl:grid-cols-[1.5fr_0.8fr]", embedded && "xl:grid-cols-[1.35fr_0.8fr]")}>
+      <div className={cn("grid gap-5", !embedded && "xl:grid-cols-[1.5fr_0.8fr]")}>
         {/* ── Chat area ── */}
-        <div className="space-y-5">
-          <Card className="relative overflow-hidden p-5 sm:p-6">
-            <div className="relative space-y-5">
+        <div className={cn("space-y-5", embedded && "h-full")}>
+          <Card
+            className={cn(
+              "relative overflow-hidden p-5 sm:p-6",
+              embedded && "flex h-full flex-col border-white/70 bg-white/90 p-4 sm:p-5",
+            )}
+          >
+            <div className={cn("relative space-y-5", embedded && "flex h-full min-h-0 flex-col")}>
               {/* Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
-                    Live coordination
-                  </span>
-                  <h2 className="mt-2 font-display text-xl text-[var(--color-ink-950)] sm:text-2xl">
-                    Group chat &amp; polls
-                  </h2>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-sm font-bold text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]">
+                    {initials(groupTitle)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-xl text-[var(--color-ink-950)] sm:text-2xl">
+                      {groupTitle}
+                    </p>
+                    <p className="truncate text-xs text-[var(--color-ink-500)]">
+                      {groupDestination ? `${groupDestination} · ` : ""}{groupMembersLabel}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {offers.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        document
-                          .getElementById("offers-section")
-                          ?.scrollIntoView({ behavior: "smooth" })
-                      }
-                      className="flex items-center gap-1.5 rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-3 py-1.5 text-xs font-semibold text-[var(--color-lavender-500)] transition-colors hover:bg-[var(--color-lavender-100)]"
-                    >
-                      <Receipt className="size-3.5" />
-                      View all offers ({offers.length})
-                    </button>
-                  )}
+                  <Link
+                    href={detailsHref}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    <Eye className="size-3.5" />
+                    Visit details
+                  </Link>
                   <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
                     <BarChart3 className="size-4" />
                     Poll
                   </Button>
+                  <div className="relative" ref={menuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setMenuOpen((current) => !current)}
+                      className="flex size-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-white text-[var(--color-ink-600)] transition hover:bg-[var(--color-surface-2)]"
+                      aria-label="Group actions"
+                    >
+                      <MoreVertical className="size-4" />
+                    </button>
+                    {menuOpen && (
+                      <div className="absolute right-0 top-11 z-20 w-52 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+                        <button
+                          type="button"
+                          onClick={() => void handleLeaveGroup()}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <LogOut className="size-4 text-[var(--color-sunset-600)]" />
+                          Leave group
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleShowAllOffers}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                          Show all offers
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePayNow}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <CreditCard className="size-4 text-[var(--color-sea-700)]" />
+                          Pay now
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -756,8 +870,75 @@ export function GroupChat({
                 </div>
               )}
 
+              {/* Compact offers */}
+              {offers.length > 0 && (
+                <div id="offers-section" className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+                      Offers ({offers.length})
+                    </p>
+                    {!showAllOffers && offers.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllOffers(true)}
+                        className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
+                      >
+                        Show all
+                      </button>
+                    )}
+                  </div>
+
+                  {visibleOffers.map((offer) => (
+                    <div key={offer.id} className="space-y-2">
+                      <CardInset className="p-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                              {offer.agency.name}
+                            </p>
+                            <p className="text-xs text-[var(--color-ink-500)]">
+                              ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
+                            </p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() =>
+                              setExpandedOfferId((current) =>
+                                current === offer.id ? null : offer.id,
+                              )
+                            }
+                          >
+                            {expandedOfferId === offer.id ? "Hide details" : "Show details"}
+                          </Button>
+                        </div>
+                      </CardInset>
+                      {expandedOfferId === offer.id && (
+                        <OfferCard
+                          offer={offer}
+                          isCreator={isCreator}
+                          isAgency={isAgency}
+                          onAccept={handleAcceptOffer}
+                          onCounter={(offerId, seedPrice) => {
+                            setCounterSheetOfferId(offerId);
+                            setCounterSheetInitialPrice(seedPrice ?? null);
+                          }}
+                          onReject={handleRejectOffer}
+                          onWithdraw={handleWithdrawOffer}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Messages */}
-              <div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto sm:max-h-[60vh]">
+              <div
+                className={cn(
+                  "space-y-3 overflow-y-auto",
+                  embedded ? "min-h-0 flex-1 pr-1" : "max-h-[calc(100dvh-220px)] sm:max-h-[60vh]",
+                )}
+              >
                 {messages.length === 0 ? (
                   <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
                     No messages yet. Coordinate arrivals, budget, and votes here.
@@ -917,7 +1098,13 @@ export function GroupChat({
               )}
 
               {/* Compose */}
-              <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-[var(--color-border)] bg-white/95 px-5 py-3 backdrop-blur-sm sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+              <div
+                className={cn(
+                  "sticky bottom-0 -mx-5 -mb-5 border-t border-[var(--color-border)] bg-white/95 px-5 py-3 backdrop-blur-sm sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none",
+                  embedded &&
+                    "static mt-auto mx-0 mb-0 border-t border-[var(--color-border)] bg-white/95 p-0 pt-3 backdrop-blur-none",
+                )}
+              >
                 <div className="flex gap-3">
                   <div className="relative flex-1">
                     <Textarea
@@ -971,114 +1158,85 @@ export function GroupChat({
             </div>
           </Card>
 
-          {/* Offer cards */}
-          {offers.length > 0 && (
-            <div id="offers-section" className="scroll-mt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg text-[var(--color-ink-950)]">
-                  Offers ({offers.length})
-                </h3>
-                <span className="text-xs text-[var(--color-ink-500)]">
-                  {offers.filter((o) => o.status === "ACCEPTED").length} accepted ·{" "}
-                  {offers.filter((o) => o.status === "COUNTERED").length} countered ·{" "}
-                  {offers.filter((o) => o.status === "PENDING").length} pending ·{" "}
-                  {offers.filter((o) => o.status === "REJECTED" || o.status === "WITHDRAWN").length} closed
-                </span>
-              </div>
-              {offers.map((offer) => (
-                <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  isCreator={isCreator}
-                  isAgency={isAgency}
-                  onAccept={handleAcceptOffer}
-                  onCounter={(offerId, seedPrice) => {
-                    setCounterSheetOfferId(offerId);
-                    setCounterSheetInitialPrice(seedPrice ?? null);
-                  }}
-                  onReject={handleRejectOffer}
-                  onWithdraw={handleWithdrawOffer}
-                />
-              ))}
-            </div>
-          )}
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="space-y-5">
-          <Card className="p-5">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
-                <Users className="size-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-                  Room
-                </p>
-                <p className="font-display text-lg text-[var(--color-ink-950)]">
-                  {group?.currentSize ?? activeMembers.length} travelers
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {activeMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2.5"
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-xs font-bold text-[var(--color-sea-700)]">
-                    {initials(member.user.fullName)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {member.user.username ? (
-                      <Link
-                        href={`/profile/${member.user.username}`}
-                        className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]"
-                      >
-                        {member.user.fullName}
-                      </Link>
-                    ) : (
-                      <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
-                        {member.user.fullName}
-                      </p>
-                    )}
-                    <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">
-                      {member.status}
-                    </p>
-                  </div>
-                  {/* @ shortcut */}
-                  <button
-                    type="button"
-                    title={`Mention ${member.user.fullName}`}
-                    onClick={() => {
-                      const mention = `@${member.user.fullName} `;
-                      setDraft((d) => {
-                        const trimmed = d.trimEnd();
-                        return trimmed ? `${trimmed} ${mention}` : mention;
-                      });
-                      textareaRef.current?.focus();
-                      // scroll chat into view
-                      document
-                        .querySelector("textarea")
-                        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                    }}
-                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
-                  >
-                    <AtSign className="size-3.5" />
-                  </button>
+        {!embedded && (
+          <div className="space-y-5">
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]">
+                  <Users className="size-5" />
                 </div>
-              ))}
-            </div>
-          </Card>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                    Room
+                  </p>
+                  <p className="font-display text-lg text-[var(--color-ink-950)]">
+                    {group?.currentSize ?? activeMembers.length} travelers
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {activeMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-3 py-2.5"
+                  >
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-xs font-bold text-[var(--color-sea-700)]">
+                      {initials(member.user.fullName)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {member.user.username ? (
+                        <Link
+                          href={`/profile/${member.user.username}`}
+                          className="truncate text-sm font-medium text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]"
+                        >
+                          {member.user.fullName}
+                        </Link>
+                      ) : (
+                        <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                          {member.user.fullName}
+                        </p>
+                      )}
+                      <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">
+                        {member.status}
+                      </p>
+                    </div>
+                    {/* @ shortcut */}
+                    <button
+                      type="button"
+                      title={`Mention ${member.user.fullName}`}
+                      onClick={() => {
+                        const mention = `@${member.user.fullName} `;
+                        setDraft((d) => {
+                          const trimmed = d.trimEnd();
+                          return trimmed ? `${trimmed} ${mention}` : mention;
+                        });
+                        textareaRef.current?.focus();
+                        // scroll chat into view
+                        document
+                          .querySelector("textarea")
+                          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                      }}
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+                    >
+                      <AtSign className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-          <CardInset className="flex items-start gap-3 p-4 text-sm text-[var(--color-ink-600)]">
-            <MessageSquareMore className="mt-0.5 size-4 shrink-0 text-[var(--color-sea-600)]" />
-            <span>
-              Type <strong>@</strong> in the message box to tag a member, or click{" "}
-              <AtSign className="mb-0.5 inline size-3" /> next to their name.
-            </span>
-          </CardInset>
-        </div>
+            <CardInset className="flex items-start gap-3 p-4 text-sm text-[var(--color-ink-600)]">
+              <MessageSquareMore className="mt-0.5 size-4 shrink-0 text-[var(--color-sea-600)]" />
+              <span>
+                Type <strong>@</strong> in the message box to tag a member, or click{" "}
+                <AtSign className="mb-0.5 inline size-3" /> next to their name.
+              </span>
+            </CardInset>
+          </div>
+        )}
       </div>
 
       {/* Poll modal */}

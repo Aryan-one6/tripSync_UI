@@ -474,7 +474,36 @@ export async function removeMember(groupId: string, creatorId: string, targetUse
 }
 
 export async function getMembers(groupId: string) {
-  const group = await prisma.group.findUnique({ where: { id: groupId } });
+  const group = await prisma.group.findUnique({
+    where: { id: groupId },
+    include: {
+      plan: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          destination: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+          coverImageUrl: true,
+        },
+      },
+      package: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          destination: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+          galleryUrls: true,
+          basePrice: true,
+        },
+      },
+    },
+  });
   if (!group) throw new NotFoundError('Group');
 
   const members = await prisma.groupMember.findMany({

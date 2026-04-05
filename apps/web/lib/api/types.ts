@@ -136,6 +136,14 @@ export interface Group {
   otherCount: number;
   isLocked: boolean;
   paymentWindowEndsAt?: string | null;
+  plan?: Pick<
+    PlanDetails,
+    "id" | "slug" | "title" | "destination" | "startDate" | "endDate" | "status" | "coverImageUrl"
+  > | null;
+  package?: Pick<
+    PackageDetails,
+    "id" | "slug" | "title" | "destination" | "startDate" | "endDate" | "status" | "galleryUrls" | "basePrice"
+  > | null;
   members?: GroupMember[];
 }
 
