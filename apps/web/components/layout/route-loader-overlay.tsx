@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { PageLoader } from "@/components/ui/page-loader";
 
 const SHOW_DELAY_MS = 80;
@@ -41,11 +41,7 @@ function shouldStartLoader(event: MouseEvent, anchor: HTMLAnchorElement) {
 
 export function RouteLoaderOverlay() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const routeKey = useMemo(
-    () => `${pathname}?${searchParams.toString()}`,
-    [pathname, searchParams]
-  );
+  const routeKey = useMemo(() => pathname, [pathname]);
 
   const mountedRef = useRef(false);
   const pendingRef = useRef(false);
