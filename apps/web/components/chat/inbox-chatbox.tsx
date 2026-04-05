@@ -1,19 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   ArrowLeft,
   ChevronRight,
+  CornerUpLeft,
   MapPin,
   MessageSquarePlus,
   Search,
   Send,
+  Smile,
   Users,
   X,
 } from "lucide-react";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const EmojiPicker = dynamic(() => import("@emoji-mart/react"), { ssr: false }) as any;
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
@@ -144,11 +150,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
   const routeIntentHandledRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const activeConversation = useMemo(
@@ -321,12 +331,20 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     const content = draft.trim();
     if (!content) return;
     const previousDraft = draft;
+    const currentReplyTo = replyTo;
     setDraft("");
+    setReplyTo(null);
     startTransition(async () => {
       try {
         await apiFetchWithAuth(
           `/chat/direct/conversations/${activeConversationId}/messages`,
-          { method: "POST", body: JSON.stringify({ content }) },
+          {
+            method: "POST",
+            body: JSON.stringify({
+              content,
+              ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
+            }),
+          },
         );
         setFeedback(null);
         emitDirectTyping(false);
@@ -587,6 +605,23 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClick = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showEmojiPicker]);
+
+  // Clear reply state when switching conversations
+  useEffect(() => {
+    setReplyTo(null);
+    setShowEmojiPicker(false);
+  }, [activeConversationId]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1027,12 +1062,16 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                             </span>
                           </div>
                         )}
-                        <div
-                          className={cn(
-                            "flex",
-                            mine ? "justify-end" : "justify-start",
+                        <div className={cn("group flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+                          {mine && (
+                            <button
+                              type="button"
+                              onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: activeConversation?.counterpart?.fullName ?? "Them" })}
+                              className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                            </button>
                           )}
-                        >
                           <div
                             className={cn(
                               "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
@@ -1041,6 +1080,16 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                                 : "rounded-tl-[4px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
                             )}
                           >
+                            {/* Reply quote */}
+                            {(message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata?.replyTo ? (() => {
+                              const rt = (message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata!.replyTo!;
+                              return (
+                                <div className={cn("mb-2 rounded-[10px] border-l-2 px-2.5 py-1.5", mine ? "border-white/50 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
+                                  <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>{rt.senderName ?? ""}</p>
+                                  <p className={cn("truncate text-xs leading-tight", mine ? "text-white/60" : "text-[var(--color-ink-500)]")}>{(rt.content ?? "").slice(0, 80)}</p>
+                                </div>
+                              );
+                            })() : null}
                             <p className="whitespace-pre-wrap text-sm leading-relaxed">
                               {message.content}
                             </p>
@@ -1053,6 +1102,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                               {format(new Date(message.createdAt), "HH:mm")}
                             </p>
                           </div>
+                          {!mine && (
+                            <button
+                              type="button"
+                              onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: activeConversation?.counterpart?.fullName ?? "Them" })}
+                              className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1074,29 +1132,69 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Input bar */}
-            <div className="flex items-end gap-2 border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa] px-3 py-3">
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendDirectMessage();
-                  }
-                }}
-                placeholder="Type a message…"
-                rows={1}
-                className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
-              />
-              <Button
-                type="button"
-                size="icon"
-                onClick={sendDirectMessage}
-                disabled={isPending || !draft.trim()}
-                className="mb-0.5 size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
-              >
-                <Send className="size-4" />
-              </Button>
+            <div className="border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa]">
+              {/* Reply preview */}
+              {replyTo && (
+                <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
+                  <CornerUpLeft className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold text-[var(--color-sea-700)]">{replyTo.senderName}</p>
+                    <p className="truncate text-xs text-[var(--color-ink-500)]">{replyTo.content.slice(0, 80)}</p>
+                  </div>
+                  <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-end gap-2 px-3 py-3">
+                {/* Emoji picker */}
+                <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker((v) => !v)}
+                    className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-ink-700)]"
+                  >
+                    <Smile className="size-5" />
+                  </button>
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-11 left-0 z-30">
+                      <EmojiPicker
+                        onEmojiSelect={(emoji: { native: string }) => {
+                          setDraft((d) => d + emoji.native);
+                          dmTextareaRef.current?.focus();
+                        }}
+                        theme="light"
+                        previewPosition="none"
+                        skinTonePosition="none"
+                      />
+                    </div>
+                  )}
+                </div>
+                <Textarea
+                  ref={dmTextareaRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setShowEmojiPicker(false);
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendDirectMessage();
+                    }
+                  }}
+                  placeholder="Type a message…"
+                  rows={1}
+                  className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={sendDirectMessage}
+                  disabled={isPending || !draft.trim()}
+                  className="mb-0.5 size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+                >
+                  <Send className="size-4" />
+                </Button>
+              </div>
             </div>
           </>
         )}

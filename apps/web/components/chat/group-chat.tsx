@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format, isToday, isYesterday } from "date-fns";
@@ -8,6 +9,7 @@ import {
   ArrowLeft,
   AtSign,
   BarChart3,
+  CornerUpLeft,
   CreditCard,
   LogOut,
   MessageSquareMore,
@@ -16,8 +18,13 @@ import {
   Plus,
   Receipt,
   Send,
+  Smile,
   Users,
+  X,
 } from "lucide-react";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const EmojiPicker = dynamic(() => import("@emoji-mart/react"), { ssr: false }) as any;
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -368,12 +375,15 @@ export function GroupChat({
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAllOffers, setShowAllOffers] = useState(false);
   const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const isAgency = session?.role === "agency_admin";
   const userId = session?.user.id;
@@ -583,17 +593,33 @@ export function GroupChat({
     };
   }, [emitTyping]);
 
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClick = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showEmojiPicker]);
+
   // ── Actions ─────────────────────────────────────────────────────────────────
   function sendMessage() {
     const content = draft.trim();
     if (!content) return;
+    const currentReplyTo = replyTo;
     startTransition(async () => {
       try {
         await apiFetchWithAuth(`/chat/groups/${groupId}/messages`, {
           method: "POST",
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({
+            content,
+            ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
+          }),
         });
         setDraft("");
+        setReplyTo(null);
         emitTyping(false);
         setFeedback(null);
       } catch (err) {
@@ -988,7 +1014,16 @@ export function GroupChat({
                   return (
                     <div key={message.id}>
                       {showDate && <DateDivider date={message.createdAt} />}
-                      <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+                      <div className={cn("group flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+                        {mine && (
+                          <button
+                            type="button"
+                            onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: message.sender?.fullName ?? "Unknown" })}
+                            className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                          </button>
+                        )}
                         <div
                           className={cn(
                             "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
@@ -1006,6 +1041,20 @@ export function GroupChat({
                           >
                             {message.sender?.fullName ?? "System"}
                           </p>
+                          {/* Reply quote */}
+                          {message.metadata?.replyTo && typeof message.metadata.replyTo === "object" ? (() => {
+                            const rt = message.metadata!.replyTo as { senderName?: string; content?: string };
+                            return (
+                              <div className={cn("mb-2 rounded-[10px] border-l-2 px-2.5 py-1.5", mine ? "border-white/50 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
+                                <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>
+                                  {rt.senderName ?? ""}
+                                </p>
+                                <p className={cn("truncate text-xs leading-tight", mine ? "text-white/60" : "text-[var(--color-ink-500)]")}>
+                                  {(rt.content ?? "").slice(0, 80)}
+                                </p>
+                              </div>
+                            );
+                          })() : null}
                           {message.messageType === "poll" ? (
                             <PollCard
                               question={pollQuestion}
@@ -1028,6 +1077,15 @@ export function GroupChat({
                             {format(new Date(message.createdAt), "HH:mm")}
                           </p>
                         </div>
+                        {!mine && (
+                          <button
+                            type="button"
+                            onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: message.sender?.fullName ?? "Unknown" })}
+                            className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1077,44 +1135,81 @@ export function GroupChat({
             </div>
           )}
 
-          {/* Input bar — same style as DM */}
-          <div className="flex items-end gap-2 border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa] px-3 py-3">
-            <Textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setShowMentionDropdown(false);
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Type a message… (@ to mention)"
-              rows={1}
-              className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
-            />
-            <div className="flex shrink-0 flex-col gap-2 self-end">
-             
-              {isAgency && isPlanGroup && (
-                <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={() => setOfferModalOpen(true)}
-                  title="Submit an offer"
+          {/* Input bar */}
+          <div className="border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa]">
+            {/* Reply preview */}
+            {replyTo && (
+              <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
+                <CornerUpLeft className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold text-[var(--color-sea-700)]">{replyTo.senderName}</p>
+                  <p className="truncate text-xs text-[var(--color-ink-500)]">{replyTo.content.slice(0, 80)}</p>
+                </div>
+                <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]">
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-end gap-2 px-3 py-3">
+              {/* Emoji picker */}
+              <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-ink-700)]"
                 >
-                  <Receipt className="size-4" />
+                  <Smile className="size-5" />
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute bottom-11 left-0 z-30">
+                    <EmojiPicker
+                      onEmojiSelect={(emoji: { native: string }) => {
+                        setDraft((d) => d + emoji.native);
+                        textareaRef.current?.focus();
+                      }}
+                      theme="light"
+                      previewPosition="none"
+                      skinTonePosition="none"
+                    />
+                  </div>
+                )}
+              </div>
+              <Textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setShowMentionDropdown(false); setShowEmojiPicker(false); }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Type a message… (@ to mention)"
+                rows={1}
+                className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
+              />
+              <div className="flex shrink-0 flex-col gap-2 self-end">
+                {isAgency && isPlanGroup && (
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => setOfferModalOpen(true)}
+                    title="Submit an offer"
+                  >
+                    <Receipt className="size-4" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={sendMessage}
+                  disabled={isPending || !draft.trim()}
+                  className="size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+                >
+                  <Send className="size-4" />
                 </Button>
-              )}
-              <Button
-                type="button"
-                size="icon"
-                onClick={sendMessage}
-                disabled={isPending || !draft.trim()}
-                className="size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
-              >
-                <Send className="size-4" />
-              </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1374,12 +1469,16 @@ export function GroupChat({
                     return (
                       <div key={message.id}>
                         {showDate && <DateDivider date={message.createdAt} />}
-                        <div
-                          className={cn(
-                            "flex",
-                            mine ? "justify-end" : "justify-start",
+                        <div className={cn("group flex items-end gap-1", mine ? "justify-end" : "justify-start")}>
+                          {mine && (
+                            <button
+                              type="button"
+                              onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: message.sender?.fullName ?? "Unknown" })}
+                              className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                            </button>
                           )}
-                        >
                           <div
                             className={cn(
                               "max-w-[85%] rounded-[var(--radius-lg)] px-4 py-3 sm:max-w-[70%] sm:px-5 sm:py-4",
@@ -1393,17 +1492,20 @@ export function GroupChat({
                               <span className="font-semibold">
                                 {message.sender?.fullName ?? "System"}
                               </span>
-                              <span
-                                className={
-                                  mine
-                                    ? "text-white/60"
-                                    : "text-[var(--color-ink-400)]"
-                                }
-                              >
+                              <span className={mine ? "text-white/60" : "text-[var(--color-ink-400)]"}>
                                 {chatMsgTime(message.createdAt)}
                               </span>
                             </div>
-
+                            {/* Reply quote */}
+                            {message.metadata?.replyTo && typeof message.metadata.replyTo === "object" ? (() => {
+                              const rt = message.metadata!.replyTo as { senderName?: string; content?: string };
+                              return (
+                                <div className={cn("mt-1.5 rounded-[8px] border-l-2 px-2.5 py-1.5", mine ? "border-white/40 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
+                                  <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>{rt.senderName ?? ""}</p>
+                                  <p className={cn("truncate text-xs leading-tight", mine ? "text-white/60" : "text-[var(--color-ink-500)]")}>{(rt.content ?? "").slice(0, 80)}</p>
+                                </div>
+                              );
+                            })() : null}
                             {message.messageType === "poll" ? (
                               <PollCard
                                 question={pollQuestion}
@@ -1418,6 +1520,15 @@ export function GroupChat({
                               </p>
                             )}
                           </div>
+                          {!mine && (
+                            <button
+                              type="button"
+                              onClick={() => setReplyTo({ id: message.id, content: message.content, senderName: message.sender?.fullName ?? "Unknown" })}
+                              className="mb-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <CornerUpLeft className="size-3.5 text-[var(--color-ink-400)]" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1471,12 +1582,47 @@ export function GroupChat({
               {/* Compose */}
               <div
                 className={cn(
-                  "sticky bottom-0 -mx-5 -mb-5 border-t border-[var(--color-border)] bg-white/95 px-5 py-3 backdrop-blur-sm sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none",
-                  embedded &&
-                    "static mt-auto mx-0 mb-0 border-t border-[var(--color-border)] bg-white/95 p-0 pt-3 backdrop-blur-none",
+                  "sticky bottom-0 -mx-5 -mb-5 border-t border-[var(--color-border)] bg-white/95 backdrop-blur-sm sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:backdrop-blur-none",
+                  embedded && "static mt-auto mx-0 mb-0 border-t border-[var(--color-border)] bg-white/95 backdrop-blur-none",
                 )}
               >
-                <div className="flex gap-3">
+                {/* Reply preview */}
+                {replyTo && (
+                  <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-5 py-2">
+                    <CornerUpLeft className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold text-[var(--color-sea-700)]">{replyTo.senderName}</p>
+                      <p className="truncate text-xs text-[var(--color-ink-500)]">{replyTo.content.slice(0, 80)}</p>
+                    </div>
+                    <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]">
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-end gap-2 px-5 py-3 sm:p-0 sm:pt-3">
+                  {/* Emoji picker */}
+                  <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker((v) => !v)}
+                      className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-700)]"
+                    >
+                      <Smile className="size-5" />
+                    </button>
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-11 left-0 z-30">
+                        <EmojiPicker
+                          onEmojiSelect={(emoji: { native: string }) => {
+                            setDraft((d) => d + emoji.native);
+                            textareaRef.current?.focus();
+                          }}
+                          theme="light"
+                          previewPosition="none"
+                          skinTonePosition="none"
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="relative flex-1">
                     <Textarea
                       ref={textareaRef}
@@ -1485,6 +1631,7 @@ export function GroupChat({
                       onKeyDown={(e) => {
                         if (e.key === "Escape") {
                           setShowMentionDropdown(false);
+                          setShowEmojiPicker(false);
                         }
                         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                           e.preventDefault();
@@ -1497,7 +1644,6 @@ export function GroupChat({
                     />
                   </div>
                   <div className="flex shrink-0 flex-col gap-2 self-end">
-                    
                     {isAgency && isPlanGroup && (
                       <Button
                         variant="soft"

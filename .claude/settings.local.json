@@ -14,7 +14,8 @@
       "Bash(brew reinstall:*)",
       "Bash(ls /Users/nareshsharma/Desktop/Files/TripSync/apps/web/app/\\\\\\(dashboard\\\\\\)/dashboard/)",
       "Bash(ls /Users/nareshsharma/Desktop/Files/TripSync/apps/web/app/\\\\\\(dashboard\\\\\\)/settings/agency/)",
-      "Bash(wc -l /Users/nareshsharma/Desktop/Files/TripSync/apps/web/components/chat/*.tsx)"
+      "Bash(wc -l /Users/nareshsharma/Desktop/Files/TripSync/apps/web/components/chat/*.tsx)",
+      "Bash(npm install:*)"
     ]
   }
 }
