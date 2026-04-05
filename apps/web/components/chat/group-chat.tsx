@@ -17,7 +17,6 @@ import {
   Receipt,
   Send,
   Users,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -802,52 +801,66 @@ export function GroupChat({
                 </p>
               </div>
             </Link>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
-                <BarChart3 className="size-4" />
-              </Button>
-              <div className="relative" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((c) => !c)}
-                  className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/80 text-[var(--color-ink-600)] transition hover:bg-white"
-                  aria-label="Group actions"
-                >
-                  <MoreVertical className="size-4" />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-10 z-20 w-48 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+            <div className="relative shrink-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((c) => !c)}
+                className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/80 text-[var(--color-ink-600)] transition hover:bg-white"
+                aria-label="Group actions"
+              >
+                <MoreVertical className="size-4" />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-10 z-20 w-52 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+                  <button
+                    type="button"
+                    onClick={() => { setPollOpen(true); setMenuOpen(false); }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <BarChart3 className="size-4 text-[var(--color-sea-600)]" />
+                    Create poll
+                  </button>
+                  {isPlanGroup && (
                     <button
                       type="button"
-                      onClick={() => void handleLeaveGroup()}
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                      onClick={handleShowAllOffers}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
                     >
-                      <LogOut className="size-4 text-[var(--color-sunset-600)]" />
-                      Leave group
+                      <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                      View offers
                     </button>
-                    {isPlanGroup && (
-                      <button
-                        type="button"
-                        onClick={handleShowAllOffers}
-                        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                      >
-                        <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                        Show all offers
-                      </button>
-                    )}
-                    {!isAgency && (
-                      <button
-                        type="button"
-                        onClick={handlePayNow}
-                        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                      >
-                        <CreditCard className="size-4 text-[var(--color-sea-700)]" />
-                        Pay now
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                  {isAgency && isPlanGroup && (
+                    <button
+                      type="button"
+                      onClick={() => { setOfferModalOpen(true); setMenuOpen(false); }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <Receipt className="size-4 text-[var(--color-sea-600)]" />
+                      Submit offer
+                    </button>
+                  )}
+                  {!isAgency && (
+                    <button
+                      type="button"
+                      onClick={handlePayNow}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <CreditCard className="size-4 text-[var(--color-sea-700)]" />
+                      Pay now
+                    </button>
+                  )}
+                  <div className="my-1 border-t border-[var(--color-border)]" />
+                  <button
+                    type="button"
+                    onClick={() => void handleLeaveGroup()}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-sunset-600)] transition hover:bg-[var(--color-sunset-50)]"
+                  >
+                    <LogOut className="size-4" />
+                    Leave group
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
