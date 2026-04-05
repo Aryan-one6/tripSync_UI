@@ -91,7 +91,7 @@ export function PlanWizard() {
     description: "",
     itineraryDays: [],
     galleryUrls: [],
-    autoApprove: true,
+    autoApprove: false,
     publishNow: true,
   });
 

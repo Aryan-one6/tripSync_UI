@@ -500,7 +500,7 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
       title: `${membership.user.fullName} posted in your trip chat`,
       body: sanitized.sanitized.slice(0, 160),
       userIds: recipients,
-      ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${groupId}/chat`,
+      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages?groupId=${encodeURIComponent(groupId)}`,
       metadata: { groupId, messageId: message.id },
     });
     await createStoredNotificationsBulk(
@@ -509,10 +509,7 @@ export async function sendMessage(groupId: string, userId: string, data: SendCha
         type: 'chat_message',
         title: `${membership.user.fullName} posted in your trip chat`,
         body: sanitized.sanitized.slice(0, 160),
-        href:
-          hrefByUserId.get(recipientId) === '/agency/inbox'
-            ? `/agency/groups/${groupId}/chat`
-            : `/dashboard/groups/${groupId}/chat`,
+        href: `${hrefByUserId.get(recipientId) === '/agency/inbox' ? '/agency/inbox' : '/dashboard/messages'}?groupId=${encodeURIComponent(groupId)}`,
         metadata: { groupId, messageId: message.id },
       })),
     );
@@ -561,7 +558,7 @@ export async function createPoll(groupId: string, userId: string, data: CreatePo
       title: `${membership.user.fullName} started a trip poll`,
       body: message.content.slice(0, 160),
       userIds: recipients,
-      ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${groupId}/chat`,
+      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages?groupId=${encodeURIComponent(groupId)}`,
       metadata: { groupId, messageId: message.id },
     });
     await createStoredNotificationsBulk(
@@ -570,10 +567,7 @@ export async function createPoll(groupId: string, userId: string, data: CreatePo
         type: 'chat_poll',
         title: `${membership.user.fullName} started a trip poll`,
         body: message.content.slice(0, 160),
-        href:
-          hrefByUserId.get(recipientId) === '/agency/inbox'
-            ? `/agency/groups/${groupId}/chat`
-            : `/dashboard/groups/${groupId}/chat`,
+        href: `${hrefByUserId.get(recipientId) === '/agency/inbox' ? '/agency/inbox' : '/dashboard/messages'}?groupId=${encodeURIComponent(groupId)}`,
         metadata: { groupId, messageId: message.id },
       })),
     );

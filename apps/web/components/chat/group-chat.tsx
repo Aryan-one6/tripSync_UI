@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import {
+  ArrowLeft,
   AtSign,
   BarChart3,
   MessageSquareMore,
@@ -333,10 +334,14 @@ export function GroupChat({
   groupId,
   planId,
   planCreatorId,
+  embedded = false,
+  onBack,
 }: {
   groupId: string;
   planId?: string;
   planCreatorId?: string;
+  embedded?: boolean;
+  onBack?: () => void;
 }) {
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
@@ -675,6 +680,16 @@ export function GroupChat({
 
   // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
+    if (embedded) {
+      return (
+        <div className="flex min-h-[320px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white/80 p-6 text-[var(--color-ink-500)]">
+          <div className="animate-pulse-soft text-center">
+            <div className="mx-auto mb-3 size-10 rounded-full bg-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]" />
+            <p className="text-sm">Loading group chat…</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <Card className="flex items-center justify-center p-12 text-[var(--color-ink-500)]">
         <div className="animate-pulse-soft text-center">
@@ -688,7 +703,17 @@ export function GroupChat({
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="grid gap-5 xl:grid-cols-[1.5fr_0.8fr]">
+      {embedded && onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-3 inline-flex items-center gap-1 rounded-full border border-[var(--color-sea-200)] bg-white/85 px-3 py-1.5 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-white md:hidden"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to chats
+        </button>
+      )}
+      <div className={cn("grid gap-5 xl:grid-cols-[1.5fr_0.8fr]", embedded && "xl:grid-cols-[1.35fr_0.8fr]")}>
         {/* ── Chat area ── */}
         <div className="space-y-5">
           <Card className="relative overflow-hidden p-5 sm:p-6">

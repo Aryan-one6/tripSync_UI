@@ -38,7 +38,9 @@ async function userCanAccessGroup(userId: string, groupId: string) {
     select: { id: true, status: true },
   });
 
-  return Boolean(membership && membership.status !== 'LEFT' && membership.status !== 'REMOVED');
+  return Boolean(
+    membership && (membership.status === 'APPROVED' || membership.status === 'COMMITTED'),
+  );
 }
 
 async function userCanAccessDirectConversation(userId: string, conversationId: string) {

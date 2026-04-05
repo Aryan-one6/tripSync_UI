@@ -9,5 +9,10 @@ export const VotePollSchema = z.object({
   optionId: z.string().min(1).max(100),
 });
 
+export const InviteGroupMemberSchema = z.object({
+  userId: z.string().uuid(),
+});
+
 export type CreatePollInput = z.infer<typeof CreatePollSchema>;
 export type VotePollInput = z.infer<typeof VotePollSchema>;
+export type InviteGroupMemberInput = z.infer<typeof InviteGroupMemberSchema>;

@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
 import { MapPin, CheckCircle2, UserMinus } from "lucide-react";
-import type { PlanDetails, GroupMember } from "@/lib/api/types";
+import type { PlanDetails, GroupMember, UserSummary } from "@/lib/api/types";
 
 export default function ManagePlanPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -16,6 +17,11 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
   const [plan, setPlan] = useState<PlanDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inviteQuery, setInviteQuery] = useState("");
+  const [inviteResults, setInviteResults] = useState<UserSummary[]>([]);
+  const [searchingInvites, setSearchingInvites] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -30,6 +36,36 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
       }
     })();
   }, [resolvedParams.id, apiFetchWithAuth]);
+
+  useEffect(() => {
+    const query = inviteQuery.trim();
+    if (!plan?.group?.id || query.length < 2) {
+      setInviteResults([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      void (async () => {
+        try {
+          setSearchingInvites(true);
+          const users = await apiFetchWithAuth<UserSummary[]>(
+            `/users/search?q=${encodeURIComponent(query)}`,
+          );
+          if (!cancelled) setInviteResults(users);
+        } catch {
+          if (!cancelled) setInviteResults([]);
+        } finally {
+          if (!cancelled) setSearchingInvites(false);
+        }
+      })();
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [apiFetchWithAuth, inviteQuery, plan?.group?.id]);
 
   const handleApprove = async (userId: string) => {
     if (!plan?.group?.id) return;
@@ -63,6 +99,25 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
     }
   };
 
+  const handleInvite = async (targetUser: UserSummary) => {
+    if (!plan?.group?.id) return;
+    try {
+      setInvitingUserId(targetUser.id);
+      setInviteFeedback(null);
+      await apiFetchWithAuth(`/groups/${plan.group.id}/invite`, {
+        method: "POST",
+        body: JSON.stringify({ userId: targetUser.id }),
+      });
+      const refreshed = await apiFetchWithAuth<PlanDetails>(`/plans/${resolvedParams.id}`);
+      setPlan(refreshed);
+      setInviteFeedback(`${targetUser.fullName} was added to this trip.`);
+    } catch (err: any) {
+      setInviteFeedback(err.message || "Unable to invite this traveler right now.");
+    } finally {
+      setInvitingUserId(null);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardShell variant="user" title="Manage plan" subtitle="Loading plan details...">
@@ -86,6 +141,11 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
 
   const members = plan.group?.members || [];
   const activeMembersCount = members.filter((m) => m.status === "APPROVED" || m.status === "COMMITTED").length;
+  const activeMemberIds = new Set(
+    members
+      .filter((m) => m.status === "INTERESTED" || m.status === "APPROVED" || m.status === "COMMITTED")
+      .map((m) => m.user.id),
+  );
 
   return (
     <DashboardShell
@@ -115,6 +175,69 @@ export default function ManagePlanPage({ params }: { params: Promise<{ id: strin
                  <Badge variant="sea">Auto-approval ON</Badge>
                )}
             </CardInset>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-display text-lg text-[var(--color-ink-950)]">Add traveler</h3>
+              <p className="text-sm text-[var(--color-ink-600)]">
+                Search a user and add them directly to your plan group.
+              </p>
+            </div>
+            <Input
+              value={inviteQuery}
+              onChange={(event) => setInviteQuery(event.target.value)}
+              placeholder="Search by full name or username"
+            />
+            {inviteFeedback && (
+              <div className="rounded-[var(--radius-md)] bg-[var(--color-sea-50)] px-3 py-2 text-sm text-[var(--color-sea-700)]">
+                {inviteFeedback}
+              </div>
+            )}
+            {inviteQuery.trim().length >= 2 && (
+              <div className="space-y-2">
+                {searchingInvites ? (
+                  <p className="text-sm text-[var(--color-ink-500)]">Searching travelers…</p>
+                ) : inviteResults.length === 0 ? (
+                  <p className="text-sm text-[var(--color-ink-500)]">No matching users found.</p>
+                ) : (
+                  inviteResults.map((user) => {
+                    const alreadyAdded = activeMemberIds.has(user.id);
+                    const isCreator = user.id === plan.creator.id;
+                    return (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">{user.fullName}</p>
+                          <p className="truncate text-xs text-[var(--color-ink-500)]">
+                            {user.username ? `@${user.username}` : "No username"}
+                            {user.city ? ` • ${user.city}` : ""}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={alreadyAdded || isCreator ? "secondary" : "primary"}
+                          disabled={alreadyAdded || isCreator || invitingUserId === user.id}
+                          onClick={() => void handleInvite(user)}
+                        >
+                          {isCreator
+                            ? "Creator"
+                            : alreadyAdded
+                            ? "Already added"
+                            : invitingUserId === user.id
+                            ? "Adding..."
+                            : "Add"}
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </Card>
 

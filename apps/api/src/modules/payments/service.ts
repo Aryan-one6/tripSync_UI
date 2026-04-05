@@ -11,6 +11,7 @@ import { env } from '../../lib/env.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { emitAgencyEvent, emitGroupEvent, emitUserEvent } from '../../lib/socket.js';
 import { createSystemMessage } from '../chat/service.js';
+import { createStoredNotificationsBulk } from '../notifications/service.js';
 import {
   queueNotification,
   scheduleEscrowRelease,
@@ -431,7 +432,7 @@ async function finalizeCapturedPayment(
 
           await tx.group.update({
             where: { id: payment.groupId },
-            data: { isLocked: true },
+            data: { isLocked: true, paymentWindowEndsAt: null },
           });
         }
       }
@@ -445,7 +446,7 @@ async function finalizeCapturedPayment(
 
           await tx.group.update({
             where: { id: payment.groupId },
-            data: { isLocked: true },
+            data: { isLocked: true, paymentWindowEndsAt: null },
           });
         }
       }
@@ -633,7 +634,7 @@ async function finalizeCapturedPayment(
         ...(result.stateName.creatorId ? [result.stateName.creatorId] : []),
         result.agency.ownerId,
       ],
-      ctaUrl: `${env.FRONTEND_URL}/dashboard/groups/${result.groupId}/chat`,
+      ctaUrl: `${env.FRONTEND_URL}/dashboard/messages?groupId=${encodeURIComponent(result.groupId)}`,
       metadata: {
         groupId: result.groupId,
         planId: result.stateName.planId,
@@ -1029,6 +1030,7 @@ export async function resolveConfirmingWindow(groupId: string, triggeredBy: 'wor
             femaleCount,
             otherCount,
             isLocked: true,
+            paymentWindowEndsAt: null,
           },
         });
 
@@ -1056,6 +1058,7 @@ export async function resolveConfirmingWindow(groupId: string, triggeredBy: 'wor
           paidCount,
           minSize,
           removedCount: unpaidUserIds.length,
+          unpaidUserIds,
         };
       }
 
@@ -1087,7 +1090,7 @@ export async function resolveConfirmingWindow(groupId: string, triggeredBy: 'wor
 
       await tx.group.update({
         where: { id: groupId },
-        data: { isLocked: false },
+        data: { isLocked: false, paymentWindowEndsAt: null },
       });
 
       if (source === 'PLAN_OFFER' && group.plan) {
@@ -1125,6 +1128,25 @@ export async function resolveConfirmingWindow(groupId: string, triggeredBy: 'wor
       groupId,
       `Payment window resolved (${triggeredBy}): group confirmed with ${result.paidCount}/${result.paidCount + (result.removedCount ?? 0)} members.`,
       { action: 'payment_progress', triggeredBy, paidCount: result.paidCount },
+    );
+  }
+
+  if (
+    result.resolved &&
+    result.outcome === 'confirmed' &&
+    Array.isArray((result as { unpaidUserIds?: string[] }).unpaidUserIds) &&
+    (result as { unpaidUserIds?: string[] }).unpaidUserIds!.length > 0
+  ) {
+    const unpaidUserIds = (result as { unpaidUserIds?: string[] }).unpaidUserIds!;
+    await createStoredNotificationsBulk(
+      unpaidUserIds.map((userId) => ({
+        userId,
+        type: 'group_removed_unpaid',
+        title: 'Removed from trip group',
+        body: 'You were removed because payment was not completed before the payment window closed.',
+        href: '/dashboard/trips',
+        metadata: { groupId, reason: 'unpaid_before_deadline' },
+      })),
     );
   }
 

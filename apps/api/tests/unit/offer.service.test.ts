@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
     offerNegotiation: { create: vi.fn() },
     $transaction:     vi.fn(),
     chatMessage:      { findMany: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-    group:            { findUnique: vi.fn(), findFirst: vi.fn() },
+    group:            { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     groupMember:      { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
     plan:             { findUnique: vi.fn() },
     agency:           { findUnique: vi.fn() },

@@ -411,13 +411,18 @@ export async function accept(offerId: string, userId: string) {
   });
 
   if (group) {
+    const windowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    await prisma.group.update({
+      where: { id: group.id },
+      data: { paymentWindowEndsAt: windowEnd },
+    });
+
     await createSystemMessage(
       group.id,
       'An agency offer was accepted. Payment collection is now open for approved travelers.',
       { planId: offer.planId, offerId, action: 'payment_window_opened' },
     );
 
-    const windowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000);
     await scheduleConfirmingWindow(group.id, windowEnd);
 
     emitGroupEvent(group.id, 'offer:updated', {

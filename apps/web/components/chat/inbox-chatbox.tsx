@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
+import { GroupChat } from "@/components/chat/group-chat";
 import { useAuth } from "@/lib/auth/auth-context";
 import { CONVERSATION_READ_EVENT } from "@/lib/realtime/use-live-notifications";
 import { useSocket } from "@/lib/realtime/use-socket";
@@ -122,10 +123,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
   const targetUserId = searchParams.get("userId");
   const initialConversationId = searchParams.get("conversationId");
+  const initialGroupId = searchParams.get("groupId");
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [conversations, setConversations] = useState<DirectConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [groupChannels, setGroupChannels] = useState<TripMembership[]>([]);
   const [messageableContacts, setMessageableContacts] = useState<MessageableContact[]>([]);
@@ -247,6 +250,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       }
       const existing = conversations.find((c) => c.counterpart?.id === userId);
       if (existing) {
+        setActiveGroupId(null);
         setActiveConversationId(existing.id);
         setShowMobileChat(true);
         setShowNewChat(false);
@@ -259,6 +263,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           { method: "POST", body: JSON.stringify({ targetUserId: userId }) },
         );
         setConversations((cur) => sortByUpdatedAtDesc([created, ...cur]));
+        setActiveGroupId(null);
         setActiveConversationId(created.id);
         setShowMobileChat(true);
         setShowNewChat(false);
@@ -271,6 +276,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     },
     [apiFetchWithAuth, conversations, session?.user.id],
   );
+
+  const openGroupChannel = useCallback((groupId: string) => {
+    setActiveConversationId(null);
+    setActiveGroupId(groupId);
+    setTypingUsers([]);
+    setShowMobileChat(true);
+    setShowNewChat(false);
+    setFeedback(null);
+  }, []);
 
   const loadAgencyOffers = useCallback(async () => {
     if (variant !== "agency") return;
@@ -420,10 +434,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     if (loadingConversations || routeIntentHandledRef.current) return;
     routeIntentHandledRef.current = true;
     void (async () => {
+      if (initialGroupId) {
+        openGroupChannel(initialGroupId);
+        return;
+      }
       if (initialConversationId) {
         const existing = conversations.find((c) => c.id === initialConversationId);
         if (existing) {
           setActiveConversationId(existing.id);
+          setActiveGroupId(null);
           setShowMobileChat(true);
           return;
         }
@@ -435,11 +454,18 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     })();
   }, [
     conversations,
+    initialGroupId,
     initialConversationId,
     loadingConversations,
+    openGroupChannel,
     openOrCreateConversation,
     targetUserId,
   ]);
+
+  useEffect(() => {
+    if (!initialGroupId) return;
+    openGroupChannel(initialGroupId);
+  }, [initialGroupId, openGroupChannel]);
 
   useEffect(() => {
     if (!activeConversationId || conversations.length === 0) return;
@@ -738,6 +764,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                     key={conversation.id}
                     type="button"
                     onClick={() => {
+                      setActiveGroupId(null);
                       setActiveConversationId(conversation.id);
                       setTypingUsers([]);
                       setShowMobileChat(true);
@@ -816,11 +843,18 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   trip.group.plan?.startDate,
                   trip.group.plan?.endDate,
                 );
+                const groupActive = trip.group.id === activeGroupId;
                 return (
-                  <Link
+                  <button
                     key={trip.id}
-                    href={`/dashboard/groups/${trip.group.id}/chat`}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-sea-50)]"
+                    type="button"
+                    onClick={() => openGroupChannel(trip.group.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-3 text-left transition",
+                      groupActive
+                        ? "border-l-2 border-[var(--color-sea-500)] bg-[var(--color-sea-50)]"
+                        : "hover:bg-[var(--color-sea-50)]",
+                    )}
                   >
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-lavender-50)] to-[var(--color-lavender-100)]">
                       <Users className="size-4 text-[var(--color-lavender-500)]" />
@@ -836,7 +870,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                       </p>
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-400)]" />
-                  </Link>
+                  </button>
                 );
               })}
             </>
@@ -878,7 +912,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           </div>
         )}
 
-        {!activeConversation ? (
+        {activeGroupId ? (
+          <div className="h-full overflow-y-auto p-4 md:p-5">
+            <GroupChat
+              groupId={activeGroupId}
+              embedded
+              onBack={() => setShowMobileChat(false)}
+            />
+          </div>
+        ) : !activeConversation ? (
           /* Empty / select state */
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex size-16 items-center justify-center rounded-full bg-gradient-to-b from-[#dcf8e8] to-[#c8f1dc] shadow-[var(--shadow-md)] ring-1 ring-[var(--color-sea-200)]">
@@ -901,7 +943,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                 Select a conversation
               </p>
               <p className="mt-1 text-sm text-[var(--color-ink-500)]">
-                Choose a chat from the list or start a new one.
+                Choose a direct chat or group channel from the list.
               </p>
             </div>
           </div>

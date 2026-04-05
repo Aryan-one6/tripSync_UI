@@ -35,7 +35,7 @@ const BasePlanSchema = z.object({
     .min(1, 'At least one trip image is required')
     .max(8),
   coverImageUrl: z.string().url().optional(),
-  autoApprove: z.boolean().default(true),
+  autoApprove: z.boolean().default(false),
 });
 
 function validatePlanRanges(

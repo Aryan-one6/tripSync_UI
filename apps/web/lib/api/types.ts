@@ -135,6 +135,7 @@ export interface Group {
   femaleCount: number;
   otherCount: number;
   isLocked: boolean;
+  paymentWindowEndsAt?: string | null;
   members?: GroupMember[];
 }
 
@@ -267,6 +268,7 @@ export interface TripMembership {
   joinedAt: string;
   group: {
     id: string;
+    paymentWindowEndsAt?: string | null;
     plan?: Pick<
       PlanDetails,
       "id" | "slug" | "title" | "destination" | "startDate" | "endDate" | "status" | "coverImageUrl"

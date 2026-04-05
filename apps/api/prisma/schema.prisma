@@ -239,7 +239,7 @@ model Plan {
   itinerary        Json?       // [{day,title,description,highlights,meals,accommodation,transport}]
   galleryUrls      Json?       // ["url1","url2"]
   coverImageUrl    String?
-  autoApprove      Boolean     @default(true)
+  autoApprove      Boolean     @default(false)
   status           PlanStatus  @default(DRAFT)
   expiresAt        DateTime?
   confirmedAt      DateTime?
@@ -307,6 +307,7 @@ model Group {
   femaleCount Int           @default(0)
   otherCount  Int           @default(0)
   isLocked    Boolean       @default(false)
+  paymentWindowEndsAt DateTime?
   createdAt   DateTime      @default(now())
 
   members     GroupMember[]

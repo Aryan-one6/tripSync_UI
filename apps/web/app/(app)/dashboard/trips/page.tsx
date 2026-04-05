@@ -14,6 +14,18 @@ import type { TripMembership } from "@/lib/api/types";
 import { formatDateRange } from "@/lib/format";
 import { buildWhatsAppShareHref } from "@/lib/share";
 
+function formatPaymentDeadline(value?: string | null) {
+  if (!value) return null;
+  const deadline = new Date(value);
+  if (Number.isNaN(deadline.getTime())) return null;
+  return deadline.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function TripsPage() {
   const { apiFetchWithAuth } = useAuth();
   const [trips, setTrips] = useState<TripMembership[]>([]);
@@ -75,6 +87,7 @@ export default function TripsPage() {
             const shareHref = buildWhatsAppShareHref(`Check this TravellersIn trip: ${title}`, href);
             const tripStatus = plan?.status ?? pkg?.status;
             const packagePrice = pkg?.basePrice;
+            const paymentWindowLabel = formatPaymentDeadline(trip.group.paymentWindowEndsAt);
 
             // Visual strip color per status
             const stripColor =
@@ -121,6 +134,7 @@ export default function TripsPage() {
                   {needsPayment && (
                     <div className="rounded-[var(--radius-md)] bg-[var(--color-sunset-50)] border border-[var(--color-sunset-200)] px-3 py-2 text-xs text-[var(--color-sunset-700)] font-medium">
                       ⚡ Payment required to confirm your seat
+                      {paymentWindowLabel ? ` · Pay before ${paymentWindowLabel}` : ""}
                     </div>
                   )}
 
@@ -140,7 +154,7 @@ export default function TripsPage() {
                       </Link>
                     )}
                     {canChat && (
-                      <Link href={`/dashboard/groups/${trip.group.id}/chat`}>
+                      <Link href={`/dashboard/messages?groupId=${encodeURIComponent(trip.group.id)}`}>
                         <Button variant="soft" size="sm">
                           <MessageSquareMore className="size-3.5" />
                           Group Chat
@@ -171,7 +185,7 @@ export default function TripsPage() {
                     <p className="pt-1 text-[11px] text-[var(--color-ink-400)]">
                       Need to cancel?{" "}
                       <a
-                        href={`/dashboard/groups/${trip.group.id}/chat`}
+                        href={`/dashboard/messages?groupId=${encodeURIComponent(trip.group.id)}`}
                         className="font-medium text-[var(--color-sunset-600)] underline decoration-dotted hover:text-[var(--color-sunset-500)]"
                       >
                         Contact agency in group chat

@@ -1,5 +1,4 @@
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { GroupChat } from "@/components/chat/group-chat";
+import { redirect } from "next/navigation";
 
 export default async function AgencyGroupChatPage({
   params,
@@ -7,14 +6,5 @@ export default async function AgencyGroupChatPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-
-  return (
-    <DashboardShell
-      variant="agency"
-      title="Group room"
-      subtitle="Coordinate offers, counter updates, and finalization live with the trip group."
-    >
-      <GroupChat groupId={id} />
-    </DashboardShell>
-  );
+  redirect(`/agency/inbox?groupId=${encodeURIComponent(id)}`);
 }

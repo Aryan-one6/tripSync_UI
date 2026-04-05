@@ -3,7 +3,7 @@ import { authenticate } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { param } from '../../lib/helpers.js';
-import { SubmitOfferViaGroupSchema } from '@tripsync/shared';
+import { InviteGroupMemberSchema, SubmitOfferViaGroupSchema } from '@tripsync/shared';
 import * as groupService from './service.js';
 import * as offerService from '../offers/service.js';
 import { prisma } from '../../lib/prisma.js';
@@ -62,6 +62,16 @@ groupsRouter.post(
   asyncHandler(async (req, res) => {
     await groupService.removeMember(param(req.params.id), req.userId!, param(req.params.userId));
     res.json({ data: { success: true } });
+  }),
+);
+
+groupsRouter.post(
+  '/:id/invite',
+  authenticate,
+  validate(InviteGroupMemberSchema),
+  asyncHandler(async (req, res) => {
+    const member = await groupService.inviteMember(param(req.params.id), req.userId!, req.body.userId);
+    res.status(201).json({ data: member });
   }),
 );
 

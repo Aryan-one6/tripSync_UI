@@ -298,7 +298,7 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
                 </>
               )}
             </Button>
-            <Link href={`/dashboard/groups/${groupId}/chat`}>
+            <Link href={`/dashboard/messages?groupId=${encodeURIComponent(groupId)}`}>
               <Button variant="secondary">
                 <MessageSquareMore className="size-4" />
                 Open group chat

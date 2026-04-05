@@ -119,3 +119,31 @@ export async function getPublicProfile(username: string) {
       .filter(Boolean),
   };
 }
+
+export async function searchUsers(currentUserId: string, query: string, limit = 12) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  return prisma.user.findMany({
+    where: {
+      isActive: true,
+      id: { not: currentUserId },
+      OR: [
+        { fullName: { contains: trimmed, mode: 'insensitive' } },
+        { username: { contains: trimmed, mode: 'insensitive' } },
+      ],
+    },
+    orderBy: [{ fullName: 'asc' }],
+    take: Math.max(1, Math.min(limit, 20)),
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      avatarUrl: true,
+      city: true,
+      verification: true,
+      avgRating: true,
+      completedTrips: true,
+    },
+  });
+}

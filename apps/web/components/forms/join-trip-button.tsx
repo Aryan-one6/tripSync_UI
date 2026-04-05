@@ -50,7 +50,7 @@ export function JoinTripButton({
 
   // ── Approved / Committed / Creator: redirect to group chat ──────────────
   if (isCreator || joinedStatus === "APPROVED" || joinedStatus === "COMMITTED") {
-    const chatHref = `/dashboard/groups/${groupId}/chat`;
+    const chatHref = `/dashboard/messages?groupId=${encodeURIComponent(groupId)}`;
     const heading = isCreator
       ? "You are hosting this trip"
       : joinedStatus === "COMMITTED"
