@@ -8,9 +8,7 @@ import {
   ArrowLeft,
   AtSign,
   BarChart3,
-  ChevronRight,
   CreditCard,
-  Eye,
   LogOut,
   MessageSquareMore,
   Minus,
@@ -786,33 +784,27 @@ export function GroupChat({
               <button
                 type="button"
                 onClick={onBack}
-                className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition hover:bg-white/70 md:hidden"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-[var(--color-sea-700)] transition hover:bg-white/70 md:hidden"
               >
                 <ArrowLeft className="size-5" />
               </button>
             )}
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-sm font-bold text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]">
-              {initials(groupTitle)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-[var(--color-ink-950)]">{groupTitle}</p>
-              <p className="text-xs text-[var(--color-ink-500)]">
-                {typingUsers.length > 0
-                  ? `${typingUsers.map((e) => e.fullName).join(", ")} typing…`
-                  : `${groupDestination ? `${groupDestination} · ` : ""}${groupMembersLabel}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href={detailsHref}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-white"
-              >
-                Visit details
-                <ChevronRight className="size-3.5" />
-              </Link>
+            <Link href={detailsHref} className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-xs font-bold text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]">
+                {initials(groupTitle)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold leading-tight text-[var(--color-ink-950)]">{groupTitle}</p>
+                <p className="truncate text-xs text-[var(--color-ink-500)]">
+                  {typingUsers.length > 0
+                    ? `${typingUsers[0]?.fullName ?? "Someone"} typing…`
+                    : `${groupDestination ? `${groupDestination} · ` : ""}${groupMembersLabel}`}
+                </p>
+              </div>
+            </Link>
+            <div className="flex shrink-0 items-center gap-1.5">
               <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
                 <BarChart3 className="size-4" />
-                <span className="hidden sm:inline">Poll</span>
               </Button>
               <div className="relative" ref={menuRef}>
                 <button
@@ -1168,8 +1160,8 @@ export function GroupChat({
           >
             <div className={cn("relative space-y-5", embedded && "flex h-full min-h-0 flex-col")}>
               {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <Link href={detailsHref} className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-sm font-bold text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]">
                     {initials(groupTitle)}
                   </div>
@@ -1181,15 +1173,8 @@ export function GroupChat({
                       {groupDestination ? `${groupDestination} · ` : ""}{groupMembersLabel}
                     </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={detailsHref}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-50)]"
-                  >
-                    <Eye className="size-3.5" />
-                    Visit details
-                  </Link>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
                   <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
                     <BarChart3 className="size-4" />
                     Poll
