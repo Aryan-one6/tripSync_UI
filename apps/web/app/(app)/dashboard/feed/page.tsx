@@ -1,16 +1,4 @@
-import Link from "next/link";
-import { TrendingUp, MapPin } from "lucide-react";
-import { DiscoverCard } from "@/components/cards/discover-card";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { Button } from "@/components/ui/button";
-import { Card, CardInset } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { SectionHeading } from "@/components/ui/section-heading";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import { getDiscoverItems, getTrendingItems, searchDiscover } from "@/lib/api/public";
-import { VIBE_OPTIONS } from "@/lib/constants";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -22,124 +10,18 @@ export default async function FeedPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const destination = typeof params.destination === "string" ? params.destination : "";
-  const vibes = typeof params.vibes === "string" ? params.vibes : "";
-  const originType =
-    params.originType === "plan" || params.originType === "package"
-      ? params.originType
-      : undefined;
-  const sort =
-    params.sort === "price_low" ||
-    params.sort === "price_high" ||
-    params.sort === "popular" ||
-    params.sort === "recent"
-      ? params.sort
-      : "recent";
-  const q = typeof params.q === "string" ? params.q : "";
-  const audience = params.audience === "agency" ? "agency" : "traveler";
+  const nextParams = new URLSearchParams();
 
-  function buildFeedHref(overrides: Record<string, string | undefined>) {
-    const nextParams = new URLSearchParams();
-    for (const [key, value] of Object.entries({
-      q: q || undefined,
-      audience,
-      destination: destination || undefined,
-      vibes: vibes || undefined,
-      originType,
-      sort,
-      ...overrides,
-    })) {
-      if (value) nextParams.set(key, value);
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value.length > 0) {
+      nextParams.set(key, value);
     }
-    const qs = nextParams.toString();
-    return qs ? `/dashboard/feed?${qs}` : `/dashboard/feed?audience=${audience}`;
   }
 
-  const items = q
-    ? await searchDiscover(q)
-    : await getDiscoverItems({ audience, destination, vibes, originType, sort });
+  if (!nextParams.has("audience")) {
+    nextParams.set("audience", "traveler");
+  }
 
-  const trending = await getTrendingItems();
-
-  return (
-    <DashboardShell
-      variant="user"
-      title="Feed"
-      subtitle="Browse live community plans and agency packages without leaving the traveler workspace."
-    >
-      <SectionHeading
-        eyebrow="Traveler feed"
-        title="Search live plans, compare market-ready packages"
-        description="Filter by destination, budget, dates, vibe, or trip format. The feed merges user-created plans and agency inventory into one browsing surface."
-      />
-
-      {/* Filters */}
-      <Card className="relative overflow-hidden p-5">
-        <div className="relative space-y-4">
-          <form
-            action="/dashboard/feed"
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto]"
-          >
-            <input type="hidden" name="audience" value={audience} />
-            {vibes ? <input type="hidden" name="vibes" value={vibes} /> : null}
-            <Input name="q" defaultValue={q} placeholder="Search destination or trip title" />
-            <Input name="destination" defaultValue={destination} placeholder="Destination" />
-            <Select
-              name="originType"
-              defaultValue={originType ?? ""}
-              options={[
-                { value: "", label: "All listing types" },
-                { value: "plan", label: "User plans" },
-                { value: "package", label: "Agency packages" },
-              ]}
-            />
-            <Select
-              name="sort"
-              defaultValue={sort}
-              options={[
-                { value: "recent", label: "Most recent" },
-                { value: "popular", label: "Trending" },
-                { value: "price_low", label: "Price: low to high" },
-                { value: "price_high", label: "Price: high to low" },
-              ]}
-            />
-            <Button type="submit">Apply</Button>
-          </form>
-          <div className="flex flex-wrap gap-2">
-            {VIBE_OPTIONS.map((vibe) => (
-              <Link key={vibe} href={buildFeedHref({ vibes: vibe })}>
-                <Badge
-                  variant={vibes === vibe ? "sea" : "default"}
-                  className="cursor-pointer transition-all hover:shadow-[var(--shadow-clay-sm)] hover:-translate-y-0.5"
-                >
-                  {vibe}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* Results + sidebar */}
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-        <div className="space-y-5">
-          {items.length === 0 ? (
-            <EmptyState
-              title="No results found"
-              description="Try a broader destination or switch between plans and packages."
-            />
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2">
-              {items.map((item) => (
-                <DiscoverCard key={`${item.originType}-${item.id}`} item={item} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Trending sidebar */}
-  
-      </div>
-    </DashboardShell>
-  );
+  const qs = nextParams.toString();
+  redirect(qs ? `/discover?${qs}` : "/discover?audience=traveler");
 }

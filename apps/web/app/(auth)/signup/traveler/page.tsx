@@ -21,7 +21,7 @@ export default async function TravelerSignupPage({
   const nextPath =
     typeof params.next === "string" && params.next.startsWith("/")
       ? params.next
-      : "/dashboard/feed";
+      : "/discover?audience=traveler";
 
   return (
     <div className="min-h-[90dvh] grid lg:grid-cols-[1fr_1fr]">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,7 +49,7 @@ const steps = [
   },
 ];
 
-export function TravelerSignupForm({ nextPath = "/dashboard/feed" }: { nextPath?: string }) {
+export function TravelerSignupForm({ nextPath = "/discover?audience=traveler" }: { nextPath?: string }) {
   const router = useRouter();
   const { signupTraveler } = useAuth();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -66,7 +66,7 @@ export function TravelerSignupForm({ nextPath = "/dashboard/feed" }: { nextPath?
 
   const currentStep = steps[step];
   const isLastStep = step === steps.length - 1;
-  const loginNextPath = nextPath.startsWith("/agency") ? "/dashboard/feed" : nextPath;
+  const loginNextPath = nextPath.startsWith("/agency") ? "/discover?audience=traveler" : nextPath;
 
   async function goNext() {
     const valid = await form.trigger(currentStep.fields);

@@ -30,7 +30,7 @@ export default async function LoginPage({
   const nextPath =
     typeof params.next === "string" && params.next.startsWith("/")
       ? params.next
-      : "/dashboard/feed";
+      : "/discover?audience=traveler";
   const defaultEmail = typeof params.email === "string" ? params.email : "";
   const successMessage =
     params.signup === "traveler"

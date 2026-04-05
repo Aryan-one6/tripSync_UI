@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Search, SlidersHorizontal, Compass, TrendingUp, Users } from "lucide-react";
+import { Compass, TrendingUp, Users } from "lucide-react";
 import { DiscoverCard, DiscoverCardCompact } from "@/components/cards/discover-card";
 import { FollowingDiscoverResults } from "@/components/discover/following-discover-results";
-import { Card, CardInset } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { DiscoverSearchFilters } from "@/components/discover/discover-search-filters";
+import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getDiscoverItems, getTrendingItems, searchDiscover } from "@/lib/api/public";
 
@@ -110,28 +110,28 @@ export default async function DiscoverPage({
     <div className="page-shell pb-mobile-nav">
 
       {/* ── Hero Header ── */}
-      <section className="relative overflow-hidden rounded-[var(--radius-2xl)] mb-8 mt-4 bg-gradient-to-br from-[var(--color-sea-700)] via-[var(--color-sea-600)] to-[var(--color-sea-500)] p-8 text-white shadow-[var(--shadow-xl)] sm:p-12">
+      <section className="relative mb-6 mt-3 overflow-hidden rounded-[var(--radius-xl)] bg-gradient-to-br from-[var(--color-sea-700)] via-[var(--color-sea-600)] to-[var(--color-sea-500)] p-5 text-white shadow-[var(--shadow-lg)] sm:mb-8 sm:mt-4 sm:rounded-[var(--radius-2xl)] sm:p-8 lg:p-10">
         {/* Decorative blobs */}
-        <div className="pointer-events-none absolute -right-12 -top-12 size-48 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-8 left-1/3 size-32 rounded-full bg-white/5 blur-xl" />
+        <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-white/10 blur-2xl sm:-right-12 sm:-top-12 sm:size-48" />
+        <div className="pointer-events-none absolute -bottom-10 left-1/3 size-24 rounded-full bg-white/5 blur-xl sm:size-32" />
 
         <div className="relative">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-white/70">
+          <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.24em] text-white/70 sm:text-[10px] sm:tracking-[0.26em]">
             TravellersIn
           </p>
-          <h1 className="font-display text-[2.6rem] font-black leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
+          <h1 className="font-display text-[2rem] font-black leading-[1.02] tracking-tight sm:text-5xl lg:text-6xl">
             Discover
             <br />
-            <em className="not-italic text-[var(--color-sea-200)]">Adventure.</em>
+            <em className="not-italic text-[var(--color-sea-200)]">Adventure</em>
           </h1>
-          <p className="mt-4 max-w-xl text-white/80 sm:text-lg">
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-4 sm:text-base">
             Browse live community plans and agency packages. Filter by destination, budget, dates, or vibe.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-2.5 sm:mt-6 sm:gap-3">
             {["Escrow protected", "Verified agencies", "Live group chat"].map((pill) => (
               <span
                 key={pill}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-sm font-medium text-white/90 backdrop-blur-sm"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur-sm sm:px-4 sm:py-1.5 sm:text-sm"
               >
                 ✓ {pill}
               </span>
@@ -141,31 +141,15 @@ export default async function DiscoverPage({
       </section>
 
       {/* ── Search bar ── */}
-      <form className="mb-5">
-        <input type="hidden" name="rail" value={rail} />
-        <input type="hidden" name="audience" value={audience} />
-        {destination ? <input type="hidden" name="destination" value={destination} /> : null}
-        {vibes ? <input type="hidden" name="vibes" value={vibes} /> : null}
-        {originType ? <input type="hidden" name="originType" value={originType} /> : null}
-        {sort ? <input type="hidden" name="sort" value={sort} /> : null}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-(--color-ink-400)" />
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Where next?"
-              className="h-12 w-full rounded-(--radius-full) border border-(--color-border-strong) bg-(--color-surface-raised) pl-11 pr-4 text-base text-foreground shadow-(--shadow-sm) placeholder:text-(--color-ink-400) focus:border-(--color-sea-400) focus:outline-none focus:ring-3 focus:ring-(--color-sea-100) md:text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            className="flex size-12 shrink-0 items-center justify-center rounded-(--radius-full) bg-(--color-sea-700) text-white shadow-(--shadow-sm) transition hover:bg-(--color-sea-600) active:scale-95"
-          >
-            <SlidersHorizontal className="size-4" />
-          </button>
-        </div>
-      </form>
+      <DiscoverSearchFilters
+        q={q}
+        destination={destination}
+        vibes={vibes}
+        originType={originType}
+        sort={sort}
+        audience={audience}
+        rail={rail}
+      />
 
       {/* ── Quick filter pills ── */}
       <div className="mb-8 flex gap-2 overflow-x-auto hide-scrollbar pb-1">

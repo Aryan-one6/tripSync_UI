@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Compass,
   Home,
   Plus,
   MessageSquare,
   User,
+  Ticket,
   BriefcaseBusiness,
   Handshake,
   Package,
@@ -20,8 +20,8 @@ import { useUnreadDirectCount } from "@/lib/realtime/use-unread-direct-count";
 // ─── Nav Items ─────────────────────────────────────────────────────────────────
 
 const USER_TABS = [
-  { href: "/dashboard/feed", label: "Feed", icon: Home },
-  { href: "/discover?audience=traveler", label: "Discover", icon: Compass },
+  { href: "/discover?audience=traveler", label: "Home", icon: Home },
+  { href: "/dashboard/trips", label: "My Trips", icon: Ticket },
   { href: "/dashboard/plans/new", label: "Create", icon: Plus, isPrimary: true },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },

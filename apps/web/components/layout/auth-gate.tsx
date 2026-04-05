@@ -27,7 +27,7 @@ export function AuthGate({
     }
 
     if (status === "authenticated" && expectedRole && session?.role !== expectedRole) {
-      router.replace(expectedRole === "agency_admin" ? "/dashboard/feed" : "/agency/dashboard");
+      router.replace(expectedRole === "agency_admin" ? "/discover?audience=traveler" : "/agency/dashboard");
     }
   }, [expectedRole, pathname, router, session?.role, status]);
 

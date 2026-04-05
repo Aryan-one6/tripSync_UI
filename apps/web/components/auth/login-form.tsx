@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 type LoginValues = { email: string; password: string };
 
 function resolveDestination(nextPath: string, role: "user" | "agency_admin" | "platform_admin") {
-  const defaultPath = role === "agency_admin" ? "/agency/dashboard" : "/dashboard/feed";
+  const defaultPath = role === "agency_admin" ? "/agency/dashboard" : "/discover?audience=traveler";
 
   if (!nextPath.startsWith("/")) {
     return defaultPath;
@@ -25,7 +25,7 @@ function resolveDestination(nextPath: string, role: "user" | "agency_admin" | "p
     return nextPath.startsWith("/agency") ? nextPath : defaultPath;
   }
 
-  return nextPath.startsWith("/dashboard") ? nextPath : defaultPath;
+  return nextPath.startsWith("/agency") ? defaultPath : nextPath;
 }
 
 export function LoginForm({
