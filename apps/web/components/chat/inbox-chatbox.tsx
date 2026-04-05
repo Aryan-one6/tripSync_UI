@@ -913,7 +913,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         )}
 
         {activeGroupId ? (
-          <div className="h-full overflow-y-auto p-4 md:p-5">
+          <div className="flex h-full flex-col">
             <GroupChat
               groupId={activeGroupId}
               embedded

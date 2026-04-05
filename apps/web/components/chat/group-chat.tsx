@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   AtSign,
   BarChart3,
+  ChevronRight,
   CreditCard,
   Eye,
   LogOut,
@@ -750,14 +751,15 @@ export function GroupChat({
     : "/dashboard/trips";
   const checkoutHref = `/dashboard/groups/${groupId}/checkout`;
   const visibleOffers = showAllOffers ? offers : offers.slice(0, 2);
+  const isPlanGroup = Boolean(group?.plan);
 
   // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
     if (embedded) {
       return (
-        <div className="flex min-h-[320px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white/80 p-6 text-[var(--color-ink-500)]">
+        <div className="flex h-full items-center justify-center text-[var(--color-ink-500)]">
           <div className="animate-pulse-soft text-center">
-            <div className="mx-auto mb-3 size-10 rounded-full bg-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]" />
+            <div className="mx-auto mb-3 size-10 rounded-full bg-[var(--color-sea-100)]" />
             <p className="text-sm">Loading group chat…</p>
           </div>
         </div>
@@ -770,6 +772,385 @@ export function GroupChat({
           <p className="text-sm">Loading group chat…</p>
         </div>
       </Card>
+    );
+  }
+
+  // ── Embedded render (matches DM UI style) ───────────────────────────────────
+  if (embedded) {
+    return (
+      <>
+        <div className="flex h-full flex-col">
+          {/* Header — same style as DM header */}
+          <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition hover:bg-white/70 md:hidden"
+              >
+                <ArrowLeft className="size-5" />
+              </button>
+            )}
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-sm font-bold text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]">
+              {initials(groupTitle)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-[var(--color-ink-950)]">{groupTitle}</p>
+              <p className="text-xs text-[var(--color-ink-500)]">
+                {typingUsers.length > 0
+                  ? `${typingUsers.map((e) => e.fullName).join(", ")} typing…`
+                  : `${groupDestination ? `${groupDestination} · ` : ""}${groupMembersLabel}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href={detailsHref}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-white"
+              >
+                Visit details
+                <ChevronRight className="size-3.5" />
+              </Link>
+              <Button variant="soft" size="sm" onClick={() => setPollOpen(true)}>
+                <BarChart3 className="size-4" />
+                <span className="hidden sm:inline">Poll</span>
+              </Button>
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((c) => !c)}
+                  className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/80 text-[var(--color-ink-600)] transition hover:bg-white"
+                  aria-label="Group actions"
+                >
+                  <MoreVertical className="size-4" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-10 z-20 w-48 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+                    <button
+                      type="button"
+                      onClick={() => void handleLeaveGroup()}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                    >
+                      <LogOut className="size-4 text-[var(--color-sunset-600)]" />
+                      Leave group
+                    </button>
+                    {isPlanGroup && (
+                      <button
+                        type="button"
+                        onClick={handleShowAllOffers}
+                        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                      >
+                        <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                        Show all offers
+                      </button>
+                    )}
+                    {!isAgency && (
+                      <button
+                        type="button"
+                        onClick={handlePayNow}
+                        className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                      >
+                        <CreditCard className="size-4 text-[var(--color-sea-700)]" />
+                        Pay now
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {feedback && (
+            <div className="mx-3 mt-3 rounded-[var(--radius-md)] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-4 py-2.5 text-sm text-[var(--color-sunset-700)]">
+              {feedback}
+            </div>
+          )}
+
+          {/* Offers — only for user-plan groups */}
+          {isPlanGroup && offers.length > 0 && (
+            <div id="offers-section" className="space-y-2 border-b border-[var(--color-sea-100)] bg-white/60 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+                  Offers ({offers.length})
+                </p>
+                {!showAllOffers && offers.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllOffers(true)}
+                    className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
+                  >
+                    Show all
+                  </button>
+                )}
+              </div>
+              {visibleOffers.map((offer) => (
+                <div key={offer.id} className="space-y-2">
+                  <CardInset className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">{offer.agency.name}</p>
+                        <p className="text-xs text-[var(--color-ink-500)]">
+                          ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setExpandedOfferId((c) => c === offer.id ? null : offer.id)}
+                      >
+                        {expandedOfferId === offer.id ? "Hide" : "Details"}
+                      </Button>
+                    </div>
+                  </CardInset>
+                  {expandedOfferId === offer.id && (
+                    <OfferCard
+                      offer={offer}
+                      isCreator={isCreator}
+                      isAgency={isAgency}
+                      onAccept={handleAcceptOffer}
+                      onCounter={(offerId, seedPrice) => {
+                        setCounterSheetOfferId(offerId);
+                        setCounterSheetInitialPrice(seedPrice ?? null);
+                      }}
+                      onReject={handleRejectOffer}
+                      onWithdraw={handleWithdrawOffer}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Messages */}
+          <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+            {messages.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-sm text-[var(--color-ink-400)]">No messages yet — say hello!</p>
+              </div>
+            ) : (
+              <>
+                {messages.map((message, idx) => {
+                  const mine = session?.user.id === message.senderId;
+                  const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                  const showDate =
+                    !prevMsg ||
+                    new Date(message.createdAt).toDateString() !==
+                      new Date(prevMsg.createdAt).toDateString();
+                  const pollOptionsData = message.metadata?.options ?? [];
+                  const pollQuestion =
+                    typeof message.metadata?.question === "string"
+                      ? message.metadata.question
+                      : message.content;
+
+                  if (message.messageType === "system") {
+                    const metaAction =
+                      message.metadata &&
+                      typeof message.metadata === "object" &&
+                      "action" in message.metadata
+                        ? String((message.metadata as Record<string, unknown>).action)
+                        : "";
+                    const isOfferMsg = metaAction.startsWith("offer_");
+                    const isPaymentMsg = metaAction.startsWith("payment_");
+                    const isSafetyWarning = metaAction === "safety_warning";
+                    const isTripCard = metaAction === "trip_contact_card";
+                    return (
+                      <div key={message.id}>
+                        {showDate && <DateDivider date={message.createdAt} />}
+                        <div
+                          className={cn(
+                            "mx-auto flex max-w-lg items-start gap-2 rounded-full px-4 py-2 text-xs",
+                            isSafetyWarning
+                              ? "rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 text-amber-800"
+                              : isTripCard
+                              ? "rounded-[var(--radius-md)] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-800)]"
+                              : isOfferMsg
+                              ? "border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
+                              : isPaymentMsg
+                              ? "border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                              : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)]",
+                          )}
+                        >
+                          {isSafetyWarning && <span className="shrink-0 text-base">⚠️</span>}
+                          {isTripCard && <span className="shrink-0 text-base">📋</span>}
+                          {isOfferMsg && <Receipt className="mt-0.5 size-3.5 shrink-0" />}
+                          <span className={cn("leading-relaxed", isSafetyWarning && "font-medium")}>
+                            {message.content}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={message.id}>
+                      {showDate && <DateDivider date={message.createdAt} />}
+                      <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
+                        <div
+                          className={cn(
+                            "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
+                            mine
+                              ? "rounded-tr-[4px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
+                              : "rounded-tl-[4px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
+                          )}
+                        >
+                          {/* Sender name — group-specific */}
+                          <p
+                            className={cn(
+                              "mb-1 text-[10px] font-semibold uppercase tracking-wider",
+                              mine ? "text-[#0a5a34]/70" : "text-[var(--color-sea-700)]",
+                            )}
+                          >
+                            {message.sender?.fullName ?? "System"}
+                          </p>
+                          {message.messageType === "poll" ? (
+                            <PollCard
+                              question={pollQuestion}
+                              options={pollOptionsData}
+                              currentUserId={session?.user.id ?? ""}
+                              isMine={mine}
+                              onVote={(optionId) => vote(message.id, optionId)}
+                            />
+                          ) : (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                              <MessageContent content={message.content} isMine={mine} />
+                            </p>
+                          )}
+                          <p
+                            className={cn(
+                              "mt-0.5 text-right text-[10px]",
+                              mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
+                            )}
+                          >
+                            {format(new Date(message.createdAt), "HH:mm")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {typingUsers.length > 0 && (
+                  <div className="flex justify-start">
+                    <div className="rounded-[18px] rounded-tl-[4px] border border-white/90 bg-white/95 px-4 py-3 shadow-sm">
+                      <span className="flex gap-1">
+                        <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:300ms]" />
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messageEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* @mention dropdown */}
+          {showMentionDropdown && (
+            <div className="relative z-10">
+              <div className="absolute bottom-20 left-4 right-4 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-lg)]">
+                <p className="border-b border-[var(--color-border)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-400)]">
+                  Tag a member
+                </p>
+                {mentionSuggestions.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertMention(member);
+                    }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] text-[10px] font-bold text-[var(--color-sea-700)]">
+                      {initials(member.user.fullName)}
+                    </div>
+                    <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
+                      {member.user.fullName}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Input bar — same style as DM */}
+          <div className="flex items-end gap-2 border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa] px-3 py-3">
+            <Textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setShowMentionDropdown(false);
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Type a message… (@ to mention)"
+              rows={1}
+              className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
+            />
+            <div className="flex shrink-0 flex-col gap-2 self-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft((d) => d + "@");
+                  textareaRef.current?.focus();
+                }}
+                title="Mention someone"
+                className="flex size-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-white/80 text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
+              >
+                <AtSign className="size-4" />
+              </button>
+              {isAgency && isPlanGroup && (
+                <Button
+                  variant="soft"
+                  size="sm"
+                  onClick={() => setOfferModalOpen(true)}
+                  title="Submit an offer"
+                >
+                  <Receipt className="size-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="icon"
+                onClick={sendMessage}
+                disabled={isPending || !draft.trim()}
+                className="size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+              >
+                <Send className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <PollModal open={pollOpen} onClose={() => setPollOpen(false)} onSubmit={createPoll} isPending={isPending} />
+        {isPlanGroup && (
+          <SubmitOfferModal
+            open={offerModalOpen}
+            groupId={groupId}
+            planCreatorId={planCreatorId}
+            onClose={() => setOfferModalOpen(false)}
+            onSubmitted={(offer) => setOffers((c) => upsertOffer(c, offer))}
+            apiFetchWithAuth={apiFetchWithAuth}
+          />
+        )}
+        <CounterOfferSheet
+          open={counterSheetOfferId !== null}
+          onClose={() => {
+            setCounterSheetOfferId(null);
+            setCounterSheetInitialPrice(null);
+          }}
+          onSubmit={async (payload) => {
+            if (!counterSheetOfferId) return;
+            await handleCounterOffer(counterSheetOfferId, payload);
+          }}
+          currentPrice={counteringOffer?.pricePerPerson ?? 0}
+          initialPrice={counterSheetInitialPrice ?? undefined}
+          counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
+          maxRounds={3}
+        />
+      </>
     );
   }
 
@@ -842,14 +1223,16 @@ export function GroupChat({
                           <LogOut className="size-4 text-[var(--color-sunset-600)]" />
                           Leave group
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleShowAllOffers}
-                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                        >
-                          <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                          Show all offers
-                        </button>
+                        {isPlanGroup && (
+                          <button
+                            type="button"
+                            onClick={handleShowAllOffers}
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                          >
+                            <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                            Show all offers
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={handlePayNow}
@@ -870,8 +1253,8 @@ export function GroupChat({
                 </div>
               )}
 
-              {/* Compact offers */}
-              {offers.length > 0 && (
+              {/* Compact offers — only for user-plan groups */}
+              {isPlanGroup && offers.length > 0 && (
                 <div id="offers-section" className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
@@ -1137,7 +1520,7 @@ export function GroupChat({
                     >
                       <AtSign className="size-4" />
                     </button>
-                    {isAgency && (
+                    {isAgency && isPlanGroup && (
                       <Button
                         variant="soft"
                         size="sm"
@@ -1247,15 +1630,17 @@ export function GroupChat({
         isPending={isPending}
       />
 
-      {/* Submit Offer modal */}
-      <SubmitOfferModal
-        open={offerModalOpen}
-        groupId={groupId}
-        planCreatorId={planCreatorId}
-        onClose={() => setOfferModalOpen(false)}
-        onSubmitted={(offer) => setOffers((c) => upsertOffer(c, offer))}
-        apiFetchWithAuth={apiFetchWithAuth}
-      />
+      {/* Submit Offer modal — only for user-plan groups */}
+      {isPlanGroup && (
+        <SubmitOfferModal
+          open={offerModalOpen}
+          groupId={groupId}
+          planCreatorId={planCreatorId}
+          onClose={() => setOfferModalOpen(false)}
+          onSubmitted={(offer) => setOffers((c) => upsertOffer(c, offer))}
+          apiFetchWithAuth={apiFetchWithAuth}
+        />
+      )}
 
       {/* Counter Offer sheet */}
       <CounterOfferSheet
