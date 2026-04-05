@@ -962,16 +962,16 @@ export function GroupChat({
                         {showDate && <DateDivider date={message.createdAt} />}
                         <div
                           className={cn(
-                            "mx-auto flex max-w-lg items-start gap-2 rounded-full px-4 py-2 text-xs",
+                            "mx-auto flex max-w-lg items-start gap-2 px-4 py-2 text-xs",
                             isSafetyWarning
                               ? "rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 text-amber-800"
                               : isTripCard
                               ? "rounded-[var(--radius-md)] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-800)]"
                               : isOfferMsg
-                              ? "border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
+                              ? "rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)]"
                               : isPaymentMsg
-                              ? "border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
-                              : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)]",
+                              ? "rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                              : "text-[var(--color-ink-500)]",
                           )}
                         >
                           {isSafetyWarning && <span className="shrink-0 text-base">⚠️</span>}
@@ -1350,16 +1350,16 @@ export function GroupChat({
                           )}
                           <div
                             className={cn(
-                              "mx-auto flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-xs",
+                              "mx-auto flex max-w-lg items-start gap-2 px-4 py-2.5 text-xs",
                               isSafetyWarning
-                                ? "border border-amber-200 bg-amber-50 text-amber-800"
+                                ? "rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 text-amber-800"
                                 : isTripCard
-                                ? "border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-800)]"
+                                ? "rounded-[var(--radius-md)] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-800)]"
                                 : isOfferMsg
                                 ? "border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] text-[var(--color-lavender-500)] rounded-full"
                                 : isPaymentMsg
                                 ? "border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)] rounded-full"
-                                : "bg-[var(--color-surface-2)] text-[var(--color-ink-500)] rounded-full",
+                                : "text-[var(--color-ink-500)]",
                             )}
                           >
                             {isSafetyWarning && <span className="mt-0.5 shrink-0 text-base">⚠️</span>}
