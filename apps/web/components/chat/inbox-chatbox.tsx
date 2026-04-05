@@ -1074,10 +1074,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                           )}
                           <div
                             className={cn(
-                              "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
+                              "w-fit max-w-[82%] rounded-2xl border px-3 py-1.5 shadow-sm",
                               mine
-                                ? "rounded-tr-[4px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
-                                : "rounded-tl-[4px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
+                                ? "rounded-tr-[6px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
+                                : "rounded-tl-[6px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
                             )}
                           >
                             {/* Reply quote */}
@@ -1090,12 +1090,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                                 </div>
                               );
                             })() : null}
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                            <p className="whitespace-pre-wrap text-[14px] leading-[1.35]">
                               {message.content}
                             </p>
                             <p
                               className={cn(
-                                "mt-0.5 text-right text-[10px]",
+                                "mt-1 text-right text-[10px] leading-none",
                                 mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
                               )}
                             >
@@ -1117,7 +1117,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   })}
                   {typingUsers.length > 0 && (
                     <div className="flex justify-start">
-                      <div className="rounded-[18px] rounded-tl-[4px] border border-white/90 bg-white/95 px-4 py-3 shadow-sm">
+                      <div className="rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 px-3 py-2 shadow-sm">
                         <span className="flex gap-1">
                           <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
                           <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
@@ -1132,7 +1132,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Input bar */}
-            <div className="border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa]">
+            <div className="border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
               {/* Reply preview */}
               {replyTo && (
                 <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
@@ -1146,15 +1146,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   </button>
                 </div>
               )}
-              <div className="flex items-end gap-2 px-3 py-3">
+              <div className="flex items-center gap-2 px-3 py-2.5">
                 {/* Emoji picker */}
-                <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+                <div className="relative shrink-0" ref={emojiPickerRef}>
                   <button
                     type="button"
                     onClick={() => setShowEmojiPicker((v) => !v)}
-                    className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-ink-700)]"
+                    className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-100)] bg-white/90 text-[var(--color-ink-500)] shadow-[var(--shadow-sm)] transition hover:bg-white hover:text-[var(--color-ink-700)]"
                   >
-                    <Smile className="size-5" />
+                    <Smile className="size-4" />
                   </button>
                   {showEmojiPicker && (
                     <div className="absolute bottom-11 left-0 z-30">
@@ -1183,16 +1183,16 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   }}
                   placeholder="Type a message…"
                   rows={1}
-                  className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
+                  className="min-h-0 flex-1 resize-none rounded-full !border-[var(--color-sea-200)] !bg-white/95 !px-4 !py-2 text-sm leading-5 shadow-[var(--shadow-sm)] focus:!border-[var(--color-sea-300)]"
                 />
                 <Button
                   type="button"
                   size="icon"
                   onClick={sendDirectMessage}
                   disabled={isPending || !draft.trim()}
-                  className="mb-0.5 size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+                  className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
                 >
-                  <Send className="size-4" />
+                  <Send className="size-3.5" />
                 </Button>
               </div>
             </div>

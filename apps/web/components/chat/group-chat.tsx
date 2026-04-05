@@ -1026,21 +1026,18 @@ export function GroupChat({
                         )}
                         <div
                           className={cn(
-                            "max-w-[72%] rounded-[18px] border px-4 py-2.5 shadow-sm",
+                            "w-fit max-w-[82%] rounded-2xl border px-3 py-1.5 shadow-sm",
                             mine
-                              ? "rounded-tr-[4px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
-                              : "rounded-tl-[4px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
+                              ? "rounded-tr-[6px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
+                              : "rounded-tl-[6px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
                           )}
                         >
                           {/* Sender name — group-specific */}
-                          <p
-                            className={cn(
-                              "mb-1 text-[10px] font-semibold uppercase tracking-wider",
-                              mine ? "text-[#0a5a34]/70" : "text-[var(--color-sea-700)]",
-                            )}
-                          >
-                            {message.sender?.fullName ?? "System"}
-                          </p>
+                          {!mine && (
+                            <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--color-sea-700)]">
+                              {message.sender?.fullName ?? "System"}
+                            </p>
+                          )}
                           {/* Reply quote */}
                           {message.metadata?.replyTo && typeof message.metadata.replyTo === "object" ? (() => {
                             const rt = message.metadata!.replyTo as { senderName?: string; content?: string };
@@ -1064,13 +1061,13 @@ export function GroupChat({
                               onVote={(optionId) => vote(message.id, optionId)}
                             />
                           ) : (
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                            <p className="whitespace-pre-wrap text-[14px] leading-[1.35]">
                               <MessageContent content={message.content} isMine={mine} />
                             </p>
                           )}
                           <p
                             className={cn(
-                              "mt-0.5 text-right text-[10px]",
+                              "mt-1 text-right text-[10px] leading-none",
                               mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
                             )}
                           >
@@ -1092,7 +1089,7 @@ export function GroupChat({
                 })}
                 {typingUsers.length > 0 && (
                   <div className="flex justify-start">
-                    <div className="rounded-[18px] rounded-tl-[4px] border border-white/90 bg-white/95 px-4 py-3 shadow-sm">
+                    <div className="rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 px-3 py-2 shadow-sm">
                       <span className="flex gap-1">
                         <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
                         <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
@@ -1136,7 +1133,7 @@ export function GroupChat({
           )}
 
           {/* Input bar */}
-          <div className="border-t border-[var(--color-sea-100)] bg-gradient-to-r from-[#edf9f2] to-[#f5fffa]">
+          <div className="border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
             {/* Reply preview */}
             {replyTo && (
               <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
@@ -1150,15 +1147,26 @@ export function GroupChat({
                 </button>
               </div>
             )}
-            <div className="flex items-end gap-2 px-3 py-3">
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              {isAgency && isPlanGroup && (
+                <Button
+                  variant="soft"
+                  size="icon"
+                  onClick={() => setOfferModalOpen(true)}
+                  title="Submit an offer"
+                  className="size-8 rounded-full border border-[var(--color-sea-200)] bg-white/90 text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]"
+                >
+                  <Receipt className="size-3.5" />
+                </Button>
+              )}
               {/* Emoji picker */}
-              <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+              <div className="relative shrink-0" ref={emojiPickerRef}>
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker((v) => !v)}
-                  className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-ink-700)]"
+                  className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-100)] bg-white/90 text-[var(--color-ink-500)] shadow-[var(--shadow-sm)] transition hover:bg-white hover:text-[var(--color-ink-700)]"
                 >
-                  <Smile className="size-5" />
+                  <Smile className="size-4" />
                 </button>
                 {showEmojiPicker && (
                   <div className="absolute bottom-11 left-0 z-30">
@@ -1187,29 +1195,17 @@ export function GroupChat({
                 }}
                 placeholder="Type a message… (@ to mention)"
                 rows={1}
-                className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
+                className="min-h-0 flex-1 resize-none rounded-full !border-[var(--color-sea-200)] !bg-white/95 !px-4 !py-2 text-sm leading-5 shadow-[var(--shadow-sm)] focus:!border-[var(--color-sea-300)]"
               />
-              <div className="flex shrink-0 flex-col gap-2 self-end">
-                {isAgency && isPlanGroup && (
-                  <Button
-                    variant="soft"
-                    size="sm"
-                    onClick={() => setOfferModalOpen(true)}
-                    title="Submit an offer"
-                  >
-                    <Receipt className="size-4" />
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  size="icon"
-                  onClick={sendMessage}
-                  disabled={isPending || !draft.trim()}
-                  className="size-10 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
-                >
-                  <Send className="size-4" />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                size="icon"
+                onClick={sendMessage}
+                disabled={isPending || !draft.trim()}
+                className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+              >
+                <Send className="size-3.5" />
+              </Button>
             </div>
           </div>
         </div>
@@ -1481,17 +1477,19 @@ export function GroupChat({
                           )}
                           <div
                             className={cn(
-                              "max-w-[85%] rounded-[var(--radius-lg)] px-4 py-3 sm:max-w-[70%] sm:px-5 sm:py-4",
+                              "w-fit max-w-[82%] rounded-2xl border px-3 py-2 sm:max-w-[74%] sm:px-3.5 sm:py-2.5",
                               mine
-                                ? "bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-sm)]"
-                                : "border border-white/60 bg-[var(--color-surface-raised)] text-[var(--color-ink-900)] shadow-[var(--shadow-md)]",
+                                ? "rounded-tr-[6px] border-[#18b85c] bg-gradient-to-b from-[var(--color-sea-500)] to-[var(--color-sea-700)] text-white shadow-[var(--shadow-sm)]"
+                                : "rounded-tl-[6px] border-white/60 bg-[var(--color-surface-raised)] text-[var(--color-ink-900)] shadow-[var(--shadow-md)]",
                             )}
                           >
                             {/* Sender + time */}
-                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em]">
-                              <span className="font-semibold">
-                                {message.sender?.fullName ?? "System"}
-                              </span>
+                            <div className="mb-0.5 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.1em]">
+                              {!mine && (
+                                <span className="font-semibold text-[var(--color-sea-700)]">
+                                  {message.sender?.fullName ?? "System"}
+                                </span>
+                              )}
                               <span className={mine ? "text-white/60" : "text-[var(--color-ink-400)]"}>
                                 {chatMsgTime(message.createdAt)}
                               </span>
@@ -1500,7 +1498,7 @@ export function GroupChat({
                             {message.metadata?.replyTo && typeof message.metadata.replyTo === "object" ? (() => {
                               const rt = message.metadata!.replyTo as { senderName?: string; content?: string };
                               return (
-                                <div className={cn("mt-1.5 rounded-[8px] border-l-2 px-2.5 py-1.5", mine ? "border-white/40 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
+                                <div className={cn("mt-1 rounded-[8px] border-l-2 px-2 py-1", mine ? "border-white/40 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
                                   <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>{rt.senderName ?? ""}</p>
                                   <p className={cn("truncate text-xs leading-tight", mine ? "text-white/60" : "text-[var(--color-ink-500)]")}>{(rt.content ?? "").slice(0, 80)}</p>
                                 </div>
@@ -1515,7 +1513,7 @@ export function GroupChat({
                                 onVote={(optionId) => vote(message.id, optionId)}
                               />
                             ) : (
-                              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                              <p className="mt-1 whitespace-pre-wrap text-[14px] leading-[1.35]">
                                 <MessageContent content={message.content} isMine={mine} />
                               </p>
                             )}
@@ -1599,15 +1597,26 @@ export function GroupChat({
                     </button>
                   </div>
                 )}
-                <div className="flex items-end gap-2 px-5 py-3 sm:p-0 sm:pt-3">
+                <div className="flex items-center gap-2 px-5 py-3 sm:p-0 sm:pt-3">
+                  {isAgency && isPlanGroup && (
+                    <Button
+                      variant="soft"
+                      size="icon"
+                      onClick={() => setOfferModalOpen(true)}
+                      title="Submit an offer"
+                      className="size-8 shrink-0 rounded-full border border-[var(--color-sea-200)] bg-white/90 text-[var(--color-sea-700)] shadow-[var(--shadow-sm)]"
+                    >
+                      <Receipt className="size-3.5" />
+                    </Button>
+                  )}
                   {/* Emoji picker */}
-                  <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+                  <div className="relative shrink-0" ref={emojiPickerRef}>
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker((v) => !v)}
-                      className="flex size-9 items-center justify-center rounded-full text-[var(--color-ink-400)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-700)]"
+                      className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-100)] bg-white/90 text-[var(--color-ink-500)] shadow-[var(--shadow-sm)] transition hover:bg-white hover:text-[var(--color-ink-700)]"
                     >
-                      <Smile className="size-5" />
+                      <Smile className="size-4" />
                     </button>
                     {showEmojiPicker && (
                       <div className="absolute bottom-11 left-0 z-30">
@@ -1639,27 +1648,18 @@ export function GroupChat({
                         }
                       }}
                       placeholder="Type a message… (⌘Enter to send, @ to mention)"
-                      rows={2}
-                      className="min-h-0"
+                      rows={1}
+                      className="min-h-0 rounded-full !border-[var(--color-sea-200)] !bg-white/95 !px-4 !py-2 text-sm leading-5 shadow-[var(--shadow-sm)] focus:!border-[var(--color-sea-300)]"
                     />
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2 self-end">
-                    {isAgency && isPlanGroup && (
-                      <Button
-                        variant="soft"
-                        size="sm"
-                        onClick={() => setOfferModalOpen(true)}
-                        title="Submit an offer"
-                        className="flex items-center gap-1.5"
-                      >
-                        <Receipt className="size-4" />
-                        <span className="hidden sm:inline">Offer</span>
-                      </Button>
-                    )}
-                    <Button onClick={sendMessage} disabled={isPending} size="icon">
-                      <Send className="size-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={sendMessage}
+                    disabled={isPending || !draft.trim()}
+                    size="icon"
+                    className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+                  >
+                    <Send className="size-3.5" />
+                  </Button>
                 </div>
               </div>
             </div>
