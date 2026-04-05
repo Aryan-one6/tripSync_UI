@@ -1090,17 +1090,7 @@ export function GroupChat({
               className="min-h-0 flex-1 resize-none rounded-[18px] !border-[var(--color-sea-200)] !bg-white shadow-[var(--shadow-sm)]"
             />
             <div className="flex shrink-0 flex-col gap-2 self-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setDraft((d) => d + "@");
-                  textareaRef.current?.focus();
-                }}
-                title="Mention someone"
-                className="flex size-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-white/80 text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
-              >
-                <AtSign className="size-4" />
-              </button>
+             
               {isAgency && isPlanGroup && (
                 <Button
                   variant="soft"
@@ -1509,17 +1499,7 @@ export function GroupChat({
                     />
                   </div>
                   <div className="flex shrink-0 flex-col gap-2 self-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraft((d) => d + "@");
-                        textareaRef.current?.focus();
-                      }}
-                      title="Mention someone"
-                      className="flex size-9 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[var(--color-sea-700)]"
-                    >
-                      <AtSign className="size-4" />
-                    </button>
+                    
                     {isAgency && isPlanGroup && (
                       <Button
                         variant="soft"
