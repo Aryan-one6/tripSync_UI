@@ -962,7 +962,7 @@ export function GroupChat({
                         {showDate && <DateDivider date={message.createdAt} />}
                         <div
                           className={cn(
-                            "mx-auto flex max-w-lg items-start gap-2 px-4 py-2 text-xs",
+                            "mx-auto flex max-w-lg items-start justify-center gap-2 px-4 py-2 text-center text-xs",
                             isSafetyWarning
                               ? "rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 text-amber-800"
                               : isTripCard
@@ -1350,7 +1350,7 @@ export function GroupChat({
                           )}
                           <div
                             className={cn(
-                              "mx-auto flex max-w-lg items-start gap-2 px-4 py-2.5 text-xs",
+                              "mx-auto flex max-w-lg items-start justify-center gap-2 px-4 py-2.5 text-center text-xs",
                               isSafetyWarning
                                 ? "rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 text-amber-800"
                                 : isTripCard
