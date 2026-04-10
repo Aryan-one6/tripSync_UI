@@ -20,6 +20,7 @@ import { socialRouter } from './modules/social/router.js';
 import { notificationsRouter } from './modules/notifications/router.js';
 import { loyaltyRouter } from './modules/loyalty/router.js';
 import { generalLimiter, authLimiter } from './middleware/rate-limit.js';
+import { isRedisConfigured, redisConfigReason } from './lib/redis.js';
 
 const app = express();
 
@@ -36,7 +37,15 @@ app.use(express.json({ limit: '25mb' }));
 app.use(generalLimiter);
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    redis: {
+      enabled: isRedisConfigured,
+      mode: isRedisConfigured ? 'tcp' : 'memory_fallback',
+      reason: redisConfigReason,
+    },
+  });
 });
 
 app.use('/api/v1/auth', authLimiter, authRouter);

@@ -68,9 +68,16 @@ class MemoryRedis {
 }
 
 const LOCAL_REDIS_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+type RedisConfigState = {
+  enabled: boolean;
+  host: string | null;
+  reason: 'ok' | 'missing_url' | 'localhost_in_production';
+};
 
-function shouldEnableRedis() {
-  if (!env.REDIS_URL) return false;
+function resolveRedisConfigState(): RedisConfigState {
+  if (!env.REDIS_URL) {
+    return { enabled: false, host: null, reason: 'missing_url' };
+  }
 
   const redisHost = new URL(env.REDIS_URL).hostname.toLowerCase();
   const isLocalRedisHost = LOCAL_REDIS_HOSTS.has(redisHost);
@@ -80,13 +87,17 @@ function shouldEnableRedis() {
     console.warn(
       `Redis is disabled because REDIS_URL points to local host (${redisHost}) in production runtime.`,
     );
-    return false;
+    return { enabled: false, host: redisHost, reason: 'localhost_in_production' };
   }
 
-  return true;
+  return { enabled: true, host: redisHost, reason: 'ok' };
 }
 
-export const isRedisConfigured = shouldEnableRedis();
+const redisConfigState = resolveRedisConfigState();
+
+export const isRedisConfigured = redisConfigState.enabled;
+export const redisHost = redisConfigState.host;
+export const redisConfigReason = redisConfigState.reason;
 
 const createRedisClient = () =>
   new (IORedis as any)(env.REDIS_URL, {
