@@ -828,6 +828,8 @@ export async function listDirectConversations(userId: string) {
       },
     },
     orderBy: { updatedAt: 'desc' },
+    // PERF: cap list to avoid unbounded full-table returns for power users
+    take: 50,
     include: {
       participants: {
         include: {
@@ -845,22 +847,15 @@ export async function listDirectConversations(userId: string) {
           },
         },
       },
+      // PERF FIX: load only 1 message (last-message preview) not 20
       messages: {
         orderBy: { createdAt: 'desc' },
-        take: 20,
-        include: {
-          sender: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-              avatarUrl: true,
-              city: true,
-              verification: true,
-              avgRating: true,
-              completedTrips: true,
-            },
-          },
+        take: 1,
+        select: {
+          id: true,
+          content: true,
+          senderId: true,
+          createdAt: true,
         },
       },
     },

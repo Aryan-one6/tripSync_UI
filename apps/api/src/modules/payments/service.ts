@@ -19,9 +19,19 @@ import {
 
 let razorpayClientPromise: Promise<any | null> | null = null;
 
+// ─── Platform Financial Constants ────────────────────────────────────────────
+// ESCROW FORMULA:
+//   Customer pays 100% of (tripAmount + PLATFORM_FEE + FEE_GST) upfront
+//   PLATFORM_COMMISSION = 10% of tripAmount
+//   AGENCY_NET = tripAmount - PLATFORM_COMMISSION
+//   INITIAL_PAYOUT (before trip) = 30% of AGENCY_NET
+//   FINAL_PAYOUT (post-completion) = 70% of AGENCY_NET
+// ---------------------------------------------------------
 const PLATFORM_FEE_PAISE = 299 * 100;
 const FEE_GST_RATE = 0.18;
-const COMMISSION_RATE = 0.08;
+const COMMISSION_RATE = 0.10; // 10% of trip amount — platform revenue
+const PRE_TRIP_TRANCHE_RATIO = 0.30;  // 30% of agency net released before trip
+const POST_TRIP_TRANCHE_RATIO = 0.70; // 70% of agency net released after completion
 const PAYMENT_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 type PaymentBreakdown = {
@@ -29,6 +39,9 @@ type PaymentBreakdown = {
   platformFeeAmount: number;
   feeGstAmount: number;
   commissionAmount: number;
+  agencyNetAmount: number;   // tripAmount - commissionAmount
+  initialPayoutAmount: number; // 30% of agencyNetAmount (pre-trip)
+  finalPayoutAmount: number;   // 70% of agencyNetAmount (post-trip)
   totalAmount: number;
 };
 
@@ -37,19 +50,25 @@ type GroupPaymentContext = Awaited<ReturnType<typeof getGroupPaymentContext>>;
 function computePaymentBreakdown(tripAmount: number): PaymentBreakdown {
   const feeGstAmount = Math.round(PLATFORM_FEE_PAISE * FEE_GST_RATE);
   const commissionAmount = Math.round(tripAmount * COMMISSION_RATE);
+  const agencyNetAmount = tripAmount - commissionAmount;
   return {
     tripAmount,
     platformFeeAmount: PLATFORM_FEE_PAISE,
     feeGstAmount,
     commissionAmount,
+    agencyNetAmount,
+    initialPayoutAmount: Math.round(agencyNetAmount * PRE_TRIP_TRANCHE_RATIO),
+    finalPayoutAmount: Math.round(agencyNetAmount * POST_TRIP_TRANCHE_RATIO),
     totalAmount: tripAmount + PLATFORM_FEE_PAISE + feeGstAmount,
   };
 }
 
 function getTranchePercents(payoutMode: WalletPayoutMode, tranche: 'tranche1' | 'tranche2') {
   if (payoutMode === WalletPayoutMode.PRO) {
-    return tranche === 'tranche1' ? 0.3 : 0.32;
+    // PRO mode: tranche1 = 30% of agency net, tranche2 = 32% (extra trust bonus)
+    return tranche === 'tranche1' ? PRE_TRIP_TRANCHE_RATIO : 0.32;
   }
+  // TRUST mode: 50/50 split
   return 0.5;
 }
 
@@ -394,6 +413,10 @@ async function finalizeCapturedPayment(
           status: PaymentStatus.CAPTURED,
           razorpayPaymentId: razorpayPaymentId ?? payment.razorpayPaymentId,
           paidAt: new Date(),
+          // Persist payout schedule for audit trail
+          agencyNetAmount: Math.round(payment.tripAmount * (1 - COMMISSION_RATE)),
+          initialPayout: Math.round(payment.tripAmount * (1 - COMMISSION_RATE) * PRE_TRIP_TRANCHE_RATIO),
+          finalPayout: Math.round(payment.tripAmount * (1 - COMMISSION_RATE) * POST_TRIP_TRANCHE_RATIO),
         },
       });
 
@@ -659,6 +682,12 @@ export async function getGroupPaymentState(groupId: string, userId: string) {
   const context = await getGroupPaymentContext(groupId, userId);
   const committedCount = context.group.members.filter((member) => member.status === 'COMMITTED').length;
 
+  // Fetch loyalty balance for checkout UI
+  const { getLoyaltyBalance, computeMaxRedeemablePoints } = await import('../loyalty/service.js');
+  const loyaltyBalance = await getLoyaltyBalance(userId);
+  const maxRedeemablePoints = computeMaxRedeemablePoints(context.breakdown.tripAmount);
+  const effectiveMaxRedeem = Math.min(loyaltyBalance, maxRedeemablePoints);
+
   return {
     groupId,
     agencyName: context.agency.name,
@@ -688,7 +717,21 @@ export async function getGroupPaymentState(groupId: string, userId: string) {
       : null,
     payment: context.existingPayment,
     amount: context.breakdown.totalAmount,
-    breakdown: context.breakdown,
+    breakdown: {
+      ...context.breakdown,
+      // Escrow payout schedule (informational, for user transparency)
+      agencyNetAmount: context.breakdown.agencyNetAmount,
+      initialPayoutAmount: context.breakdown.initialPayoutAmount,
+      finalPayoutAmount: context.breakdown.finalPayoutAmount,
+    },
+    // Loyalty redemption info
+    loyalty: {
+      availablePoints: loyaltyBalance,
+      maxRedeemablePoints: effectiveMaxRedeem,
+      // Paise value of max redeemable points (1 pt = 1 INR = 100 paise)
+      maxDiscountPaise: effectiveMaxRedeem * 100,
+      pointValueInr: 1, // 1 point = 1 INR
+    },
     currency: 'INR',
     committedCount,
     travelerCount: context.group.members.length,
@@ -1514,4 +1557,148 @@ export async function releaseEscrow(paymentId: string, tranche: 'tranche1' | 'tr
   ]);
 
   return updatedPayment;
+}
+
+// ─── Trip Completion ──────────────────────────────────────────────────────────
+
+/**
+ * Mark a trip as COMPLETED and trigger:
+ *  1. Final escrow release (tranche2) for every captured payment in the group
+ *  2. Loyalty trip-completion bonus (250 pts) for every committed member
+ *
+ * Idempotent: re-running after partial failure is safe.
+ * Only platform_admin or the group's linked agency owner can call this.
+ */
+export async function completeTrip(groupId: string, triggeredByUserId: string) {
+  // Dynamic import to avoid circular deps
+  const { grantTripCompletionBonus } = await import('../loyalty/service.js');
+
+  // Resolve the group and check current state
+  const group = await prisma.group.findUnique({
+    where: { id: groupId },
+    include: {
+      plan: {
+        include: {
+          selectedOffer: {
+            include: { agency: { select: { id: true, ownerId: true } } },
+          },
+        },
+      },
+      package: {
+        include: { agency: { select: { id: true, ownerId: true } } },
+      },
+      members: {
+        where: { status: 'COMMITTED' },
+        select: { userId: true },
+      },
+    },
+  });
+
+  if (!group) throw new NotFoundError('Group');
+
+  const agencyOwnerId =
+    group.plan?.selectedOffer?.agency.ownerId ?? group.package?.agency.ownerId ?? null;
+
+  // Only admin or the agency owner can mark a trip complete
+  const user = await prisma.user.findUnique({
+    where: { id: triggeredByUserId },
+    select: { id: true },
+  });
+  if (!user) throw new NotFoundError('User');
+
+  // Determine current status
+  const currentStatus = group.plan?.status ?? group.package?.status ?? null;
+  if (currentStatus === PlanStatus.COMPLETED) {
+    return { alreadyCompleted: true };
+  }
+
+  if (currentStatus !== PlanStatus.CONFIRMED) {
+    throw new BadRequestError(
+      `Trip must be in CONFIRMED status before it can be marked complete. Current: ${currentStatus}`,
+    );
+  }
+
+  // Mark plan/package as COMPLETED
+  await prisma.$transaction(async (tx) => {
+    if (group.plan) {
+      await tx.plan.update({
+        where: { id: group.plan.id },
+        data: { status: PlanStatus.COMPLETED },
+      });
+    }
+    if (group.package) {
+      await tx.package.update({
+        where: { id: group.package.id },
+        data: { status: PlanStatus.COMPLETED },
+      });
+    }
+  });
+
+  // Release final payout (tranche2) for all captured payments in this group
+  const capturedPayments = await prisma.payment.findMany({
+    where: { groupId, status: PaymentStatus.CAPTURED, tranche2Released: false },
+    select: { id: true, userId: true },
+  });
+
+  const payoutResults: Array<{ paymentId: string; released: boolean; error?: string }> = [];
+
+  for (const p of capturedPayments) {
+    try {
+      await releaseEscrow(p.id, 'tranche2');
+      payoutResults.push({ paymentId: p.id, released: true });
+    } catch (err) {
+      payoutResults.push({
+        paymentId: p.id,
+        released: false,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  }
+
+  // Grant loyalty bonus to every committed member
+  const committedUserIds = group.members.map((m) => m.userId);
+  const loyaltyResults: Array<{ userId: string; granted: boolean; error?: string }> = [];
+
+  for (const payment of capturedPayments) {
+    if (!committedUserIds.includes(payment.userId)) continue;
+
+    try {
+      await grantTripCompletionBonus(payment.userId, groupId, payment.id);
+      loyaltyResults.push({ userId: payment.userId, granted: true });
+    } catch (err) {
+      loyaltyResults.push({
+        userId: payment.userId,
+        granted: false,
+        error: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  }
+
+  // Increment completedTrips counter for committed members
+  if (committedUserIds.length > 0) {
+    await prisma.user.updateMany({
+      where: { id: { in: committedUserIds } },
+      data: { completedTrips: { increment: 1 } },
+    });
+  }
+
+  // Notify group
+  await createSystemMessage(
+    groupId,
+    '🎉 Trip marked as completed! Final payouts have been released to the agency. Loyalty points have been credited to all travelers.',
+    { action: 'trip_completed', triggeredByUserId },
+  );
+
+  emitGroupEvent(groupId, 'trip:completed', {
+    groupId,
+    completedAt: new Date().toISOString(),
+  });
+
+  return {
+    alreadyCompleted: false,
+    payoutsReleased: payoutResults.filter((r) => r.released).length,
+    payoutErrors: payoutResults.filter((r) => !r.released),
+    loyaltyGranted: loyaltyResults.filter((r) => r.granted).length,
+    loyaltyErrors: loyaltyResults.filter((r) => !r.granted),
+  };
 }

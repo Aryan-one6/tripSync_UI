@@ -148,6 +148,21 @@ paymentsRouter.post(
   }),
 );
 
+// POST /payments/groups/:groupId/complete
+// Called by admin or agency when a trip finishes successfully.
+// Releases final escrow tranche and grants loyalty bonus to all members.
+paymentsRouter.post(
+  '/groups/:groupId/complete',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await paymentService.completeTrip(
+      param(req.params.groupId),
+      req.userId!,
+    );
+    res.json({ data: result });
+  }),
+);
+
 export async function razorpayWebhookHandler(req: Request, res: Response) {
   const signature =
     typeof req.headers['x-razorpay-signature'] === 'string'
