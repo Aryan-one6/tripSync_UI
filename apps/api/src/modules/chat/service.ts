@@ -13,7 +13,7 @@ import { emitDirectConversationEvent, emitGroupEvent, emitUserEvent } from '../.
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
 import { createStoredNotificationsBulk } from '../notifications/service.js';
-import { redis } from '../../lib/redis.js';
+import { redisGetSafe, redisSetexSafe, redisDelSafe } from '../../lib/redis.js';
 
 // ─── Chat Access Cache ────────────────────────────────────────────────────────
 // Caches the result of assertChatAccess for 30 seconds.
@@ -33,12 +33,12 @@ function dmAccessKey(conversationId: string, userId: string) {
 
 /** Invalidate the access cache when a member's status changes. */
 export async function invalidateChatAccessCache(groupId: string, userId: string) {
-  await redis.del(chatAccessKey(groupId, userId));
+  await redisDelSafe(chatAccessKey(groupId, userId));
 }
 
 /** Invalidate DM access cache when a conversation participant changes. */
 export async function invalidateDmAccessCache(conversationId: string, userId: string) {
-  await redis.del(dmAccessKey(conversationId, userId));
+  await redisDelSafe(dmAccessKey(conversationId, userId));
 }
 
 const CHAT_MEMBER_STATUSES = ['APPROVED', 'COMMITTED'] as const;
@@ -273,7 +273,7 @@ async function assertDirectConversationAccess(
 ): Promise<DirectConversationAccess> {
   const cacheKey = dmAccessKey(conversationId, userId);
   if (SHOULD_USE_CHAT_CACHE) {
-    const cached = await redis.get(cacheKey);
+    const cached = await redisGetSafe(cacheKey);
     if (cached) {
       try {
         const minimal = JSON.parse(cached) as DirectConversationAccess;
@@ -304,7 +304,7 @@ async function assertDirectConversationAccess(
   }
 
   if (SHOULD_USE_CHAT_CACHE) {
-    await redis.setex(cacheKey, DM_ACCESS_TTL_S, JSON.stringify(participant));
+    await redisSetexSafe(cacheKey, DM_ACCESS_TTL_S, JSON.stringify(participant));
   }
   return participant;
 }
@@ -313,7 +313,7 @@ async function assertChatAccess(groupId: string, userId: string) {
   // ── Cache check (Redis, 30-second TTL) ─────────────────────────────────────
   const cacheKey = chatAccessKey(groupId, userId);
   if (SHOULD_USE_CHAT_CACHE) {
-    const cached = await redis.get(cacheKey);
+    const cached = await redisGetSafe(cacheKey);
     if (cached) {
       try {
         const parsed = JSON.parse(cached) as {
@@ -346,18 +346,22 @@ async function assertChatAccess(groupId: string, userId: string) {
     membership &&
     CHAT_MEMBER_STATUSES.includes(membership.status as (typeof CHAT_MEMBER_STATUSES)[number])
   ) {
-    // Cache the happy path
-    if (SHOULD_USE_CHAT_CACHE) {
-      await redis.setex(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify({
-        id: membership.id,
-        groupId: membership.groupId,
-        userId: membership.userId,
-        role: membership.role,
-        status: membership.status,
-        user: membership.user,
-      }));
-    }
-    return membership;
+      // Cache the happy path
+      if (SHOULD_USE_CHAT_CACHE) {
+        await redisSetexSafe(
+          cacheKey,
+          CHAT_ACCESS_TTL_S,
+          JSON.stringify({
+            id: membership.id,
+            groupId: membership.groupId,
+            userId: membership.userId,
+            role: membership.role,
+            status: membership.status,
+            user: membership.user,
+          }),
+        );
+      }
+      return membership;
   }
 
   // Both DB queries run in parallel to minimize latency
@@ -395,7 +399,7 @@ async function assertChatAccess(groupId: string, userId: string) {
 
         const stub = { id: `agency:${groupId}:${userId}`, groupId, userId, role: 'MEMBER', status: 'APPROVED', user: agencyUser };
         if (SHOULD_USE_CHAT_CACHE) {
-          await redis.setex(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
+          await redisSetexSafe(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
         }
         return { ...stub, joinedAt: new Date(), committedAt: null, leftAt: null };
       }
@@ -411,7 +415,7 @@ async function assertChatAccess(groupId: string, userId: string) {
 
       const stub = { id: `agency:${groupId}:${userId}`, groupId, userId, role: 'MEMBER', status: 'APPROVED', user: agencyUser };
       if (SHOULD_USE_CHAT_CACHE) {
-        await redis.setex(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
+        await redisSetexSafe(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
       }
       return { ...stub, joinedAt: new Date(), committedAt: null, leftAt: null };
     }
@@ -948,17 +952,18 @@ export async function listDirectMessages(conversationId: string, userId: string,
 
   const messages = await prisma.directMessage.findMany({
     where: { conversationId },
-    include: {
+    select: {
+      id: true,
+      conversationId: true,
+      senderId: true,
+      content: true,
+      createdAt: true,
       sender: {
         select: {
           id: true,
           username: true,
           fullName: true,
           avatarUrl: true,
-          city: true,
-          verification: true,
-          avgRating: true,
-          completedTrips: true,
         },
       },
     },

@@ -7,7 +7,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { apiFetch, ApiError } from "@/lib/api/client";
+import { apiFetch, ApiError, type ApiRequestInit } from "@/lib/api/client";
 import type { AuthSession } from "@/lib/api/types";
 
 const STORAGE_KEY = "tripsync.session";
@@ -56,7 +56,7 @@ interface AuthContextValue {
   refreshAuthSession: () => Promise<AuthSession | null>;
   updateUser: (user: AuthSession["user"]) => void;
   logout: () => void;
-  apiFetchWithAuth: <T>(path: string, init?: RequestInit) => Promise<T>;
+  apiFetchWithAuth: <T>(path: string, init?: ApiRequestInit) => Promise<T>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -204,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return refreshSession(session);
   }
 
-  async function apiFetchWithAuth<T>(path: string, init: RequestInit = {}) {
+  async function apiFetchWithAuth<T>(path: string, init: ApiRequestInit = {}) {
     if (!session) {
       throw new ApiError(401, ["Please log in to continue"]);
     }

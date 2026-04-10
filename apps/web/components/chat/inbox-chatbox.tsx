@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import {
@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { GroupChat } from "@/components/chat/group-chat";
 import { useAuth } from "@/lib/auth/auth-context";
+import { ApiError } from "@/lib/api/client";
 import { CONVERSATION_READ_EVENT } from "@/lib/realtime/use-live-notifications";
 import { useSocket } from "@/lib/realtime/use-socket";
 import { formatDateRange, initials } from "@/lib/format";
@@ -39,13 +40,52 @@ import type {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function upsertDirectMessage(list: DirectMessage[], next: DirectMessage) {
+type ChatMessageDeliveryState = "sent" | "pending" | "failed";
+type LocalDirectMessage = DirectMessage & {
+  clientId?: string;
+  isOptimistic?: boolean;
+  deliveryState?: ChatMessageDeliveryState;
+};
+
+function normalizeDirectMessage(message: DirectMessage): LocalDirectMessage {
+  return {
+    ...message,
+    isOptimistic: false,
+    deliveryState: "sent",
+  };
+}
+
+function upsertDirectMessage(list: LocalDirectMessage[], next: LocalDirectMessage) {
   const idx = list.findIndex((m) => m.id === next.id);
   if (idx === -1)
     return [...list, next].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const clone = [...list];
   clone[idx] = next;
   return clone;
+}
+
+function mergeFetchedWithOptimistic(
+  current: LocalDirectMessage[],
+  fetched: LocalDirectMessage[],
+) {
+  const optimisticPending = current.filter((message) => message.isOptimistic);
+  if (optimisticPending.length === 0) return fetched;
+
+  const pendingWithoutServerEquivalent = optimisticPending.filter((optimisticMessage) => {
+    return !fetched.some((serverMessage) => {
+      const sameAuthor = serverMessage.senderId === optimisticMessage.senderId;
+      const sameContent = serverMessage.content === optimisticMessage.content;
+      const timeDistance = Math.abs(
+        new Date(serverMessage.createdAt).getTime() -
+          new Date(optimisticMessage.createdAt).getTime(),
+      );
+      return sameAuthor && sameContent && timeDistance < 30_000;
+    });
+  });
+
+  return [...fetched, ...pendingWithoutServerEquivalent].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
 }
 
 function sortByUpdatedAtDesc(list: DirectConversation[]) {
@@ -91,7 +131,11 @@ type AgencyOfferThread = {
 
 const CONVERSATION_CACHE_TTL_MS = 30_000;
 const CONTACTS_CACHE_TTL_MS = 60_000;
-const MESSAGE_CACHE_TTL_MS = 20_000;
+const CHAT_FETCH_TIMEOUT_MS = 8_000;
+const CHAT_READ_TIMEOUT_MS = 4_000;
+const CHAT_SEND_TIMEOUT_MS = 8_000;
+const CHAT_FETCH_RETRY_DELAYS_MS = [900, 2_000];
+const CHAT_SOCKET_POLL_MS = 4_500;
 
 type TimedCache<T> = {
   data: T;
@@ -100,7 +144,7 @@ type TimedCache<T> = {
 
 let conversationCache: TimedCache<DirectConversation[]> | null = null;
 const contactsCache = new Map<string, TimedCache<MessageableContact[]>>();
-const directMessagesCache = new Map<string, TimedCache<DirectMessage[]>>();
+const directMessagesCache = new Map<string, TimedCache<LocalDirectMessage[]>>();
 
 function isCacheFresh(cachedAt: number, ttlMs: number) {
   return Date.now() - cachedAt < ttlMs;
@@ -156,7 +200,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   );
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [messages, setMessages] = useState<LocalDirectMessage[]>([]);
   const [groupChannels, setGroupChannels] = useState<TripMembership[]>([]);
   const [messageableContacts, setMessageableContacts] = useState<MessageableContact[]>([]);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
@@ -169,8 +213,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [loadingConversations, setLoadingConversations] = useState(!hasFreshConversationCache);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [syncingMessages, setSyncingMessages] = useState(false);
+  const [messageSyncIssue, setMessageSyncIssue] = useState<string | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
-  const [isPending, startTransition] = useTransition();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
@@ -300,7 +346,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       try {
         const created = await apiFetchWithAuth<DirectConversation>(
           "/chat/direct/conversations",
-          { method: "POST", body: JSON.stringify({ targetUserId: userId }) },
+          {
+            method: "POST",
+            body: JSON.stringify({ targetUserId: userId }),
+            timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+          },
         );
         setConversations((cur) => sortByUpdatedAtDesc([created, ...cur]));
         setActiveGroupId(null);
@@ -332,14 +382,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
 
-  const markConversationRead = useCallback(async (conversationId: string) => {
-    await apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
-      method: "POST",
-    });
+  const markConversationRead = useCallback((conversationId: string) => {
+    const nowIso = new Date().toISOString();
     setConversations((cur) =>
       cur.map((c) =>
         c.id === conversationId
-          ? { ...c, unreadCount: 0, lastReadAt: new Date().toISOString() }
+          ? { ...c, unreadCount: 0, lastReadAt: nowIso }
           : c,
       ),
     );
@@ -348,6 +396,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         detail: { conversationId },
       }),
     );
+    void apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
+      method: "POST",
+      timeoutMs: CHAT_READ_TIMEOUT_MS,
+    }).catch(() => {
+      // Non-blocking by design to keep message rendering instant.
+    });
   }, [apiFetchWithAuth]);
 
   const emitDirectTyping = (isTyping: boolean) => {
@@ -356,33 +410,120 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     isTypingRef.current = isTyping;
   };
 
-  function sendDirectMessage() {
-    if (!activeConversationId || isPending) return;
+  async function sendDirectMessage() {
+    if (!activeConversationId) return;
     const content = draft.trim();
     if (!content) return;
+    const conversationId = activeConversationId;
     const previousDraft = draft;
     const currentReplyTo = replyTo;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const optimisticMessage: LocalDirectMessage = {
+      id: optimisticId,
+      conversationId,
+      senderId: session?.user.id ?? "me",
+      content,
+      createdAt: nowIso,
+      sender: session?.user
+        ? {
+            id: session.user.id,
+            fullName: session.user.fullName,
+            username: session.user.username,
+            avatarUrl: session.user.avatarUrl,
+            city: session.user.city,
+            verification: session.user.verification,
+            avgRating: session.user.avgRating,
+            completedTrips: session.user.completedTrips,
+          }
+        : null,
+      clientId: optimisticId,
+      isOptimistic: true,
+      deliveryState: "pending",
+    };
+
     setDraft("");
     setReplyTo(null);
-    startTransition(async () => {
-      try {
-        await apiFetchWithAuth(
-          `/chat/direct/conversations/${activeConversationId}/messages`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              content,
-              ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
-            }),
-          },
-        );
-        setFeedback(null);
-        emitDirectTyping(false);
-      } catch (err) {
-        setDraft(previousDraft);
-        setFeedback(err instanceof Error ? err.message : "Unable to send message.");
-      }
+    setMessageSyncIssue(null);
+    emitDirectTyping(false);
+
+    setMessages((cur) => {
+      const next = upsertDirectMessage(cur, optimisticMessage);
+      directMessagesCache.set(conversationId, {
+        data: next,
+        cachedAt: Date.now(),
+      });
+      return next;
     });
+
+    setConversations((cur) =>
+      sortByUpdatedAtDesc(
+        cur.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                updatedAt: nowIso,
+                unreadCount: 0,
+                lastMessage: optimisticMessage,
+              }
+            : conversation,
+        ),
+      ),
+    );
+
+    try {
+      const created = await apiFetchWithAuth<DirectMessage>(
+        `/chat/direct/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            content,
+            ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
+          }),
+          timeoutMs: CHAT_SEND_TIMEOUT_MS,
+        },
+      );
+      const normalized = normalizeDirectMessage(created);
+      setMessages((cur) => {
+        const withoutOptimistic = cur.filter((message) => message.id !== optimisticId);
+        const next = upsertDirectMessage(withoutOptimistic, normalized);
+        directMessagesCache.set(conversationId, {
+          data: next,
+          cachedAt: Date.now(),
+        });
+        return next;
+      });
+      setConversations((cur) =>
+        sortByUpdatedAtDesc(
+          cur.map((conversation) =>
+            conversation.id === conversationId
+              ? {
+                  ...conversation,
+                  updatedAt: normalized.createdAt,
+                  unreadCount: 0,
+                  lastMessage: normalized,
+                }
+              : conversation,
+          ),
+        ),
+      );
+      setFeedback(null);
+    } catch (err) {
+      setDraft(previousDraft);
+      setMessages((cur) => {
+        const next = cur.map((message) =>
+          message.id === optimisticId
+            ? { ...message, deliveryState: "failed" as const, isOptimistic: true }
+            : message,
+        );
+        directMessagesCache.set(conversationId, {
+          data: next,
+          cachedAt: Date.now(),
+        });
+        return next;
+      });
+      setFeedback(err instanceof Error ? err.message : "Unable to send message.");
+    }
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -405,6 +546,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         }
         const data = await apiFetchWithAuth<DirectConversation[]>(
           "/chat/direct/conversations",
+          { timeoutMs: CHAT_FETCH_TIMEOUT_MS },
         ).catch(() => [] as DirectConversation[]);
         if (cancelled) return;
         setConversations(sortByUpdatedAtDesc(data));
@@ -567,48 +709,122 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [initialGroupId, openGroupChannel]);
 
   useEffect(() => {
-    if (!activeConversationId) return;
-
-    const cached = directMessagesCache.get(activeConversationId);
-    if (cached && isCacheFresh(cached.cachedAt, MESSAGE_CACHE_TTL_MS)) {
-      setMessages(cached.data);
+    if (!activeConversationId) {
+      setMessages([]);
       setLoadingMessages(false);
-    } else {
-      setLoadingMessages(true);
+      setSyncingMessages(false);
+      setMessageSyncIssue(null);
+      return;
     }
 
     let cancelled = false;
-    void (async () => {
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const cachedEntry = directMessagesCache.get(activeConversationId);
+    const hasCachedMessages = Boolean(cachedEntry && cachedEntry.data.length > 0);
+
+    if (hasCachedMessages && cachedEntry) {
+      setMessages(cachedEntry.data);
+      setLoadingMessages(false);
+      setSyncingMessages(true);
+      setMessageSyncIssue(null);
+    } else {
+      setMessages([]);
+      setLoadingMessages(true);
+      setSyncingMessages(false);
+      setMessageSyncIssue(null);
+    }
+
+    markConversationRead(activeConversationId);
+
+    const fetchMessages = async (attempt: number) => {
+      let scheduledRetry = false;
       try {
         const data = await apiFetchWithAuth<DirectMessage[]>(
           `/chat/direct/conversations/${activeConversationId}/messages`,
+          { timeoutMs: CHAT_FETCH_TIMEOUT_MS },
         );
         if (cancelled) return;
-        setMessages(data);
-        directMessagesCache.set(activeConversationId, {
-          data,
-          cachedAt: Date.now(),
+        const normalized = data.map(normalizeDirectMessage);
+        setMessages((cur) => {
+          const next = mergeFetchedWithOptimistic(cur, normalized);
+          directMessagesCache.set(activeConversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
         });
-        await markConversationRead(activeConversationId);
+        setLoadingMessages(false);
+        setSyncingMessages(false);
+        setMessageSyncIssue(null);
+        setFeedback(null);
+        markConversationRead(activeConversationId);
       } catch (err) {
-        if (!cancelled) {
-          setFeedback(
+        if (cancelled) return;
+        const fallback = directMessagesCache.get(activeConversationId)?.data ?? [];
+        const hasFallback = fallback.length > 0;
+        if (hasFallback) {
+          setMessages(fallback);
+          setLoadingMessages(false);
+          setSyncingMessages(true);
+        }
+
+        const retriesLeft = attempt < CHAT_FETCH_RETRY_DELAYS_MS.length;
+        if (retriesLeft) {
+          const retryDelay = CHAT_FETCH_RETRY_DELAYS_MS[attempt];
+          scheduledRetry = true;
+          retryTimer = setTimeout(() => {
+            void fetchMessages(attempt + 1);
+          }, retryDelay);
+        } else {
+          setLoadingMessages(false);
+          setSyncingMessages(false);
+        }
+
+        const timeoutError = err instanceof ApiError && err.status === 408;
+        if (hasFallback) {
+          setMessageSyncIssue("Reconnecting… showing cached messages.");
+        } else if (timeoutError && retriesLeft) {
+          setMessageSyncIssue("Network is slow. Retrying…");
+        } else {
+          setMessageSyncIssue(
             err instanceof Error ? err.message : "Unable to load messages.",
           );
         }
       } finally {
-        if (!cancelled) setLoadingMessages(false);
+        if (!scheduledRetry && !cancelled) {
+          setLoadingMessages((current) => (hasCachedMessages ? false : current));
+        }
       }
-    })();
+    };
+
+    void fetchMessages(0);
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [activeConversationId, apiFetchWithAuth, markConversationRead]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers.length]);
+
+  useEffect(() => {
+    if (!socket) {
+      setIsSocketConnected(false);
+      return;
+    }
+    const syncConnectionState = () => {
+      setIsSocketConnected(socket.connected);
+    };
+    syncConnectionState();
+    socket.on("connect", syncConnectionState);
+    socket.on("disconnect", syncConnectionState);
+    return () => {
+      socket.off("connect", syncConnectionState);
+      socket.off("disconnect", syncConnectionState);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!socket || !activeConversationId) return;
@@ -619,11 +835,55 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [activeConversationId, socket]);
 
   useEffect(() => {
+    if (!activeConversationId || isSocketConnected) return;
+    let cancelled = false;
+
+    const pollMessages = async () => {
+      try {
+        setSyncingMessages(true);
+        const data = await apiFetchWithAuth<DirectMessage[]>(
+          `/chat/direct/conversations/${activeConversationId}/messages`,
+          { timeoutMs: CHAT_FETCH_TIMEOUT_MS },
+        );
+        if (cancelled) return;
+        const normalized = data.map(normalizeDirectMessage);
+        setMessages((cur) => {
+          const next = mergeFetchedWithOptimistic(cur, normalized);
+          directMessagesCache.set(activeConversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
+        });
+        setMessageSyncIssue(null);
+        markConversationRead(activeConversationId);
+      } catch {
+        if (!cancelled) {
+          setMessageSyncIssue("Reconnecting… showing cached messages.");
+        }
+      } finally {
+        if (!cancelled) setSyncingMessages(false);
+      }
+    };
+
+    void pollMessages();
+    const intervalId = setInterval(() => {
+      void pollMessages();
+    }, CHAT_SOCKET_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeConversationId, apiFetchWithAuth, isSocketConnected, markConversationRead]);
+
+  useEffect(() => {
     if (!socket) return;
 
     const handleMessage = (payload: { conversationId?: string; message?: DirectMessage }) => {
       if (!payload.conversationId || !payload.message) return;
-      const { conversationId, message } = payload;
+      const { conversationId } = payload;
+      const message = normalizeDirectMessage(payload.message);
       const known = conversationsRef.current.some((c) => c.id === conversationId);
 
       setConversations((cur) => {
@@ -650,7 +910,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
       if (conversationId === activeConversationId) {
         setMessages((cur) => {
-          const next = upsertDirectMessage(cur, message);
+          const next = mergeFetchedWithOptimistic(cur, [message]);
           directMessagesCache.set(conversationId, {
             data: next,
             cachedAt: Date.now(),
@@ -658,7 +918,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           return next;
         });
         if (message.senderId !== session?.user.id) {
-          void markConversationRead(conversationId);
+          markConversationRead(conversationId);
         }
       }
     };
@@ -1136,10 +1396,29 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
             {/* Messages */}
             <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+              {(syncingMessages || messageSyncIssue || (socket && !isSocketConnected)) && (
+                <div className="sticky top-0 z-10 mx-auto mb-3 w-fit rounded-full border border-[var(--color-sea-200)] bg-white/85 px-3 py-1 text-[11px] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)] backdrop-blur">
+                  {messageSyncIssue
+                    ? messageSyncIssue
+                    : syncingMessages
+                    ? "Syncing latest messages…"
+                    : "Realtime reconnecting…"}
+                </div>
+              )}
               {loadingMessages ? (
-                <p className="py-10 text-center text-sm text-[var(--color-ink-400)]">
-                  Loading messages…
-                </p>
+                <div className="space-y-3 py-6">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div
+                      key={`dm-skeleton-${idx}`}
+                      className={cn("flex", idx % 2 === 0 ? "justify-start" : "justify-end")}
+                    >
+                      <div className="w-[68%] max-w-[360px] animate-pulse rounded-2xl border border-white/70 bg-white/70 px-3 py-3">
+                        <div className="h-2.5 w-3/4 rounded bg-[var(--color-ink-200)]/70" />
+                        <div className="mt-2 h-2.5 w-1/2 rounded bg-[var(--color-ink-200)]/60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : messages.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-sm text-[var(--color-ink-400)]">
@@ -1185,11 +1464,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                               mine
                                 ? "rounded-tr-[6px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
                                 : "rounded-tl-[6px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
+                              message.deliveryState === "failed" && "border-[var(--color-sunset-400)]",
                             )}
                           >
                             {/* Reply quote */}
-                            {(message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata?.replyTo ? (() => {
-                              const rt = (message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata!.replyTo!;
+                            {(message as LocalDirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata?.replyTo ? (() => {
+                              const rt = (message as LocalDirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata!.replyTo!;
                               return (
                                 <div className={cn("mb-2 rounded-[10px] border-l-2 px-2.5 py-1.5", mine ? "border-white/50 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
                                   <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>{rt.senderName ?? ""}</p>
@@ -1206,7 +1486,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                                 mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
                               )}
                             >
-                              {format(new Date(message.createdAt), "HH:mm")}
+                              {message.deliveryState === "pending"
+                                ? "Sending…"
+                                : message.deliveryState === "failed"
+                                ? "Failed"
+                                : format(new Date(message.createdAt), "HH:mm")}
                             </p>
                           </div>
                           {!mine && (
@@ -1296,7 +1580,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   type="button"
                   size="icon"
                   onClick={sendDirectMessage}
-                  disabled={isPending || !draft.trim()}
+                  disabled={!draft.trim()}
                   className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
                 >
                   <Send className="size-3.5" />

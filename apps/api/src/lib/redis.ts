@@ -71,7 +71,11 @@ const LOCAL_REDIS_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 type RedisConfigState = {
   enabled: boolean;
   host: string | null;
-  reason: 'ok' | 'missing_url' | 'localhost_in_production';
+  reason:
+    | 'ok'
+    | 'missing_url'
+    | 'localhost_in_production'
+    | 'non_tls_in_production';
 };
 
 function resolveRedisConfigState(): RedisConfigState {
@@ -80,6 +84,7 @@ function resolveRedisConfigState(): RedisConfigState {
   }
 
   const redisHost = new URL(env.REDIS_URL).hostname.toLowerCase();
+  const redisProtocol = new URL(env.REDIS_URL).protocol;
   const isLocalRedisHost = LOCAL_REDIS_HOSTS.has(redisHost);
   const isProductionRuntime = env.NODE_ENV === 'production';
 
@@ -88,6 +93,13 @@ function resolveRedisConfigState(): RedisConfigState {
       `Redis is disabled because REDIS_URL points to local host (${redisHost}) in production runtime.`,
     );
     return { enabled: false, host: redisHost, reason: 'localhost_in_production' };
+  }
+
+  if (isProductionRuntime && redisProtocol !== 'rediss:') {
+    console.warn(
+      `Redis is disabled because REDIS_URL must use TLS in production (expected rediss://, got ${redisProtocol}).`,
+    );
+    return { enabled: false, host: redisHost, reason: 'non_tls_in_production' };
   }
 
   return { enabled: true, host: redisHost, reason: 'ok' };
@@ -113,4 +125,38 @@ if (isRedisConfigured) {
   redisSub.on('error', (err: Error) => console.error('Redis subscriber error:', err));
 } else {
   console.warn('Redis is not configured. Falling back to in-memory cache semantics.');
+}
+
+function logRedisSoftFailure(operation: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`Redis ${operation} failed; falling back gracefully: ${message}`);
+}
+
+export async function redisGetSafe(key: string): Promise<string | null> {
+  try {
+    return await redis.get(key);
+  } catch (error) {
+    logRedisSoftFailure('GET', error);
+    return null;
+  }
+}
+
+export async function redisSetexSafe(
+  key: string,
+  ttlSeconds: number,
+  value: string,
+): Promise<void> {
+  try {
+    await redis.setex(key, ttlSeconds, value);
+  } catch (error) {
+    logRedisSoftFailure('SETEX', error);
+  }
+}
+
+export async function redisDelSafe(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+  } catch (error) {
+    logRedisSoftFailure('DEL', error);
+  }
 }

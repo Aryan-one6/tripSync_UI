@@ -103,6 +103,8 @@ For live/production deployments, use a managed Redis URL with TLS:
 REDIS_URL="rediss://default:<password>@<host>:6379"
 ```
 
+If you set `NODE_ENV=production` with a `redis://` URL, the API now intentionally disables Redis and falls back to in-memory semantics to avoid non-TLS production traffic.
+
 Quick production validation:
 
 ```bash
