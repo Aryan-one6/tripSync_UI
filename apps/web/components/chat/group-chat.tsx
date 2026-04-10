@@ -65,6 +65,23 @@ function chatMsgTime(dateStr: string): string {
   return format(d, "dd MMM");
 }
 
+const GROUP_CHAT_CACHE_TTL_MS = 20_000;
+
+type GroupChatCacheEntry = {
+  group: Group | null;
+  members: GroupMember[];
+  resolvedPlanId: string | null;
+  messages: ChatMessage[];
+  offers: Offer[];
+  cachedAt: number;
+};
+
+const groupChatCache = new Map<string, GroupChatCacheEntry>();
+
+function hasFreshGroupChatCache(cacheEntry: GroupChatCacheEntry | undefined) {
+  return Boolean(cacheEntry && Date.now() - cacheEntry.cachedAt < GROUP_CHAT_CACHE_TTL_MS);
+}
+
 /** Render message content with @mention highlighting */
 function MessageContent({
   content,
@@ -356,19 +373,31 @@ export function GroupChat({
   const router = useRouter();
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
+  const cachedGroupChat = groupChatCache.get(groupId);
+  const hasWarmCache = hasFreshGroupChatCache(cachedGroupChat);
 
-  const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<GroupMember[]>([]);
-  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(planId ?? null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [offers, setOffers] = useState<Offer[]>([]);
+  const [group, setGroup] = useState<Group | null>(() =>
+    hasWarmCache ? (cachedGroupChat?.group ?? null) : null,
+  );
+  const [members, setMembers] = useState<GroupMember[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.members ?? []) : [],
+  );
+  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(
+    () => planId ?? (hasWarmCache ? (cachedGroupChat?.resolvedPlanId ?? null) : null),
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.messages ?? []) : [],
+  );
+  const [offers, setOffers] = useState<Offer[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.offers ?? []) : [],
+  );
   const [draft, setDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
   const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
   const [counterSheetInitialPrice, setCounterSheetInitialPrice] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasWarmCache);
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -409,6 +438,17 @@ export function GroupChat({
       )
       .slice(0, 6);
   }, [mentionQuery, activeMembers, userId]);
+
+  useEffect(() => {
+    groupChatCache.set(groupId, {
+      group,
+      members,
+      resolvedPlanId,
+      messages,
+      offers,
+      cachedAt: Date.now(),
+    });
+  }, [groupId, group, members, offers, resolvedPlanId, messages]);
 
   useEffect(() => {
     setShowMentionDropdown(mentionQuery !== null && mentionSuggestions.length > 0);
@@ -469,19 +509,41 @@ export function GroupChat({
   }, [apiFetchWithAuth, planId, resolvedPlanId]);
 
   useEffect(() => {
+    let cancelled = false;
+    const cached = groupChatCache.get(groupId);
+    const hasFreshCache = hasFreshGroupChatCache(cached);
+    if (hasFreshCache && cached) {
+      setGroup(cached.group);
+      setMembers(cached.members);
+      setMessages(cached.messages);
+      setOffers(cached.offers);
+      setResolvedPlanId((current) => current ?? cached.resolvedPlanId ?? null);
+      setLoading(false);
+    }
+
     void (async () => {
       try {
-        setLoading(true);
-        await Promise.all([loadMembers(), loadMessages()]);
-      } catch (err) {
-        setFeedback(
-          err instanceof Error ? err.message : "Unable to load the trip chat.",
-        );
-      } finally {
+        if (!hasFreshCache) {
+          setLoading(true);
+        }
+        await loadMessages();
+        if (cancelled) return;
         setLoading(false);
+        await loadMembers();
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback(
+            err instanceof Error ? err.message : "Unable to load the trip chat.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [loadMembers, loadMessages]);
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, loadMembers, loadMessages]);
 
   useEffect(() => {
     void loadOffers();

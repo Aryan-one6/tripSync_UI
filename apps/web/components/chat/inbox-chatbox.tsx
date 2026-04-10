@@ -89,6 +89,23 @@ type AgencyOfferThread = {
   updatedAt: string;
 };
 
+const CONVERSATION_CACHE_TTL_MS = 30_000;
+const CONTACTS_CACHE_TTL_MS = 60_000;
+const MESSAGE_CACHE_TTL_MS = 20_000;
+
+type TimedCache<T> = {
+  data: T;
+  cachedAt: number;
+};
+
+let conversationCache: TimedCache<DirectConversation[]> | null = null;
+const contactsCache = new Map<string, TimedCache<MessageableContact[]>>();
+const directMessagesCache = new Map<string, TimedCache<DirectMessage[]>>();
+
+function isCacheFresh(cachedAt: number, ttlMs: number) {
+  return Date.now() - cachedAt < ttlMs;
+}
+
 // ── Avatar helper ─────────────────────────────────────────────────────────────
 
 function Avatar({
@@ -130,9 +147,13 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const targetUserId = searchParams.get("userId");
   const initialConversationId = searchParams.get("conversationId");
   const initialGroupId = searchParams.get("groupId");
+  const hasFreshConversationCache =
+    conversationCache && isCacheFresh(conversationCache.cachedAt, CONVERSATION_CACHE_TTL_MS);
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [conversations, setConversations] = useState<DirectConversation[]>([]);
+  const [conversations, setConversations] = useState<DirectConversation[]>(() =>
+    hasFreshConversationCache ? sortByUpdatedAtDesc(conversationCache!.data) : [],
+  );
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -145,7 +166,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(!hasFreshConversationCache);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
@@ -159,6 +180,15 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const conversationsRef = useRef<DirectConversation[]>(conversations);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+    conversationCache = {
+      data: conversations,
+      cachedAt: Date.now(),
+    };
+  }, [conversations]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const activeConversation = useMemo(
@@ -258,7 +288,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         setFeedback("You cannot start a conversation with yourself.");
         return;
       }
-      const existing = conversations.find((c) => c.counterpart?.id === userId);
+      const existing = conversationsRef.current.find((c) => c.counterpart?.id === userId);
       if (existing) {
         setActiveGroupId(null);
         setActiveConversationId(existing.id);
@@ -284,7 +314,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         );
       }
     },
-    [apiFetchWithAuth, conversations, session?.user.id],
+    [apiFetchWithAuth, session?.user.id],
   );
 
   const openGroupChannel = useCallback((groupId: string) => {
@@ -302,7 +332,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
 
-  async function markConversationRead(conversationId: string) {
+  const markConversationRead = useCallback(async (conversationId: string) => {
     await apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
       method: "POST",
     });
@@ -318,7 +348,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         detail: { conversationId },
       }),
     );
-  }
+  }, [apiFetchWithAuth]);
 
   const emitDirectTyping = (isTyping: boolean) => {
     if (!socket || !activeConversationId) return;
@@ -357,28 +387,53 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
 
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    void (async () => {
+    let cancelled = false;
+
+    const cached = conversationCache;
+    const hasFreshCache = Boolean(
+      cached && isCacheFresh(cached.cachedAt, CONVERSATION_CACHE_TTL_MS),
+    );
+    if (cached && hasFreshCache) {
+      setConversations(sortByUpdatedAtDesc(cached.data));
+      setLoadingConversations(false);
+    }
+
+    const refreshConversations = async () => {
       try {
-        setLoadingConversations(true);
+        if (!hasFreshCache) {
+          setLoadingConversations(true);
+        }
         const data = await apiFetchWithAuth<DirectConversation[]>(
           "/chat/direct/conversations",
         ).catch(() => [] as DirectConversation[]);
+        if (cancelled) return;
         setConversations(sortByUpdatedAtDesc(data));
       } finally {
-        if (variant === "user") {
-          try {
-            const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
-            setGroupChannels(trips);
-          } catch {
-            // non-fatal
-          }
-        }
-        if (variant === "agency") {
-          void loadAgencyOffers();
-        }
-        setLoadingConversations(false);
+        if (!cancelled) setLoadingConversations(false);
       }
-    })();
+    };
+
+    const loadSidebarData = async () => {
+      if (variant === "user") {
+        try {
+          const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
+          if (!cancelled) setGroupChannels(trips);
+        } catch {
+          // non-fatal
+        }
+        return;
+      }
+      if (variant === "agency") {
+        void loadAgencyOffers();
+      }
+    };
+
+    void refreshConversations();
+    void loadSidebarData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [apiFetchWithAuth, loadAgencyOffers, variant]);
 
   useEffect(() => {
@@ -399,10 +454,32 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [loadAgencyOffers, socket, variant]);
 
   useEffect(() => {
-    if (variant !== "user" || !session?.user.id || activeGroupChannels.length === 0) {
+    if (variant !== "user" || !session?.user.id) {
       setMessageableContacts([]);
+      setLoadingContacts(false);
       return;
     }
+
+    if (!showNewChat) {
+      setLoadingContacts(false);
+      return;
+    }
+
+    if (activeGroupChannels.length === 0) {
+      setMessageableContacts([]);
+      setLoadingContacts(false);
+      return;
+    }
+
+    const groupIds = activeGroupChannels.map((trip) => trip.group.id).sort();
+    const cacheKey = `${session.user.id}:${groupIds.join(",")}`;
+    const cached = contactsCache.get(cacheKey);
+    if (cached && isCacheFresh(cached.cachedAt, CONTACTS_CACHE_TTL_MS)) {
+      setMessageableContacts(cached.data);
+      setLoadingContacts(false);
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       try {
@@ -438,6 +515,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             return b.sharedGroupIds.length - a.sharedGroupIds.length;
           return a.user.fullName.localeCompare(b.user.fullName);
         });
+        contactsCache.set(cacheKey, {
+          data: sorted,
+          cachedAt: Date.now(),
+        });
         setMessageableContacts(sorted);
       } finally {
         if (!cancelled) setLoadingContacts(false);
@@ -446,7 +527,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     return () => {
       cancelled = true;
     };
-  }, [activeGroupChannels, apiFetchWithAuth, session?.user.id, variant]);
+  }, [activeGroupChannels, apiFetchWithAuth, session?.user.id, showNewChat, variant]);
 
   useEffect(() => {
     if (loadingConversations || routeIntentHandledRef.current) return;
@@ -486,25 +567,44 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [initialGroupId, openGroupChannel]);
 
   useEffect(() => {
-    if (!activeConversationId || conversations.length === 0) return;
+    if (!activeConversationId) return;
+
+    const cached = directMessagesCache.get(activeConversationId);
+    if (cached && isCacheFresh(cached.cachedAt, MESSAGE_CACHE_TTL_MS)) {
+      setMessages(cached.data);
+      setLoadingMessages(false);
+    } else {
+      setLoadingMessages(true);
+    }
+
+    let cancelled = false;
     void (async () => {
       try {
-        setLoadingMessages(true);
         const data = await apiFetchWithAuth<DirectMessage[]>(
           `/chat/direct/conversations/${activeConversationId}/messages`,
         );
+        if (cancelled) return;
         setMessages(data);
+        directMessagesCache.set(activeConversationId, {
+          data,
+          cachedAt: Date.now(),
+        });
         await markConversationRead(activeConversationId);
       } catch (err) {
-        setFeedback(
-          err instanceof Error ? err.message : "Unable to load messages.",
-        );
+        if (!cancelled) {
+          setFeedback(
+            err instanceof Error ? err.message : "Unable to load messages.",
+          );
+        }
       } finally {
-        setLoadingMessages(false);
+        if (!cancelled) setLoadingMessages(false);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversationId, apiFetchWithAuth, conversations.length]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversationId, apiFetchWithAuth, markConversationRead]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -524,7 +624,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     const handleMessage = (payload: { conversationId?: string; message?: DirectMessage }) => {
       if (!payload.conversationId || !payload.message) return;
       const { conversationId, message } = payload;
-      const known = conversations.some((c) => c.id === conversationId);
+      const known = conversationsRef.current.some((c) => c.id === conversationId);
 
       setConversations((cur) => {
         const next = cur.map((c) => {
@@ -549,7 +649,14 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       }
 
       if (conversationId === activeConversationId) {
-        setMessages((cur) => upsertDirectMessage(cur, message));
+        setMessages((cur) => {
+          const next = upsertDirectMessage(cur, message);
+          directMessagesCache.set(conversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
+        });
         if (message.senderId !== session?.user.id) {
           void markConversationRead(conversationId);
         }
@@ -582,7 +689,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       socket.off("direct:message_created", handleMessage);
       socket.off("direct:typing", handleTyping);
     };
-  }, [activeConversationId, apiFetchWithAuth, conversations, session?.user.id, socket]);
+  }, [activeConversationId, apiFetchWithAuth, markConversationRead, session?.user.id, socket]);
 
   useEffect(() => {
     if (!socket || !activeConversationId) return;
