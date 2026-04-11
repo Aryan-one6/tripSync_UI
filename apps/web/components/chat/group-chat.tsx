@@ -1024,7 +1024,7 @@ export function GroupChat({
           )}
 
           {/* Messages */}
-          <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
             {messages.length === 0 && fallbackInlineOffers.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-sm text-[var(--color-ink-400)]">No messages yet — say hello!</p>

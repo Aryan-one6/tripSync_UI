@@ -172,81 +172,84 @@ export function OfferCard({
 
   if (compact) {
     return (
-      <article className="overflow-hidden rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]">
+      <article className="overflow-hidden rounded-[16px] bg-[var(--color-surface-raised)]">
+        {/* ── Header band ── */}
         <div className="flex items-start justify-between gap-2 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-3.5 py-2.5">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold text-[var(--color-sea-800)]">
+            <p className="truncate text-xs font-bold text-[var(--color-sea-800)]">
               {agencyName}
-              <span className="ml-1.5 inline-flex items-center gap-1 text-[var(--color-sea-700)]">
+              <span className="ml-1.5 inline-flex items-center gap-0.5 font-semibold text-[var(--color-sea-700)]">
                 <Star className="size-3 fill-current" />
                 {agencyRating}
               </span>
             </p>
-            <p className="text-[10px] text-[var(--color-ink-500)]">
-              {formatCompactDate(offer.updatedAt)} · Round {Math.min(roundsUsed + 1, 3)}/3
-            </p>
+            {offer.plan?.title && (
+              <p className="truncate text-[10px] text-[var(--color-ink-500)]">{offer.plan.title}</p>
+            )}
           </div>
-          <span
-            className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${statusInfo.tone}`}
-          >
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${statusInfo.tone}`}>
             {statusInfo.label}
           </span>
         </div>
 
-        <div className="space-y-2.5 px-3.5 py-3">
-          <div className="flex items-end justify-between gap-2">
-            <p className="font-display text-2xl leading-none text-[var(--color-ink-950)]">
+        {/* ── Price block ── */}
+        <div className="px-3.5 pb-0 pt-3">
+          <div className="flex items-baseline gap-1.5">
+            <p className="font-display text-[1.65rem] font-extrabold leading-none text-[var(--color-ink-950)]">
               {formatCurrency(offer.pricePerPerson)}
             </p>
-            <p className="text-xs font-medium text-[var(--color-ink-500)]">/ person</p>
+            <p className="text-sm font-semibold text-[var(--color-ink-500)]">⁄ person</p>
           </div>
 
-          {validityText && (
-            <p className="inline-flex items-center gap-1 text-[11px] text-[var(--color-ink-500)]">
-              <Clock3 className="size-3.5" />
-              {validityText}
-            </p>
-          )}
-
-          {quoteTimeline.length > 0 && (
-            <div className="space-y-1.5 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
-              {quoteTimeline.slice(0, 2).map((quote) => (
-                <div key={quote.id} className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="truncate text-[var(--color-ink-600)]">
-                    {quote.senderType === "agency" ? "Agency" : "Creator"} · {quote.label}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-[var(--color-ink-900)]">
-                      {formatCurrency(quote.price)}
-                    </span>
-                    {canReuseQuoteAsCounter && !quote.isLive && (
-                      <button
-                        type="button"
-                        onClick={() => onCounter?.(offer.id, quote.price)}
-                        className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-lavender-500)]"
-                      >
-                        Use
-                      </button>
-                    )}
-                  </div>
-                </div>
+          {/* Inclusions */}
+          {includes.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              {includes.slice(0, 6).map((item) => (
+                <span key={item} className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-sea-700)]">
+                  <Check className="size-3 shrink-0" />
+                  {item}
+                </span>
               ))}
             </div>
           )}
 
+          {/* Meta row */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--color-ink-400)]">
+            {offer.plan?.destination && <span>{offer.plan.destination}</span>}
+            {validityText && (
+              <>
+                {offer.plan?.destination && <span>·</span>}
+                <span className="inline-flex items-center gap-0.5">
+                  <Clock3 className="size-3" />
+                  {validityText}
+                </span>
+              </>
+            )}
+            {roundsUsed > 0 && (
+              <>
+                <span>·</span>
+                <span>Round {Math.min(roundsUsed + 1, 3)}/3</span>
+              </>
+            )}
+          </div>
+
+          {/* Agency note */}
           {latestAgencyNote && (
-            <p className="rounded-[8px] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--color-ink-600)]">
-              <span className="font-semibold text-[var(--color-ink-700)]">Note:</span>{" "}
+            <p className="mt-2 rounded-[8px] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--color-ink-600)]">
+              <span className="font-semibold text-[var(--color-ink-700)]">Note: </span>
               {latestAgencyNote}
             </p>
           )}
+        </div>
 
+        {/* ── Action buttons ── */}
+        <div className="px-3.5 pb-3.5 pt-3">
           {creatorCanAccept && !isTerminal && (
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => onAccept?.(offer.id)}
-                className="rounded-[8px] bg-[var(--color-sea-700)] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-sea-800)]"
+                className="rounded-[8px] bg-[var(--color-sea-700)] py-2 text-xs font-bold text-white transition hover:bg-[var(--color-sea-800)] active:scale-[0.97]"
               >
                 Accept
               </button>
@@ -254,14 +257,14 @@ export function OfferCard({
                 type="button"
                 onClick={() => onCounter?.(offer.id)}
                 disabled={!creatorCanCounter || roundsLeft === 0}
-                className="rounded-[8px] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[8px] bg-[var(--color-surface-2)] py-2 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {creatorCanCounter ? `Counter${roundsLeft > 0 ? ` (${roundsLeft})` : ""}` : "Await"}
+                {creatorCanCounter ? "Counter" : "Await"}
               </button>
               <button
                 type="button"
                 onClick={() => onReject?.(offer.id)}
-                className="rounded-[8px] bg-[var(--color-sunset-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)]"
+                className="rounded-[8px] bg-[var(--color-sunset-50)] py-2 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)] active:scale-[0.97]"
               >
                 Decline
               </button>
@@ -274,14 +277,14 @@ export function OfferCard({
                 type="button"
                 onClick={() => onCounter?.(offer.id)}
                 disabled={roundsLeft === 0}
-                className="rounded-[8px] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[8px] bg-[var(--color-surface-2)] py-2 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Counter{roundsLeft > 0 ? ` (${roundsLeft})` : ""}
               </button>
               <button
                 type="button"
                 onClick={() => onWithdraw?.(offer.id)}
-                className="rounded-[8px] bg-[var(--color-sunset-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)]"
+                className="rounded-[8px] bg-[var(--color-sunset-50)] py-2 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)] active:scale-[0.97]"
               >
                 Withdraw
               </button>
@@ -289,21 +292,21 @@ export function OfferCard({
           )}
 
           {offer.status === "ACCEPTED" && (
-            <div className="rounded-[8px] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-sea-700)]">
-              Offer accepted. Move to payment.
+            <div className="rounded-[8px] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-2 text-xs font-semibold text-[var(--color-sea-700)]">
+              ✓ Offer accepted — proceed to payment
             </div>
           )}
 
           {offer.status === "REJECTED" && (
-            <div className="rounded-[8px] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-2.5 py-1.5 text-xs text-[var(--color-sunset-700)]">
+            <div className="rounded-[8px] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-2.5 py-2 text-xs text-[var(--color-sunset-700)]">
               This offer was declined.
             </div>
           )}
 
-          {canReconfirmOldAgencyQuote && (
-            <p className="text-[10px] text-[var(--color-ink-500)]">
-              Reconfirm an older agency quote, then accept the latest quote.
-            </p>
+          {offer.status === "WITHDRAWN" && (
+            <div className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-2 text-xs text-[var(--color-ink-500)]">
+              Offer withdrawn by agency.
+            </div>
           )}
         </div>
       </article>
@@ -311,6 +314,7 @@ export function OfferCard({
   }
 
   return (
+
     <article className="overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
       <div className="flex items-center justify-between gap-3 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-4 py-2.5">
         <div className="min-w-0">
