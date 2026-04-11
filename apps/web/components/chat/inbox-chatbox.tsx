@@ -526,6 +526,8 @@ export function InboxChatbox({
     : totalUnread > 0
     ? `${totalUnread} unread`
     : "Your conversations";
+  const mobileShellHeightClass =
+    showMobileChat && activeGroupId ? "h-[100svh]" : "h-[calc(100svh-3.5rem)]";
 
   const clearRouteIntentQuery = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -1472,22 +1474,23 @@ export function InboxChatbox({
           if (!cancelled) setDmOffers(relevant);
           return;
         }
-        // For user variant: fetch offers by counterpart to avoid empty-conversation 404 noise
-        const data = await apiFetchWithAuth<Offer[]>(
-          `/offers/by-counterpart/${counterpartId}`,
-        ).catch(() => [] as Offer[]);
-        if (!cancelled) setDmOffers(data);
+        // Keep direct user chat simple: no inline offer cards in DM flow.
+        if (!cancelled) setDmOffers([]);
+        return;
       } catch {
         // Non-fatal
       }
     })();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId, activeConversation, variant, agencyOffers]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className={cn(mobileMessengerMode && "flex h-full min-h-0 flex-col")}>
+    <div
+      className={cn(
+        mobileMessengerMode && "flex h-[100svh] min-h-[100svh] min-w-0 flex-col md:h-auto md:min-h-0",
+      )}
+    >
       {mobileMessengerMode && !(showMobileChat && activeGroupId) && (
         <div className="flex h-14 items-center justify-between border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -1617,7 +1620,7 @@ export function InboxChatbox({
         className={cn(
           "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
           mobileMessengerMode
-            ? "min-h-0 flex-1 border-0 md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]"
+            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-auto md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]`
             : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
         )}
       >
@@ -2306,22 +2309,24 @@ export function InboxChatbox({
               </div>
             </div>
             {/* Counter offer sheet for DM offers */}
-            <CounterOfferSheet
-              open={dmCounterSheetOfferId !== null}
-              onClose={() => {
-                setDmCounterSheetOfferId(null);
-                setDmCounterSheetInitialPrice(null);
-              }}
-              onSubmit={async (payload) => {
-                if (!dmCounterSheetOfferId) return;
-                await handleDmCounterOffer(dmCounterSheetOfferId, payload);
-              }}
-              currentPrice={dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.pricePerPerson ?? 0}
-              initialPrice={dmCounterSheetInitialPrice ?? undefined}
-              counterRound={(dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.negotiations?.length ?? 0) + 1}
-              maxRounds={3}
-              embedded
-            />
+            {dmCounterSheetOfferId !== null && (
+              <CounterOfferSheet
+                open
+                onClose={() => {
+                  setDmCounterSheetOfferId(null);
+                  setDmCounterSheetInitialPrice(null);
+                }}
+                onSubmit={async (payload) => {
+                  if (!dmCounterSheetOfferId) return;
+                  await handleDmCounterOffer(dmCounterSheetOfferId, payload);
+                }}
+                currentPrice={dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.pricePerPerson ?? 0}
+                initialPrice={dmCounterSheetInitialPrice ?? undefined}
+                counterRound={(dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.negotiations?.length ?? 0) + 1}
+                maxRounds={3}
+                embedded
+              />
+            )}
           </>
         )}
       </div>
