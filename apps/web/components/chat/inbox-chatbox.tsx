@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { GroupChat } from "@/components/chat/group-chat";
+import { OfferCard } from "@/components/chat/offer-card";
+import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { CONVERSATION_READ_EVENT } from "@/lib/realtime/use-live-notifications";
@@ -335,6 +337,9 @@ export function InboxChatbox({
   const [messageSyncIssue, setMessageSyncIssue] = useState<string | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
+  const [dmOffers, setDmOffers] = useState<Offer[]>([]);
+  const [dmCounterSheetOfferId, setDmCounterSheetOfferId] = useState<string | null>(null);
+  const [dmCounterSheetInitialPrice, setDmCounterSheetInitialPrice] = useState<number | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
   const [directHeaderMenuOpen, setDirectHeaderMenuOpen] = useState(false);
@@ -661,6 +666,60 @@ export function InboxChatbox({
     const data = await apiFetchWithAuth<Offer[]>("/offers/my").catch(() => [] as Offer[]);
     setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
+
+  // ── DM Offer actions ───────────────────────────────────────────────────────
+  const handleDmAcceptOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/accept`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+      setFeedback("Offer accepted!");
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not accept the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmRejectOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/reject`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not decline the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmWithdrawOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/withdraw`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not withdraw the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmCounterOffer = useCallback(async (offerId: string, payload: CounterOfferPayload) => {
+    try {
+      await apiFetchWithAuth(`/offers/${offerId}/counter`, {
+        method: "POST",
+        body: JSON.stringify({
+          price: payload.price,
+          message: payload.message,
+          inclusionsDelta: payload.requestedAdditions.length > 0
+            ? { requestedAdditions: payload.requestedAdditions }
+            : undefined,
+        }),
+      });
+      setDmCounterSheetOfferId(null);
+      setDmCounterSheetInitialPrice(null);
+      // Refresh offers
+      const counterpartId = activeConversation?.counterpart?.id;
+      if (counterpartId) {
+        const refreshed = await apiFetchWithAuth<Offer[]>(`/offers/by-counterpart/${counterpartId}`).catch(() => [] as Offer[]);
+        setDmOffers(refreshed);
+      }
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not send counter offer.");
+    }
+  }, [apiFetchWithAuth, activeConversation?.counterpart?.id]);
 
   const markConversationRead = useCallback((
     conversationId: string,
@@ -1391,7 +1450,40 @@ export function InboxChatbox({
   useEffect(() => {
     setReplyTo(null);
     setShowEmojiPicker(false);
+    setDmOffers([]);
+    setDmCounterSheetOfferId(null);
+    setDmCounterSheetInitialPrice(null);
   }, [activeConversationId]);
+
+  // Load offers for DM conversations
+  useEffect(() => {
+    if (!activeConversationId || !activeConversation) return;
+    const counterpartId = activeConversation.counterpart?.id;
+    if (!counterpartId) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        // For agency variant: filter existing agencyOffers by counterpart (trip creator)
+        if (variant === "agency") {
+          const relevant = agencyOffers.filter(
+            (o) => o.plan?.creator?.id === counterpartId,
+          );
+          if (!cancelled) setDmOffers(relevant);
+          return;
+        }
+        // For user variant: fetch offers where the counterpart is an agency
+        const data = await apiFetchWithAuth<Offer[]>(
+          `/offers/for-conversation/${activeConversationId}`,
+        ).catch(() => [] as Offer[]);
+        if (!cancelled) setDmOffers(data);
+      } catch {
+        // Non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId, activeConversation, variant, agencyOffers]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1993,6 +2085,35 @@ export function InboxChatbox({
 
             {/* Messages */}
             <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+              {/* Offer cards as messages */}
+              {dmOffers.length > 0 && (
+                <div className="space-y-3 pb-1">
+                  {dmOffers.map((offer) => (
+                    <div key={`dm-offer-${offer.id}`} className="flex justify-start">
+                      <div className="w-full max-w-[92%] sm:max-w-[75%]">
+                        <p className="mb-1 pl-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)]">
+                          {offer.agency?.name ?? "Agency"} · Offer
+                        </p>
+                        <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
+                          <OfferCard
+                            compact
+                            offer={offer}
+                            isCreator={variant === "user"}
+                            isAgency={variant === "agency"}
+                            onAccept={handleDmAcceptOffer}
+                            onCounter={(offerId, seedPrice) => {
+                              setDmCounterSheetOfferId(offerId);
+                              setDmCounterSheetInitialPrice(seedPrice ?? null);
+                            }}
+                            onReject={handleDmRejectOffer}
+                            onWithdraw={handleDmWithdrawOffer}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {(syncingMessages || messageSyncIssue || (socket && !isSocketConnected)) && (
                 <div className="sticky top-0 z-10 mx-auto mb-3 w-fit rounded-full border border-[var(--color-sea-200)] bg-white/85 px-3 py-1 text-[11px] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)] backdrop-blur">
                   {messageSyncIssue
@@ -2184,6 +2305,23 @@ export function InboxChatbox({
                 </Button>
               </div>
             </div>
+            {/* Counter offer sheet for DM offers */}
+            <CounterOfferSheet
+              open={dmCounterSheetOfferId !== null}
+              onClose={() => {
+                setDmCounterSheetOfferId(null);
+                setDmCounterSheetInitialPrice(null);
+              }}
+              onSubmit={async (payload) => {
+                if (!dmCounterSheetOfferId) return;
+                await handleDmCounterOffer(dmCounterSheetOfferId, payload);
+              }}
+              currentPrice={dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.pricePerPerson ?? 0}
+              initialPrice={dmCounterSheetInitialPrice ?? undefined}
+              counterRound={(dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.negotiations?.length ?? 0) + 1}
+              maxRounds={3}
+              embedded
+            />
           </>
         )}
       </div>

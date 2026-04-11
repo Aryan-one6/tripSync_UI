@@ -1036,21 +1036,28 @@ export function GroupChat({
                     key={`fallback-offer-${offer.id}`}
                     id={`offer-card-${offer.id}`}
                     data-inline-offer-card="true"
-                    className="mx-auto mb-2 w-full max-w-lg"
+                    className="flex justify-start mb-2"
                   >
-                    <OfferCard
-                      compact
-                      offer={offer}
-                      isCreator={isCreator}
-                      isAgency={isAgency}
-                      onAccept={handleAcceptOffer}
-                      onCounter={(nextOfferId, seedPrice) => {
-                        setCounterSheetOfferId(nextOfferId);
-                        setCounterSheetInitialPrice(seedPrice ?? null);
-                      }}
-                      onReject={handleRejectOffer}
-                      onWithdraw={handleWithdrawOffer}
-                    />
+                    <div className="w-full max-w-[90%] sm:max-w-[72%]">
+                      <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
+                        Agency Offer
+                      </p>
+                      <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
+                        <OfferCard
+                          compact
+                          offer={offer}
+                          isCreator={isCreator}
+                          isAgency={isAgency}
+                          onAccept={handleAcceptOffer}
+                          onCounter={(nextOfferId, seedPrice) => {
+                            setCounterSheetOfferId(nextOfferId);
+                            setCounterSheetInitialPrice(seedPrice ?? null);
+                          }}
+                          onReject={handleRejectOffer}
+                          onWithdraw={handleWithdrawOffer}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
                 {messages.map((message, idx) => {
@@ -1107,21 +1114,28 @@ export function GroupChat({
                           <div
                             id={`offer-card-${inlineOffer.id}`}
                             data-inline-offer-card="true"
-                            className="mx-auto mt-2 w-full max-w-lg"
+                            className="mt-2 flex justify-start"
                           >
-                            <OfferCard
-                              compact
-                              offer={inlineOffer}
-                              isCreator={isCreator}
-                              isAgency={isAgency}
-                              onAccept={handleAcceptOffer}
-                              onCounter={(nextOfferId, seedPrice) => {
-                                setCounterSheetOfferId(nextOfferId);
-                                setCounterSheetInitialPrice(seedPrice ?? null);
-                              }}
-                              onReject={handleRejectOffer}
-                              onWithdraw={handleWithdrawOffer}
-                            />
+                            <div className="w-full max-w-[90%] sm:max-w-[72%]">
+                              <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
+                                Agency Offer
+                              </p>
+                              <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
+                                <OfferCard
+                                  compact
+                                  offer={inlineOffer}
+                                  isCreator={isCreator}
+                                  isAgency={isAgency}
+                                  onAccept={handleAcceptOffer}
+                                  onCounter={(nextOfferId, seedPrice) => {
+                                    setCounterSheetOfferId(nextOfferId);
+                                    setCounterSheetInitialPrice(seedPrice ?? null);
+                                  }}
+                                  onReject={handleRejectOffer}
+                                  onWithdraw={handleWithdrawOffer}
+                                />
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1468,21 +1482,28 @@ export function GroupChat({
                         key={`fallback-offer-${offer.id}`}
                         id={`offer-card-${offer.id}`}
                         data-inline-offer-card="true"
-                        className="mx-auto w-full max-w-lg"
+                        className="flex justify-start"
                       >
-                        <OfferCard
-                          compact
-                          offer={offer}
-                          isCreator={isCreator}
-                          isAgency={isAgency}
-                          onAccept={handleAcceptOffer}
-                          onCounter={(nextOfferId, seedPrice) => {
-                            setCounterSheetOfferId(nextOfferId);
-                            setCounterSheetInitialPrice(seedPrice ?? null);
-                          }}
-                          onReject={handleRejectOffer}
-                          onWithdraw={handleWithdrawOffer}
-                        />
+                        <div className="w-full max-w-[88%] sm:max-w-[70%]">
+                          <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
+                            Agency Offer
+                          </p>
+                          <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/60 bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
+                            <OfferCard
+                              compact
+                              offer={offer}
+                              isCreator={isCreator}
+                              isAgency={isAgency}
+                              onAccept={handleAcceptOffer}
+                              onCounter={(nextOfferId, seedPrice) => {
+                                setCounterSheetOfferId(nextOfferId);
+                                setCounterSheetInitialPrice(seedPrice ?? null);
+                              }}
+                              onReject={handleRejectOffer}
+                              onWithdraw={handleWithdrawOffer}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                     {messages.map((message, idx) => {
@@ -1541,21 +1562,28 @@ export function GroupChat({
                             <div
                               id={`offer-card-${inlineOffer.id}`}
                               data-inline-offer-card="true"
-                              className="mx-auto mt-2 w-full max-w-lg"
+                              className="mt-2 flex justify-start"
                             >
-                              <OfferCard
-                                compact
-                                offer={inlineOffer}
-                                isCreator={isCreator}
-                                isAgency={isAgency}
-                                onAccept={handleAcceptOffer}
-                                onCounter={(nextOfferId, seedPrice) => {
-                                  setCounterSheetOfferId(nextOfferId);
-                                  setCounterSheetInitialPrice(seedPrice ?? null);
-                                }}
-                                onReject={handleRejectOffer}
-                                onWithdraw={handleWithdrawOffer}
-                              />
+                              <div className="w-full max-w-[88%] sm:max-w-[70%]">
+                                <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
+                                  Agency Offer
+                                </p>
+                                <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/60 bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
+                                  <OfferCard
+                                    compact
+                                    offer={inlineOffer}
+                                    isCreator={isCreator}
+                                    isAgency={isAgency}
+                                    onAccept={handleAcceptOffer}
+                                    onCounter={(nextOfferId, seedPrice) => {
+                                      setCounterSheetOfferId(nextOfferId);
+                                      setCounterSheetInitialPrice(seedPrice ?? null);
+                                    }}
+                                    onReject={handleRejectOffer}
+                                    onWithdraw={handleWithdrawOffer}
+                                  />
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
