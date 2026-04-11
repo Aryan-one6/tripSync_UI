@@ -1472,9 +1472,9 @@ export function InboxChatbox({
           if (!cancelled) setDmOffers(relevant);
           return;
         }
-        // For user variant: fetch offers where the counterpart is an agency
+        // For user variant: fetch offers by counterpart to avoid empty-conversation 404 noise
         const data = await apiFetchWithAuth<Offer[]>(
-          `/offers/for-conversation/${activeConversationId}`,
+          `/offers/by-counterpart/${counterpartId}`,
         ).catch(() => [] as Offer[]);
         if (!cancelled) setDmOffers(data);
       } catch {
@@ -1487,7 +1487,7 @@ export function InboxChatbox({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
+    <div className={cn(mobileMessengerMode && "flex h-full min-h-0 flex-col")}>
       {mobileMessengerMode && !(showMobileChat && activeGroupId) && (
         <div className="flex h-14 items-center justify-between border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -1617,7 +1617,7 @@ export function InboxChatbox({
         className={cn(
           "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
           mobileMessengerMode
-            ? "h-[calc(100dvh-3.5rem)] border-0 md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]"
+            ? "min-h-0 flex-1 border-0 md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]"
             : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
         )}
       >
@@ -2326,6 +2326,6 @@ export function InboxChatbox({
         )}
       </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -2,8 +2,8 @@ import { InboxChatbox } from "@/components/chat/inbox-chatbox";
 
 export default function MessagesPage() {
   return (
-    <main className="mx-auto h-[100dvh] w-full max-w-screen-2xl px-0 md:h-auto md:px-6 md:py-6">
-      <div className="h-full md:h-auto">
+    <main className="mx-auto flex h-[100svh] min-h-[100svh] w-full max-w-screen-2xl flex-col px-0 md:h-auto md:min-h-0 md:px-6 md:py-6">
+      <div className="min-h-0 flex-1 md:h-auto md:min-h-0">
         <InboxChatbox variant="user" mobileMessengerMode />
       </div>
     </main>
