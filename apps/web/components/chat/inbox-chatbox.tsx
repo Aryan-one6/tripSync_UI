@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +12,7 @@ import {
   CornerUpLeft,
   MapPin,
   MessageSquarePlus,
+  MoreVertical,
   Search,
   Send,
   Smile,
@@ -226,6 +228,7 @@ export function InboxChatbox({
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
   const routeIntentHandledRef = useRef(false);
@@ -234,6 +237,7 @@ export function InboxChatbox({
   const endRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileHeaderMenuRef = useRef<HTMLDivElement>(null);
   const conversationsRef = useRef<DirectConversation[]>(conversations);
   const readApiAtRef = useRef<Map<string, number>>(new Map());
   const readEventAtRef = useRef<Map<string, number>>(new Map());
@@ -1055,6 +1059,26 @@ export function InboxChatbox({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showEmojiPicker]);
 
+  useEffect(() => {
+    if (!mobileHeaderMenuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (
+        mobileHeaderMenuRef.current &&
+        !mobileHeaderMenuRef.current.contains(event.target as Node)
+      ) {
+        setMobileHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [mobileHeaderMenuOpen]);
+
+  useEffect(() => {
+    if (!showMobileChat && mobileHeaderMenuOpen) {
+      setMobileHeaderMenuOpen(false);
+    }
+  }, [mobileHeaderMenuOpen, showMobileChat]);
+
   // Clear reply state when switching conversations
   useEffect(() => {
     setReplyTo(null);
@@ -1066,48 +1090,97 @@ export function InboxChatbox({
     <>
       {mobileMessengerMode && (
         <div className="flex h-14 items-center justify-between border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowMobileChat(false)}
-              className={cn(
-                "flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200",
-                showMobileChat
-                  ? "opacity-100 hover:bg-[var(--color-sea-50)] active:scale-95"
-                  : "pointer-events-none opacity-0",
-              )}
-              aria-label="Back to chats"
-            >
-              <ArrowLeft className="size-4.5" />
-            </button>
+          <div className="flex min-w-0 items-center gap-2.5">
             {showMobileChat ? (
-              activeConversation ? (
-                <Avatar
-                  name={activeConversation.counterpart?.fullName ?? "?"}
-                  size="sm"
-                />
-              ) : (
-                <div className="flex size-8 items-center justify-center rounded-full bg-[var(--color-lavender-100)] text-[var(--color-lavender-600)] ring-1 ring-[var(--color-lavender-200)]">
-                  <Users className="size-4" />
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileChat(false);
+                    setMobileHeaderMenuOpen(false);
+                  }}
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-50)] active:scale-95"
+                  aria-label="Back to chats"
+                >
+                  <ArrowLeft className="size-4.5" />
+                </button>
+                {activeConversation ? (
+                  <Avatar
+                    name={activeConversation.counterpart?.fullName ?? "?"}
+                    size="sm"
+                  />
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-full bg-[var(--color-lavender-100)] text-[var(--color-lavender-600)] ring-1 ring-[var(--color-lavender-200)]">
+                    <Users className="size-4" />
+                  </div>
+                )}
+                <div className="min-w-0 transition-all duration-250">
+                  <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                    {mobileHeaderTitle}
+                  </p>
+                  <p className="truncate text-[11px] text-[var(--color-ink-500)]">
+                    {mobileHeaderSubtitle}
+                  </p>
                 </div>
-              )
-            ) : null}
-            <div className="min-w-0 transition-all duration-250">
-              <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-                {mobileHeaderTitle}
-              </p>
-              <p className="truncate text-[11px] text-[var(--color-ink-500)]">
-                {mobileHeaderSubtitle}
-              </p>
-            </div>
+              </>
+            ) : (
+              <Image
+                src="/brand/travellersin.png"
+                alt="Travellersin"
+                width={132}
+                height={28}
+                className="h-6 w-auto"
+                priority={false}
+              />
+            )}
           </div>
-          <Link
-            href={mobileExitHref}
-            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-100)] active:scale-95"
-          >
-            <X className="size-3.5" />
-            Close
-          </Link>
+          <div className="relative" ref={mobileHeaderMenuRef}>
+            {showMobileChat ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMobileHeaderMenuOpen((open) => !open)}
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-50)] active:scale-95"
+                  aria-label="Open chat options"
+                >
+                  <MoreVertical className="size-4.5" />
+                </button>
+                <div
+                  className={cn(
+                    "absolute right-0 top-[calc(100%+0.35rem)] z-40 w-44 origin-top-right rounded-2xl border border-[var(--color-sea-100)] bg-white/95 p-1 shadow-[var(--shadow-md)] backdrop-blur transition-all duration-180",
+                    mobileHeaderMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0",
+                  )}
+                >
+                  {counterpartProfileHref && (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setMobileHeaderMenuOpen(false)}
+                      className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    >
+                      View profile
+                    </Link>
+                  )}
+                  <Link
+                    href={mobileExitHref}
+                    onClick={() => setMobileHeaderMenuOpen(false)}
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    Close messenger
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <Link
+                href={mobileExitHref}
+                aria-label="Close messenger"
+                className="inline-flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-100)] active:scale-95"
+              >
+                <X className="size-3.5" />
+              </Link>
+            )}
+          </div>
         </div>
       )}
       <div
