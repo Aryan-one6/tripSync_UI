@@ -22,6 +22,7 @@ interface CounterOfferSheetProps {
   initialPrice?: number;
   counterRound?: number;
   maxRounds?: number;
+  embedded?: boolean;
 }
 
 // ─── Available additions ──────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export function CounterOfferSheet({
   initialPrice,
   counterRound = 1,
   maxRounds = 3,
+  embedded = false,
 }: CounterOfferSheetProps) {
   const [counterPrice, setCounterPrice] = useState(currentPrice);
   const [selectedAdditions, setSelectedAdditions] = useState<string[]>([]);
@@ -106,17 +108,17 @@ export function CounterOfferSheet({
       <div
         ref={overlayRef}
         onClick={handleOverlayClick}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`${embedded ? "absolute inset-0 z-20" : "fixed inset-0 z-40"} bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       />
 
       {/* Sheet */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 rounded-t-[var(--radius-2xl)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-transform duration-350 ease-out ${
+        className={`${embedded ? "absolute bottom-0 left-0 right-0 z-30" : "fixed bottom-0 left-0 right-0 z-50"} rounded-t-[var(--radius-2xl)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-transform duration-350 ease-out ${
           open ? "translate-y-0" : "translate-y-full"
         }`}
-        style={{ maxHeight: "90dvh", overflowY: "auto" }}
+        style={{ maxHeight: embedded ? "75%" : "90dvh", overflowY: "auto" }}
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-4 pb-2">

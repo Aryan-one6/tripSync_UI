@@ -10,7 +10,8 @@ function sumUnread(conversations: DirectConversation[]) {
   return conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
 }
 
-export function useUnreadDirectCount() {
+export function useUnreadDirectCount(options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
   const { session, status, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
   const userId = session?.user?.id ?? null;
@@ -19,7 +20,7 @@ export function useUnreadDirectCount() {
   const lastRefreshAtRef = useRef(0);
 
   const refreshUnreadDirectCount = useCallback(async (force = false) => {
-    if (status !== "authenticated" || !userId) {
+    if (!enabled || status !== "authenticated" || !userId) {
       setCount(0);
       return;
     }
@@ -43,14 +44,15 @@ export function useUnreadDirectCount() {
       refreshInFlightRef.current = false;
       lastRefreshAtRef.current = Date.now();
     }
-  }, [apiFetchWithAuth, status, userId]);
+  }, [apiFetchWithAuth, enabled, status, userId]);
 
   useEffect(() => {
+    if (!enabled) return;
     void refreshUnreadDirectCount(true);
-  }, [refreshUnreadDirectCount]);
+  }, [enabled, refreshUnreadDirectCount]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !socket || !userId) return;
+    if (!enabled || status !== "authenticated" || !socket || !userId) return;
 
     const refresh = () => {
       void refreshUnreadDirectCount();
@@ -60,9 +62,10 @@ export function useUnreadDirectCount() {
     return () => {
       socket.off("direct:message_created", refresh);
     };
-  }, [refreshUnreadDirectCount, socket, status, userId]);
+  }, [enabled, refreshUnreadDirectCount, socket, status, userId]);
 
   useEffect(() => {
+    if (!enabled) return;
     const refresh = () => {
       void refreshUnreadDirectCount();
     };
@@ -73,7 +76,7 @@ export function useUnreadDirectCount() {
       window.removeEventListener("focus", refresh);
       window.removeEventListener(CONVERSATION_READ_EVENT, refresh);
     };
-  }, [refreshUnreadDirectCount]);
+  }, [enabled, refreshUnreadDirectCount]);
 
   return useMemo(
     () => ({

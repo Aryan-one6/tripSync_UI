@@ -153,13 +153,15 @@ export function SiteHeader() {
   const userName = session?.user?.fullName ?? session?.user?.username ?? "User";
   const userAvatarUrl = session?.user?.avatarUrl;
   const userEmail = session?.user?.email ?? "";
-  const { notifications, unreadCount, markAllRead, markRead } = useLiveNotifications();
-  const { unreadDirectCount } = useUnreadDirectCount();
   const isMobileMessengerRoute =
     pathname === "/dashboard/messages" ||
     pathname === "/agency/inbox" ||
     pathname.startsWith("/dashboard/messages/") ||
     pathname.startsWith("/agency/inbox/");
+  const { notifications, unreadCount, markAllRead, markRead } = useLiveNotifications();
+  const { unreadDirectCount } = useUnreadDirectCount({
+    enabled: !isMobileMessengerRoute,
+  });
 
   const publicNavLinks = [
     { href: discoverHref, label: "Home" },
