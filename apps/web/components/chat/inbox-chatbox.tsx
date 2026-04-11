@@ -1488,7 +1488,8 @@ export function InboxChatbox({
   return (
     <div
       className={cn(
-        mobileMessengerMode && "flex h-[100svh] min-h-[100svh] min-w-0 flex-col md:h-auto md:min-h-0",
+        mobileMessengerMode &&
+          "flex h-[100svh] min-h-[100svh] min-w-0 flex-col md:h-full md:min-h-0",
       )}
     >
       {mobileMessengerMode && !(showMobileChat && activeGroupId) && (
@@ -1639,7 +1640,7 @@ export function InboxChatbox({
         className={cn(
           "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
           mobileMessengerMode
-            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-auto md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]`
+            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-full md:min-h-0 md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]`
             : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
         )}
       >
