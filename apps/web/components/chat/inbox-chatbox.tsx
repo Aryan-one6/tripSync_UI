@@ -18,6 +18,7 @@ import {
   Send,
   Smile,
   Trash2,
+  User,
   Users,
   X,
 } from "lucide-react";
@@ -1508,20 +1509,45 @@ export function InboxChatbox({
                   <ArrowLeft className="size-4.5" />
                 </button>
                 {activeConversation ? (
-                  <Avatar
-                    name={activeConversation.counterpart?.fullName ?? "?"}
-                    avatarUrl={activeConversation.counterpart?.avatarUrl}
-                    size="sm"
-                  />
+                  counterpartProfileHref ? (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setMobileHeaderMenuOpen(false)}
+                      className="shrink-0"
+                      aria-label="Open profile"
+                    >
+                      <Avatar
+                        name={activeConversation.counterpart?.fullName ?? "?"}
+                        avatarUrl={activeConversation.counterpart?.avatarUrl}
+                        size="sm"
+                      />
+                    </Link>
+                  ) : (
+                    <Avatar
+                      name={activeConversation.counterpart?.fullName ?? "?"}
+                      avatarUrl={activeConversation.counterpart?.avatarUrl}
+                      size="sm"
+                    />
+                  )
                 ) : (
                   <div className="flex size-8 items-center justify-center rounded-full bg-[var(--color-lavender-100)] text-[var(--color-lavender-600)] ring-1 ring-[var(--color-lavender-200)]">
                     <Users className="size-4" />
                   </div>
                 )}
                 <div className="min-w-0 transition-all duration-250">
-                  <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-                    {mobileHeaderTitle}
-                  </p>
+                  {counterpartProfileHref && activeConversation ? (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setMobileHeaderMenuOpen(false)}
+                      className="block truncate text-sm font-semibold text-[var(--color-ink-900)] underline-offset-2 transition hover:text-[var(--color-sea-700)] hover:underline"
+                    >
+                      {mobileHeaderTitle}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                      {mobileHeaderTitle}
+                    </p>
+                  )}
                   <p className="truncate text-[11px] text-[var(--color-ink-500)]">
                     {mobileHeaderSubtitle}
                   </p>
@@ -1571,8 +1597,9 @@ export function InboxChatbox({
                     <Link
                       href={counterpartProfileHref}
                       onClick={() => setMobileHeaderMenuOpen(false)}
-                      className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
+                      <User className="size-4 text-[var(--color-sea-700)]" />
                       View profile
                     </Link>
                   )}
@@ -1580,9 +1607,10 @@ export function InboxChatbox({
                     <button
                       type="button"
                       onClick={clearActiveDirectMessages}
-                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
-                      Clear messages
+                      <Trash2 className="size-4 text-[var(--color-ink-500)]" />
+                      Delete messages
                     </button>
                   )}
                   {activeConversation && (
@@ -2009,11 +2037,26 @@ export function InboxChatbox({
               >
                 <ArrowLeft className="size-5" />
               </button>
-              <Avatar
-                name={activeConversation.counterpart?.fullName ?? "?"}
-                avatarUrl={activeConversation.counterpart?.avatarUrl}
-                size="md"
-              />
+              {counterpartProfileHref ? (
+                <Link
+                  href={counterpartProfileHref}
+                  onClick={() => setDirectHeaderMenuOpen(false)}
+                  className="shrink-0"
+                  aria-label="Open profile"
+                >
+                  <Avatar
+                    name={activeConversation.counterpart?.fullName ?? "?"}
+                    avatarUrl={activeConversation.counterpart?.avatarUrl}
+                    size="md"
+                  />
+                </Link>
+              ) : (
+                <Avatar
+                  name={activeConversation.counterpart?.fullName ?? "?"}
+                  avatarUrl={activeConversation.counterpart?.avatarUrl}
+                  size="md"
+                />
+              )}
               <div className="min-w-0 flex-1">
                 {counterpartProfileHref ? (
                   <Link
@@ -2062,17 +2105,19 @@ export function InboxChatbox({
                     <Link
                       href={counterpartProfileHref}
                       onClick={() => setDirectHeaderMenuOpen(false)}
-                      className="block rounded-lg px-3 py-2 text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
+                      <User className="size-4 text-[var(--color-sea-700)]" />
                       View profile
                     </Link>
                   )}
                   <button
                     type="button"
                     onClick={clearActiveDirectMessages}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                   >
-                    Clear messages
+                    <Trash2 className="size-4 text-[var(--color-ink-500)]" />
+                    Delete messages
                   </button>
                   <button
                     type="button"
