@@ -1002,16 +1002,14 @@ export function GroupChat({
                     <BarChart3 className="size-4 text-[var(--color-sea-600)]" />
                     Create poll
                   </button>
-                  {isPlanGroup && (
-                    <button
-                      type="button"
-                      onClick={openOffersDrawer}
-                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                    >
-                      <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                      See offers
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={openOffersDrawer}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                    See offers
+                  </button>
                   {isAgency && isPlanGroup && (
                     <button
                       type="button"
@@ -1317,7 +1315,7 @@ export function GroupChat({
             apiFetchWithAuth={apiFetchWithAuth}
           />
         )}
-        {offersDrawerOpen && isPlanGroup && (
+        {offersDrawerOpen && (
           <GroupChatOffersDrawer
             offers={offers}
             isCreator={isCreator}
@@ -1395,16 +1393,14 @@ export function GroupChat({
                           <LogOut className="size-4 text-[var(--color-sunset-600)]" />
                           Leave group
                         </button>
-                        {isPlanGroup && (
-                          <button
-                            type="button"
-                            onClick={openOffersDrawer}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                          >
-                            <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                            See offers
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={openOffersDrawer}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                          See offers
+                        </button>
                         <button
                           type="button"
                           onClick={handlePayNow}
@@ -1792,7 +1788,7 @@ export function GroupChat({
         />
       )}
 
-      {offersDrawerOpen && isPlanGroup && (
+      {offersDrawerOpen && (
         <GroupChatOffersDrawer
           offers={offers}
           isCreator={isCreator}
