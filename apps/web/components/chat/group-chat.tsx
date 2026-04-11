@@ -471,16 +471,34 @@ export function GroupChat({
     return map;
   }, [messages]);
 
+  const sortedOfferIds = useMemo(
+    () =>
+      offers
+        .slice()
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .map((offer) => offer.id),
+    [offers],
+  );
+
+  const visibleOfferIds = useMemo(
+    () => (showAllOffers ? sortedOfferIds : sortedOfferIds.slice(0, 2)),
+    [showAllOffers, sortedOfferIds],
+  );
+
   const inlineOfferIds = useMemo(() => {
-    const sorted = Array.from(latestOfferMessageIndexByOfferId.keys())
-      .filter((offerId) => offerById.has(offerId))
-      .sort((left, right) => {
-        const leftUpdatedAt = offerById.get(left)?.updatedAt ?? "";
-        const rightUpdatedAt = offerById.get(right)?.updatedAt ?? "";
-        return rightUpdatedAt.localeCompare(leftUpdatedAt);
-      });
-    return new Set(showAllOffers ? sorted : sorted.slice(0, 2));
-  }, [latestOfferMessageIndexByOfferId, offerById, showAllOffers]);
+    return new Set(
+      visibleOfferIds.filter((offerId) => latestOfferMessageIndexByOfferId.has(offerId)),
+    );
+  }, [latestOfferMessageIndexByOfferId, visibleOfferIds]);
+
+  const fallbackInlineOffers = useMemo(
+    () =>
+      visibleOfferIds
+        .filter((offerId) => !latestOfferMessageIndexByOfferId.has(offerId))
+        .map((offerId) => offerById.get(offerId))
+        .filter((offer): offer is Offer => Boolean(offer)),
+    [latestOfferMessageIndexByOfferId, offerById, visibleOfferIds],
+  );
 
   useEffect(() => {
     groupChatCache.set(groupId, {
@@ -1007,12 +1025,34 @@ export function GroupChat({
 
           {/* Messages */}
           <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
-            {messages.length === 0 ? (
+            {messages.length === 0 && fallbackInlineOffers.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-sm text-[var(--color-ink-400)]">No messages yet — say hello!</p>
               </div>
             ) : (
               <>
+                {fallbackInlineOffers.map((offer) => (
+                  <div
+                    key={`fallback-offer-${offer.id}`}
+                    id={`offer-card-${offer.id}`}
+                    data-inline-offer-card="true"
+                    className="mx-auto mb-2 w-full max-w-lg"
+                  >
+                    <OfferCard
+                      compact
+                      offer={offer}
+                      isCreator={isCreator}
+                      isAgency={isAgency}
+                      onAccept={handleAcceptOffer}
+                      onCounter={(nextOfferId, seedPrice) => {
+                        setCounterSheetOfferId(nextOfferId);
+                        setCounterSheetInitialPrice(seedPrice ?? null);
+                      }}
+                      onReject={handleRejectOffer}
+                      onWithdraw={handleWithdrawOffer}
+                    />
+                  </div>
+                ))}
                 {messages.map((message, idx) => {
                   const mine = session?.user.id === message.senderId;
                   const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -1417,12 +1457,35 @@ export function GroupChat({
                   embedded ? "min-h-0 flex-1 pr-1" : "max-h-[calc(100dvh-220px)] sm:max-h-[60vh]",
                 )}
               >
-                {messages.length === 0 ? (
+                {messages.length === 0 && fallbackInlineOffers.length === 0 ? (
                   <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
                     No messages yet. Coordinate arrivals, budget, and votes here.
                   </CardInset>
                 ) : (
-                  messages.map((message, idx) => {
+                  <>
+                    {fallbackInlineOffers.map((offer) => (
+                      <div
+                        key={`fallback-offer-${offer.id}`}
+                        id={`offer-card-${offer.id}`}
+                        data-inline-offer-card="true"
+                        className="mx-auto w-full max-w-lg"
+                      >
+                        <OfferCard
+                          compact
+                          offer={offer}
+                          isCreator={isCreator}
+                          isAgency={isAgency}
+                          onAccept={handleAcceptOffer}
+                          onCounter={(nextOfferId, seedPrice) => {
+                            setCounterSheetOfferId(nextOfferId);
+                            setCounterSheetInitialPrice(seedPrice ?? null);
+                          }}
+                          onReject={handleRejectOffer}
+                          onWithdraw={handleWithdrawOffer}
+                        />
+                      </div>
+                    ))}
+                    {messages.map((message, idx) => {
                     const mine = session?.user.id === message.senderId;
                     const pollOptionsData = message.metadata?.options ?? [];
                     const pollQuestion =
@@ -1567,7 +1630,8 @@ export function GroupChat({
                         </div>
                       </div>
                     );
-                  })
+                  })}
+                  </>
                 )}
                 <div ref={messageEndRef} />
               </div>
