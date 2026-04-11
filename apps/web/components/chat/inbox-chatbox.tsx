@@ -18,7 +18,6 @@ import {
   Send,
   Smile,
   Trash2,
-  User,
   Users,
   X,
 } from "lucide-react";
@@ -1405,13 +1404,13 @@ export function InboxChatbox({
         setShowEmojiPicker(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
   }, [showEmojiPicker]);
 
   useEffect(() => {
     if (!mobileHeaderMenuOpen) return;
-    const handleClick = (event: MouseEvent) => {
+    const handleClick = (event: PointerEvent) => {
       if (
         mobileHeaderMenuRef.current &&
         !mobileHeaderMenuRef.current.contains(event.target as Node)
@@ -1419,13 +1418,13 @@ export function InboxChatbox({
         setMobileHeaderMenuOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
   }, [mobileHeaderMenuOpen]);
 
   useEffect(() => {
     if (!directHeaderMenuOpen) return;
-    const handleClick = (event: MouseEvent) => {
+    const handleClick = (event: PointerEvent) => {
       if (
         directHeaderMenuRef.current &&
         !directHeaderMenuRef.current.contains(event.target as Node)
@@ -1433,8 +1432,8 @@ export function InboxChatbox({
         setDirectHeaderMenuOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
   }, [directHeaderMenuOpen]);
 
   useEffect(() => {
@@ -1493,7 +1492,7 @@ export function InboxChatbox({
       )}
     >
       {mobileMessengerMode && !(showMobileChat && activeGroupId) && (
-        <div className="flex h-14 items-center justify-between border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
+        <div className="relative z-40 flex h-14 items-center justify-between overflow-visible border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
           <div className="flex min-w-0 items-center gap-2.5">
             {showMobileChat ? (
               <>
@@ -1535,19 +1534,9 @@ export function InboxChatbox({
                   </div>
                 )}
                 <div className="min-w-0 transition-all duration-250">
-                  {counterpartProfileHref && activeConversation ? (
-                    <Link
-                      href={counterpartProfileHref}
-                      onClick={() => setMobileHeaderMenuOpen(false)}
-                      className="block truncate text-sm font-semibold text-[var(--color-ink-900)] underline-offset-2 transition hover:text-[var(--color-sea-700)] hover:underline"
-                    >
-                      {mobileHeaderTitle}
-                    </Link>
-                  ) : (
-                    <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-                      {mobileHeaderTitle}
-                    </p>
-                  )}
+                  <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                    {mobileHeaderTitle}
+                  </p>
                   <p className="truncate text-[11px] text-[var(--color-ink-500)]">
                     {mobileHeaderSubtitle}
                   </p>
@@ -1569,15 +1558,19 @@ export function InboxChatbox({
               <>
                 <button
                   type="button"
-                  onClick={() => setMobileHeaderMenuOpen((open) => !open)}
-                  className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-50)] active:scale-95"
+                  onClick={() => {
+                    setMobileHeaderMenuOpen((open) => !open);
+                    setDirectHeaderMenuOpen(false);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/85 text-[var(--color-sea-700)] transition-all duration-200 hover:bg-white active:scale-95"
                   aria-label="Open chat options"
+                  aria-expanded={mobileHeaderMenuOpen}
                 >
                   <MoreVertical className="size-4.5" />
                 </button>
                 <div
                   className={cn(
-                    "absolute right-0 top-[calc(100%+0.35rem)] z-40 w-44 origin-top-right rounded-2xl border border-[var(--color-sea-100)] bg-white/95 p-1 shadow-[var(--shadow-md)] backdrop-blur transition-all duration-180",
+                    "absolute right-0 top-[calc(100%+0.35rem)] z-[90] w-44 origin-top-right rounded-2xl border border-[var(--color-sea-100)] bg-white p-1 shadow-[var(--shadow-lg)] transition-all duration-180",
                     mobileHeaderMenuOpen
                       ? "scale-100 opacity-100"
                       : "pointer-events-none scale-95 opacity-0",
@@ -1597,9 +1590,8 @@ export function InboxChatbox({
                     <Link
                       href={counterpartProfileHref}
                       onClick={() => setMobileHeaderMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
-                      <User className="size-4 text-[var(--color-sea-700)]" />
                       View profile
                     </Link>
                   )}
@@ -1607,9 +1599,8 @@ export function InboxChatbox({
                     <button
                       type="button"
                       onClick={clearActiveDirectMessages}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
-                      <Trash2 className="size-4 text-[var(--color-ink-500)]" />
                       Delete messages
                     </button>
                   )}
@@ -2026,7 +2017,7 @@ export function InboxChatbox({
             {/* Conversation header */}
             <div
               className={cn(
-                "shrink-0 items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3",
+                "relative z-20 shrink-0 items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3",
                 mobileMessengerMode ? "hidden md:flex" : "flex",
               )}
             >
@@ -2079,15 +2070,19 @@ export function InboxChatbox({
               <div className="relative shrink-0" ref={directHeaderMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setDirectHeaderMenuOpen((open) => !open)}
+                  onClick={() => {
+                    setDirectHeaderMenuOpen((open) => !open);
+                    setMobileHeaderMenuOpen(false);
+                  }}
                   className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/85 text-[var(--color-sea-700)] transition hover:bg-white"
                   aria-label="Direct chat actions"
+                  aria-expanded={directHeaderMenuOpen}
                 >
                   <MoreVertical className="size-4.5" />
                 </button>
                 <div
                   className={cn(
-                    "absolute right-0 top-11 z-30 w-48 origin-top-right rounded-xl border border-[var(--color-sea-100)] bg-white p-1.5 shadow-[var(--shadow-lg)] transition-all duration-150",
+                    "absolute right-0 top-11 z-[90] w-48 origin-top-right rounded-xl border border-[var(--color-sea-100)] bg-white p-1.5 shadow-[var(--shadow-lg)] transition-all duration-150",
                     directHeaderMenuOpen
                       ? "scale-100 opacity-100"
                       : "pointer-events-none scale-95 opacity-0",
@@ -2105,18 +2100,16 @@ export function InboxChatbox({
                     <Link
                       href={counterpartProfileHref}
                       onClick={() => setDirectHeaderMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                      className="block rounded-lg px-3 py-2 text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                     >
-                      <User className="size-4 text-[var(--color-sea-700)]" />
                       View profile
                     </Link>
                   )}
                   <button
                     type="button"
                     onClick={clearActiveDirectMessages}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
                   >
-                    <Trash2 className="size-4 text-[var(--color-ink-500)]" />
                     Delete messages
                   </button>
                   <button
