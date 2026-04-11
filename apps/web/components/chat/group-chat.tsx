@@ -929,7 +929,7 @@ export function GroupChat({
   if (embedded) {
     return (
       <>
-        <div className="relative flex h-full flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Header — same style as DM header */}
           <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
             {onBack && (
