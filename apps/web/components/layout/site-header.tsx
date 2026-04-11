@@ -155,6 +155,11 @@ export function SiteHeader() {
   const userEmail = session?.user?.email ?? "";
   const { notifications, unreadCount, markAllRead, markRead } = useLiveNotifications();
   const { unreadDirectCount } = useUnreadDirectCount();
+  const isMobileMessengerRoute =
+    pathname === "/dashboard/messages" ||
+    pathname === "/agency/inbox" ||
+    pathname.startsWith("/dashboard/messages/") ||
+    pathname.startsWith("/agency/inbox/");
 
   const publicNavLinks = [
     { href: discoverHref, label: "Home" },
@@ -204,7 +209,12 @@ export function SiteHeader() {
   return (
     <>
       {/* ── Sticky header bar ─────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]">
+      <header
+        className={cn(
+          "sticky top-0 z-40 border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
+          isMobileMessengerRoute && "hidden md:block",
+        )}
+      >
         <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-4 sm:px-6">
 
           {/* Logo */}
@@ -395,14 +405,15 @@ export function SiteHeader() {
       </header>
 
       {/* ── Mobile slide-in sidebar ──────────────────────────────── */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50 md:hidden",
-          sidebarOpen ? "pointer-events-auto" : "pointer-events-none",
-        )}
-        aria-modal="true"
-        role="dialog"
-      >
+      {!isMobileMessengerRoute && (
+        <div
+          className={cn(
+            "fixed inset-0 z-50 md:hidden",
+            sidebarOpen ? "pointer-events-auto" : "pointer-events-none",
+          )}
+          aria-modal="true"
+          role="dialog"
+        >
         <div
           className={cn(
             "absolute inset-0 bg-[var(--color-ink-950)]/50 backdrop-blur-sm transition-opacity duration-200",
@@ -553,7 +564,8 @@ export function SiteHeader() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </>
   );
 }

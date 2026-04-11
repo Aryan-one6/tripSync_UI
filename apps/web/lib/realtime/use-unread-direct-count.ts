@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { DirectConversation } from "@/lib/api/types";
 import { useSocket } from "@/lib/realtime/use-socket";
@@ -15,25 +15,38 @@ export function useUnreadDirectCount() {
   const socket = useSocket();
   const userId = session?.user?.id ?? null;
   const [count, setCount] = useState(0);
+  const refreshInFlightRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
 
-  const refreshUnreadDirectCount = useCallback(async () => {
+  const refreshUnreadDirectCount = useCallback(async (force = false) => {
     if (status !== "authenticated" || !userId) {
       setCount(0);
       return;
     }
 
+    const now = Date.now();
+    if (!force) {
+      if (refreshInFlightRef.current) return;
+      if (now - lastRefreshAtRef.current < 1_500) return;
+    }
+
+    refreshInFlightRef.current = true;
     try {
       const conversations = await apiFetchWithAuth<DirectConversation[]>(
         "/chat/direct/conversations",
+        { timeoutMs: 5_000 },
       );
       setCount(sumUnread(conversations));
     } catch {
       setCount(0);
+    } finally {
+      refreshInFlightRef.current = false;
+      lastRefreshAtRef.current = Date.now();
     }
   }, [apiFetchWithAuth, status, userId]);
 
   useEffect(() => {
-    void refreshUnreadDirectCount();
+    void refreshUnreadDirectCount(true);
   }, [refreshUnreadDirectCount]);
 
   useEffect(() => {
@@ -70,4 +83,3 @@ export function useUnreadDirectCount() {
     [count, refreshUnreadDirectCount],
   );
 }
-

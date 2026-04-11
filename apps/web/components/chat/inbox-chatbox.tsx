@@ -136,6 +136,8 @@ const CHAT_READ_TIMEOUT_MS = 4_000;
 const CHAT_SEND_TIMEOUT_MS = 8_000;
 const CHAT_FETCH_RETRY_DELAYS_MS = [900, 2_000];
 const CHAT_SOCKET_POLL_MS = 4_500;
+const READ_API_THROTTLE_MS = 2_500;
+const READ_EVENT_THROTTLE_MS = 1_500;
 
 type TimedCache<T> = {
   data: T;
@@ -183,7 +185,13 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
+export function InboxChatbox({
+  variant,
+  mobileMessengerMode = false,
+}: {
+  variant: "user" | "agency";
+  mobileMessengerMode?: boolean;
+}) {
   const searchParams = useSearchParams();
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
@@ -227,6 +235,8 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
   const conversationsRef = useRef<DirectConversation[]>(conversations);
+  const readApiAtRef = useRef<Map<string, number>>(new Map());
+  const readEventAtRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -326,6 +336,35 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const counterpartProfileHref = activeCounterpartHandle
     ? `/profile/${encodeURIComponent(activeCounterpartHandle)}`
     : null;
+  const mobileExitHref = variant === "agency" ? "/agency/dashboard" : "/dashboard/trips";
+  const activeGroupChannel = useMemo(
+    () => activeGroupChannels.find((trip) => trip.group.id === activeGroupId) ?? null,
+    [activeGroupChannels, activeGroupId],
+  );
+  const activeGroupTitle = activeGroupChannel
+    ? activeGroupChannel.group.plan?.title ??
+      activeGroupChannel.group.package?.title ??
+      "Trip group"
+    : null;
+  const activeGroupDestination = activeGroupChannel
+    ? activeGroupChannel.group.plan?.destination ??
+      activeGroupChannel.group.package?.destination ??
+      "Group chat"
+    : null;
+  const mobileHeaderTitle = showMobileChat
+    ? activeConversation
+      ? activeConversation.counterpart?.fullName ?? "Direct chat"
+      : activeGroupTitle ?? "Trip chat"
+    : "Chats";
+  const mobileHeaderSubtitle = showMobileChat
+    ? activeConversation
+      ? typingUsers.length > 0
+        ? `${typingUsers.map((e) => e.fullName).join(", ")} typing…`
+        : "Direct message"
+      : activeGroupDestination ?? "Group channel"
+    : totalUnread > 0
+    ? `${totalUnread} unread`
+    : "Your conversations";
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const openOrCreateConversation = useCallback(
@@ -382,20 +421,47 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
 
-  const markConversationRead = useCallback((conversationId: string) => {
+  const markConversationRead = useCallback((
+    conversationId: string,
+    options?: { forceRequest?: boolean; forceNotify?: boolean },
+  ) => {
+    let hadUnread = false;
     const nowIso = new Date().toISOString();
     setConversations((cur) =>
       cur.map((c) =>
         c.id === conversationId
-          ? { ...c, unreadCount: 0, lastReadAt: nowIso }
+          ? (() => {
+              hadUnread = hadUnread || c.unreadCount > 0;
+              return c.unreadCount === 0 && c.lastReadAt
+                ? c
+                : { ...c, unreadCount: 0, lastReadAt: nowIso };
+            })()
           : c,
       ),
     );
-    window.dispatchEvent(
-      new CustomEvent(CONVERSATION_READ_EVENT, {
-        detail: { conversationId },
-      }),
-    );
+    const forceRequest = options?.forceRequest ?? false;
+    const forceNotify = options?.forceNotify ?? false;
+    const shouldRequest = forceRequest || hadUnread;
+    const shouldNotify = forceNotify || hadUnread;
+    const nowMs = Date.now();
+
+    if (shouldNotify) {
+      const lastNotify = readEventAtRef.current.get(conversationId) ?? 0;
+      if (nowMs - lastNotify >= READ_EVENT_THROTTLE_MS) {
+        readEventAtRef.current.set(conversationId, nowMs);
+        window.dispatchEvent(
+          new CustomEvent(CONVERSATION_READ_EVENT, {
+            detail: { conversationId },
+          }),
+        );
+      }
+    }
+
+    if (!shouldRequest) return;
+    const lastApiCall = readApiAtRef.current.get(conversationId) ?? 0;
+    if (nowMs - lastApiCall < READ_API_THROTTLE_MS) return;
+    readApiAtRef.current.set(conversationId, nowMs);
+
     void apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
       method: "POST",
       timeoutMs: CHAT_READ_TIMEOUT_MS,
@@ -903,7 +969,9 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       });
 
       if (!known) {
-        void apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations")
+        void apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations", {
+          timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+        })
           .then((r) => setConversations(sortByUpdatedAtDesc(r)))
           .catch(() => {});
       }
@@ -918,7 +986,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           return next;
         });
         if (message.senderId !== session?.user.id) {
-          markConversationRead(conversationId);
+          markConversationRead(conversationId, {
+            forceRequest: true,
+            forceNotify: true,
+          });
         }
       }
     };
@@ -993,14 +1064,67 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
+      {mobileMessengerMode && (
+        <div className="flex h-14 items-center justify-between border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMobileChat(false)}
+              className={cn(
+                "flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200",
+                showMobileChat
+                  ? "opacity-100 hover:bg-[var(--color-sea-50)] active:scale-95"
+                  : "pointer-events-none opacity-0",
+              )}
+              aria-label="Back to chats"
+            >
+              <ArrowLeft className="size-4.5" />
+            </button>
+            {showMobileChat ? (
+              activeConversation ? (
+                <Avatar
+                  name={activeConversation.counterpart?.fullName ?? "?"}
+                  size="sm"
+                />
+              ) : (
+                <div className="flex size-8 items-center justify-center rounded-full bg-[var(--color-lavender-100)] text-[var(--color-lavender-600)] ring-1 ring-[var(--color-lavender-200)]">
+                  <Users className="size-4" />
+                </div>
+              )
+            ) : null}
+            <div className="min-w-0 transition-all duration-250">
+              <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                {mobileHeaderTitle}
+              </p>
+              <p className="truncate text-[11px] text-[var(--color-ink-500)]">
+                {mobileHeaderSubtitle}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={mobileExitHref}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-100)] active:scale-95"
+          >
+            <X className="size-3.5" />
+            Close
+          </Link>
+        </div>
+      )}
       <div
-        className="flex min-h-[calc(100dvh-8rem)] overflow-hidden border-y border-[var(--color-sea-100)] bg-[var(--color-surface-raised)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]"
+        className={cn(
+          "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
+          mobileMessengerMode
+            ? "h-[calc(100dvh-3.5rem)] border-0 md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]"
+            : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
+        )}
       >
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "flex w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)]",
-          showMobileChat ? "hidden md:flex" : "flex",
+          "absolute inset-0 z-20 flex min-h-0 w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)] md:transition-none",
+          showMobileChat
+            ? "-translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto"
+            : "translate-x-0 opacity-100",
         )}
       >
         {/* Header */}
@@ -1066,7 +1190,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         </div>
 
         {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {/* New chat: contacts to message */}
           {showNewChat && (
             <div>
@@ -1304,8 +1428,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)]",
-          showMobileChat ? "flex" : "hidden md:flex",
+          "absolute inset-0 z-30 flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:transition-none",
+          showMobileChat
+            ? "translate-x-0 opacity-100"
+            : "translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto",
         )}
       >
         {feedback && (
@@ -1352,7 +1478,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         ) : (
           <>
             {/* Conversation header */}
-            <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
+            <div
+              className={cn(
+                "shrink-0 items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3",
+                mobileMessengerMode ? "hidden md:flex" : "flex",
+              )}
+            >
               <button
                 type="button"
                 onClick={() => setShowMobileChat(false)}
@@ -1395,7 +1526,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
               {(syncingMessages || messageSyncIssue || (socket && !isSocketConnected)) && (
                 <div className="sticky top-0 z-10 mx-auto mb-3 w-fit rounded-full border border-[var(--color-sea-200)] bg-white/85 px-3 py-1 text-[11px] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)] backdrop-blur">
                   {messageSyncIssue
@@ -1523,7 +1654,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Input bar */}
-            <div className="border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
+            <div className="shrink-0 border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
               {/* Reply preview */}
               {replyTo && (
                 <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
