@@ -14,16 +14,17 @@ Example ₹10,000 trip:
   Commission = ₹1,000 | Agency net = ₹9,000 | Pre-trip ₹2,700 | Post-trip ₹6,300
 
 ## Loyalty System
-
-| Rule                | Value          |
-|---------------------|----------------|
-| 1 point             | = 1 INR        |
-| Referral inviter    | 250 pts        |
-| Referral new user   | 250 pts        |
-| Trip completion     | 250 pts        |
-| Expiry              | 6 months       |
-| Redemption cap      | 20% of booking |
-| Model               | Append-only ledger |
+----------------------------------------------
+| Rule                | Value                |
+|---------------------|----------------------|
+| 1 point             | = 1 INR              |
+| Referral inviter    | 250 pts              |
+| Referral new user   | 250 pts              |
+| Trip completion     | 250 pts              |
+| Expiry              | 6 months             |
+| Redemption cap      | 20% of booking       |
+| Model               | Append-only ledger   |
+----------------------------------------------
 
 ## New Endpoints
 

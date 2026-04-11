@@ -34,8 +34,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/lib/realtime/use-socket";
-import { OfferCard } from "@/components/chat/offer-card";
-import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
+import { OfferCard, type OfferCounterPayload } from "@/components/chat/offer-card";
 import { PollCard } from "@/components/chat/poll-card";
 import type { ChatMessage, Group, GroupMember, Offer } from "@/lib/api/types";
 
@@ -70,14 +69,6 @@ function messageAction(message: ChatMessage): string {
     return "";
   }
   return String((message.metadata as Record<string, unknown>).action ?? "");
-}
-
-function messageOfferId(message: ChatMessage): string | null {
-  if (!message.metadata || typeof message.metadata !== "object" || !("offerId" in message.metadata)) {
-    return null;
-  }
-  const offerId = (message.metadata as Record<string, unknown>).offerId;
-  return typeof offerId === "string" && offerId.length > 0 ? offerId : null;
 }
 
 const GROUP_CHAT_CACHE_TTL_MS = 20_000;
@@ -370,6 +361,105 @@ function PollModal({
   );
 }
 
+function GroupChatOffersDrawer({
+  offers,
+  isCreator,
+  isAgency,
+  onClose,
+  onAccept,
+  onReject,
+  onWithdraw,
+  onCounterSubmit,
+}: {
+  offers: Offer[];
+  isCreator: boolean;
+  isAgency: boolean;
+  onClose: () => void;
+  onAccept: (offerId: string) => void;
+  onReject: (offerId: string) => void;
+  onWithdraw: (offerId: string) => void;
+  onCounterSubmit: (offerId: string, payload: OfferCounterPayload) => Promise<void>;
+}) {
+  const orderedOffers = useMemo(
+    () => offers.slice().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    [offers],
+  );
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[90]">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[var(--color-ink-900)]/45 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Close offers panel"
+      />
+      <aside className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] md:w-[430px] lg:w-[480px]">
+        <div className="flex items-center justify-between border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#e9f9ef] to-[#f5fffa] px-4 py-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+              Offers
+            </p>
+            <p className="font-display text-lg text-[var(--color-ink-950)]">
+              {orderedOffers.length} received
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white text-[var(--color-ink-600)] transition hover:bg-[var(--color-sea-50)]"
+            aria-label="Close offers panel"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          {orderedOffers.length === 0 ? (
+            <CardInset className="p-5 text-center">
+              <p className="text-sm font-medium text-[var(--color-ink-700)]">No offers yet</p>
+              <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                New agency offers and negotiations will appear here.
+              </p>
+            </CardInset>
+          ) : (
+            orderedOffers.map((offer) => (
+              <article key={offer.id} className="rounded-[16px] border border-[var(--color-border)] bg-white/90 shadow-[var(--shadow-sm)]">
+                <OfferCard
+                  compact
+                  enableInlineCounterComposer
+                  offer={offer}
+                  isCreator={isCreator}
+                  isAgency={isAgency}
+                  onAccept={onAccept}
+                  onReject={onReject}
+                  onWithdraw={onWithdraw}
+                  onCounterSubmit={onCounterSubmit}
+                />
+              </article>
+            ))
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 // ── Main GroupChat Component ──────────────────────────────────────────────────
 
 export function GroupChat({
@@ -410,14 +500,12 @@ export function GroupChat({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
-  const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
-  const [counterSheetInitialPrice, setCounterSheetInitialPrice] = useState<number | null>(null);
+  const [offersDrawerOpen, setOffersDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(!hasWarmCache);
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showAllOffers, setShowAllOffers] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
@@ -452,53 +540,6 @@ export function GroupChat({
       )
       .slice(0, 6);
   }, [mentionQuery, activeMembers, userId]);
-
-  const offerById = useMemo(() => {
-    const map = new Map<string, Offer>();
-    offers.forEach((offer) => map.set(offer.id, offer));
-    return map;
-  }, [offers]);
-
-  const latestOfferMessageIndexByOfferId = useMemo(() => {
-    const map = new Map<string, number>();
-    messages.forEach((message, index) => {
-      if (message.messageType !== "system") return;
-      const action = messageAction(message);
-      const offerId = messageOfferId(message);
-      if ((!action.startsWith("offer_") && action !== "payment_window_opened") || !offerId) return;
-      map.set(offerId, index);
-    });
-    return map;
-  }, [messages]);
-
-  const sortedOfferIds = useMemo(
-    () =>
-      offers
-        .slice()
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .map((offer) => offer.id),
-    [offers],
-  );
-
-  const visibleOfferIds = useMemo(
-    () => (showAllOffers ? sortedOfferIds : sortedOfferIds.slice(0, 2)),
-    [showAllOffers, sortedOfferIds],
-  );
-
-  const inlineOfferIds = useMemo(() => {
-    return new Set(
-      visibleOfferIds.filter((offerId) => latestOfferMessageIndexByOfferId.has(offerId)),
-    );
-  }, [latestOfferMessageIndexByOfferId, visibleOfferIds]);
-
-  const fallbackInlineOffers = useMemo(
-    () =>
-      visibleOfferIds
-        .filter((offerId) => !latestOfferMessageIndexByOfferId.has(offerId))
-        .map((offerId) => offerById.get(offerId))
-        .filter((offer): offer is Offer => Boolean(offer)),
-    [latestOfferMessageIndexByOfferId, offerById, visibleOfferIds],
-  );
 
   useEffect(() => {
     groupChatCache.set(groupId, {
@@ -810,7 +851,7 @@ export function GroupChat({
     }
   }
 
-  async function handleCounterOffer(offerId: string, payload: CounterOfferPayload) {
+  async function handleCounterOffer(offerId: string, payload: OfferCounterPayload) {
     await apiFetchWithAuth(`/offers/${offerId}/counter`, {
       method: "POST",
       body: JSON.stringify({
@@ -822,8 +863,6 @@ export function GroupChat({
             : undefined,
       }),
     });
-    setCounterSheetInitialPrice(null);
-    setCounterSheetOfferId(null);
     await loadOffers();
   }
 
@@ -861,20 +900,13 @@ export function GroupChat({
     }
   }
 
-  function handleShowAllOffers() {
-    if (offers.length === 0) {
-      setFeedback("No offers are available in this group yet.");
-      setMenuOpen(false);
-      return;
-    }
-    setShowAllOffers(true);
+  function openOffersDrawer() {
+    setOffersDrawerOpen(true);
     setMenuOpen(false);
-    window.setTimeout(() => {
-      document.querySelector<HTMLElement>("[data-inline-offer-card='true']")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 50);
+  }
+
+  function closeOffersDrawer() {
+    setOffersDrawerOpen(false);
   }
 
   function handlePayNow() {
@@ -887,9 +919,6 @@ export function GroupChat({
     router.push(checkoutHref);
   }
 
-  const counteringOffer = counterSheetOfferId
-    ? offers.find((o) => o.id === counterSheetOfferId)
-    : null;
   const creatorUserId = planCreatorId ?? members.find((member) => member.role === "CREATOR")?.user.id;
   const isCreator = creatorUserId ? userId === creatorUserId : false;
   const groupTitle = group?.plan?.title ?? group?.package?.title ?? "Trip group";
@@ -976,11 +1005,11 @@ export function GroupChat({
                   {isPlanGroup && (
                     <button
                       type="button"
-                      onClick={handleShowAllOffers}
+                      onClick={openOffersDrawer}
                       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
                     >
                       <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                      View offers
+                      See offers
                     </button>
                   )}
                   {isAgency && isPlanGroup && (
@@ -1025,41 +1054,12 @@ export function GroupChat({
 
           {/* Messages */}
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
-            {messages.length === 0 && fallbackInlineOffers.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-sm text-[var(--color-ink-400)]">No messages yet — say hello!</p>
               </div>
             ) : (
               <>
-                {fallbackInlineOffers.map((offer) => (
-                  <div
-                    key={`fallback-offer-${offer.id}`}
-                    id={`offer-card-${offer.id}`}
-                    data-inline-offer-card="true"
-                    className="flex justify-start mb-2"
-                  >
-                    <div className="w-full max-w-[90%] sm:max-w-[72%]">
-                      <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
-                        Agency Offer
-                      </p>
-                      <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
-                        <OfferCard
-                          compact
-                          offer={offer}
-                          isCreator={isCreator}
-                          isAgency={isAgency}
-                          onAccept={handleAcceptOffer}
-                          onCounter={(nextOfferId, seedPrice) => {
-                            setCounterSheetOfferId(nextOfferId);
-                            setCounterSheetInitialPrice(seedPrice ?? null);
-                          }}
-                          onReject={handleRejectOffer}
-                          onWithdraw={handleWithdrawOffer}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
                 {messages.map((message, idx) => {
                   const mine = session?.user.id === message.senderId;
                   const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -1075,13 +1075,6 @@ export function GroupChat({
 
                   if (message.messageType === "system") {
                     const metaAction = messageAction(message);
-                    const offerId = messageOfferId(message);
-                    const inlineOffer =
-                      offerId &&
-                      latestOfferMessageIndexByOfferId.get(offerId) === idx &&
-                      inlineOfferIds.has(offerId)
-                        ? offerById.get(offerId)
-                        : null;
                     const isOfferMsg = metaAction.startsWith("offer_");
                     const isPaymentMsg = metaAction.startsWith("payment_");
                     const isSafetyWarning = metaAction === "safety_warning";
@@ -1110,34 +1103,6 @@ export function GroupChat({
                             {message.content}
                           </span>
                         </div>
-                        {inlineOffer && (
-                          <div
-                            id={`offer-card-${inlineOffer.id}`}
-                            data-inline-offer-card="true"
-                            className="mt-2 flex justify-start"
-                          >
-                            <div className="w-full max-w-[90%] sm:max-w-[72%]">
-                              <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
-                                Agency Offer
-                              </p>
-                              <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
-                                <OfferCard
-                                  compact
-                                  offer={inlineOffer}
-                                  isCreator={isCreator}
-                                  isAgency={isAgency}
-                                  onAccept={handleAcceptOffer}
-                                  onCounter={(nextOfferId, seedPrice) => {
-                                    setCounterSheetOfferId(nextOfferId);
-                                    setCounterSheetInitialPrice(seedPrice ?? null);
-                                  }}
-                                  onReject={handleRejectOffer}
-                                  onWithdraw={handleWithdrawOffer}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   }
@@ -1352,22 +1317,18 @@ export function GroupChat({
             apiFetchWithAuth={apiFetchWithAuth}
           />
         )}
-        <CounterOfferSheet
-          open={counterSheetOfferId !== null}
-          onClose={() => {
-            setCounterSheetOfferId(null);
-            setCounterSheetInitialPrice(null);
-          }}
-          onSubmit={async (payload) => {
-            if (!counterSheetOfferId) return;
-            await handleCounterOffer(counterSheetOfferId, payload);
-          }}
-          currentPrice={counteringOffer?.pricePerPerson ?? 0}
-          initialPrice={counterSheetInitialPrice ?? undefined}
-          counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
-          maxRounds={3}
-          embedded
-        />
+        {offersDrawerOpen && isPlanGroup && (
+          <GroupChatOffersDrawer
+            offers={offers}
+            isCreator={isCreator}
+            isAgency={isAgency}
+            onClose={closeOffersDrawer}
+            onAccept={handleAcceptOffer}
+            onReject={handleRejectOffer}
+            onWithdraw={handleWithdrawOffer}
+            onCounterSubmit={handleCounterOffer}
+          />
+        )}
       </>
     );
   }
@@ -1437,11 +1398,11 @@ export function GroupChat({
                         {isPlanGroup && (
                           <button
                             type="button"
-                            onClick={handleShowAllOffers}
+                            onClick={openOffersDrawer}
                             className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
                           >
                             <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                            Show all offers
+                            See offers
                           </button>
                         )}
                         <button
@@ -1471,41 +1432,12 @@ export function GroupChat({
                   embedded ? "min-h-0 flex-1 pr-1" : "max-h-[calc(100dvh-220px)] sm:max-h-[60vh]",
                 )}
               >
-                {messages.length === 0 && fallbackInlineOffers.length === 0 ? (
+                {messages.length === 0 ? (
                   <CardInset className="p-6 text-center text-sm text-[var(--color-ink-500)]">
                     No messages yet. Coordinate arrivals, budget, and votes here.
                   </CardInset>
                 ) : (
                   <>
-                    {fallbackInlineOffers.map((offer) => (
-                      <div
-                        key={`fallback-offer-${offer.id}`}
-                        id={`offer-card-${offer.id}`}
-                        data-inline-offer-card="true"
-                        className="flex justify-start"
-                      >
-                        <div className="w-full max-w-[88%] sm:max-w-[70%]">
-                          <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
-                            Agency Offer
-                          </p>
-                          <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/60 bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
-                            <OfferCard
-                              compact
-                              offer={offer}
-                              isCreator={isCreator}
-                              isAgency={isAgency}
-                              onAccept={handleAcceptOffer}
-                              onCounter={(nextOfferId, seedPrice) => {
-                                setCounterSheetOfferId(nextOfferId);
-                                setCounterSheetInitialPrice(seedPrice ?? null);
-                              }}
-                              onReject={handleRejectOffer}
-                              onWithdraw={handleWithdrawOffer}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
                     {messages.map((message, idx) => {
                     const mine = session?.user.id === message.senderId;
                     const pollOptionsData = message.metadata?.options ?? [];
@@ -1522,13 +1454,6 @@ export function GroupChat({
 
                     if (message.messageType === "system") {
                       const metaAction = messageAction(message);
-                      const offerId = messageOfferId(message);
-                      const inlineOffer =
-                        offerId &&
-                        latestOfferMessageIndexByOfferId.get(offerId) === idx &&
-                        inlineOfferIds.has(offerId)
-                          ? offerById.get(offerId)
-                          : null;
                       const isOfferMsg = metaAction.startsWith("offer_");
                       const isPaymentMsg = metaAction.startsWith("payment_");
                       const isSafetyWarning = metaAction === "safety_warning";
@@ -1558,34 +1483,6 @@ export function GroupChat({
                             {isOfferMsg && <Receipt className="size-3.5 shrink-0 mt-0.5" />}
                             <span className={cn("leading-relaxed", isSafetyWarning && "font-medium")}>{message.content}</span>
                           </div>
-                          {inlineOffer && (
-                            <div
-                              id={`offer-card-${inlineOffer.id}`}
-                              data-inline-offer-card="true"
-                              className="mt-2 flex justify-start"
-                            >
-                              <div className="w-full max-w-[88%] sm:max-w-[70%]">
-                                <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)] pl-1">
-                                  Agency Offer
-                                </p>
-                                <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/60 bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
-                                  <OfferCard
-                                    compact
-                                    offer={inlineOffer}
-                                    isCreator={isCreator}
-                                    isAgency={isAgency}
-                                    onAccept={handleAcceptOffer}
-                                    onCounter={(nextOfferId, seedPrice) => {
-                                      setCounterSheetOfferId(nextOfferId);
-                                      setCounterSheetInitialPrice(seedPrice ?? null);
-                                    }}
-                                    onReject={handleRejectOffer}
-                                    onWithdraw={handleWithdrawOffer}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       );
                     }
@@ -1895,23 +1792,18 @@ export function GroupChat({
         />
       )}
 
-      {/* Counter Offer sheet */}
-      <CounterOfferSheet
-        open={counterSheetOfferId !== null}
-        onClose={() => {
-          setCounterSheetOfferId(null);
-          setCounterSheetInitialPrice(null);
-        }}
-        onSubmit={async (payload) => {
-          if (!counterSheetOfferId) return;
-          await handleCounterOffer(counterSheetOfferId, payload);
-        }}
-        currentPrice={counteringOffer?.pricePerPerson ?? 0}
-        initialPrice={counterSheetInitialPrice ?? undefined}
-        counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
-        maxRounds={3}
-        embedded={false}
-      />
+      {offersDrawerOpen && isPlanGroup && (
+        <GroupChatOffersDrawer
+          offers={offers}
+          isCreator={isCreator}
+          isAgency={isAgency}
+          onClose={closeOffersDrawer}
+          onAccept={handleAcceptOffer}
+          onReject={handleRejectOffer}
+          onWithdraw={handleWithdrawOffer}
+          onCounterSubmit={handleCounterOffer}
+        />
+      )}
     </>
   );
 }
