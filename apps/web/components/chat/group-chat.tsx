@@ -65,6 +65,21 @@ function chatMsgTime(dateStr: string): string {
   return format(d, "dd MMM");
 }
 
+function messageAction(message: ChatMessage): string {
+  if (!message.metadata || typeof message.metadata !== "object" || !("action" in message.metadata)) {
+    return "";
+  }
+  return String((message.metadata as Record<string, unknown>).action ?? "");
+}
+
+function messageOfferId(message: ChatMessage): string | null {
+  if (!message.metadata || typeof message.metadata !== "object" || !("offerId" in message.metadata)) {
+    return null;
+  }
+  const offerId = (message.metadata as Record<string, unknown>).offerId;
+  return typeof offerId === "string" && offerId.length > 0 ? offerId : null;
+}
+
 const GROUP_CHAT_CACHE_TTL_MS = 20_000;
 
 type GroupChatCacheEntry = {
@@ -403,7 +418,6 @@ export function GroupChat({
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAllOffers, setShowAllOffers] = useState(false);
-  const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
@@ -438,6 +452,35 @@ export function GroupChat({
       )
       .slice(0, 6);
   }, [mentionQuery, activeMembers, userId]);
+
+  const offerById = useMemo(() => {
+    const map = new Map<string, Offer>();
+    offers.forEach((offer) => map.set(offer.id, offer));
+    return map;
+  }, [offers]);
+
+  const latestOfferMessageIndexByOfferId = useMemo(() => {
+    const map = new Map<string, number>();
+    messages.forEach((message, index) => {
+      if (message.messageType !== "system") return;
+      const action = messageAction(message);
+      const offerId = messageOfferId(message);
+      if ((!action.startsWith("offer_") && action !== "payment_window_opened") || !offerId) return;
+      map.set(offerId, index);
+    });
+    return map;
+  }, [messages]);
+
+  const inlineOfferIds = useMemo(() => {
+    const sorted = Array.from(latestOfferMessageIndexByOfferId.keys())
+      .filter((offerId) => offerById.has(offerId))
+      .sort((left, right) => {
+        const leftUpdatedAt = offerById.get(left)?.updatedAt ?? "";
+        const rightUpdatedAt = offerById.get(right)?.updatedAt ?? "";
+        return rightUpdatedAt.localeCompare(leftUpdatedAt);
+      });
+    return new Set(showAllOffers ? sorted : sorted.slice(0, 2));
+  }, [latestOfferMessageIndexByOfferId, offerById, showAllOffers]);
 
   useEffect(() => {
     groupChatCache.set(groupId, {
@@ -808,7 +851,12 @@ export function GroupChat({
     }
     setShowAllOffers(true);
     setMenuOpen(false);
-    document.getElementById("offers-section")?.scrollIntoView({ behavior: "smooth" });
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>("[data-inline-offer-card='true']")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 50);
   }
 
   function handlePayNow() {
@@ -835,7 +883,6 @@ export function GroupChat({
     ? `/packages/${group.package.slug}`
     : "/dashboard/trips";
   const checkoutHref = `/dashboard/groups/${groupId}/checkout`;
-  const visibleOffers = showAllOffers ? offers : offers.slice(0, 2);
   const isPlanGroup = Boolean(group?.plan);
 
   // ── Loading state ───────────────────────────────────────────────────────────
@@ -958,61 +1005,6 @@ export function GroupChat({
             </div>
           )}
 
-          {/* Offers — only for user-plan groups */}
-          {isPlanGroup && offers.length > 0 && (
-            <div id="offers-section" className="space-y-2 border-b border-[var(--color-sea-100)] bg-white/60 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-                  Offers ({offers.length})
-                </p>
-                {!showAllOffers && offers.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllOffers(true)}
-                    className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
-                  >
-                    Show all
-                  </button>
-                )}
-              </div>
-              {visibleOffers.map((offer) => (
-                <div key={offer.id} className="space-y-2">
-                  <CardInset className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">{offer.agency.name}</p>
-                        <p className="text-xs text-[var(--color-ink-500)]">
-                          ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
-                        </p>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setExpandedOfferId((c) => c === offer.id ? null : offer.id)}
-                      >
-                        {expandedOfferId === offer.id ? "Hide" : "Details"}
-                      </Button>
-                    </div>
-                  </CardInset>
-                  {expandedOfferId === offer.id && (
-                    <OfferCard
-                      offer={offer}
-                      isCreator={isCreator}
-                      isAgency={isAgency}
-                      onAccept={handleAcceptOffer}
-                      onCounter={(offerId, seedPrice) => {
-                        setCounterSheetOfferId(offerId);
-                        setCounterSheetInitialPrice(seedPrice ?? null);
-                      }}
-                      onReject={handleRejectOffer}
-                      onWithdraw={handleWithdrawOffer}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Messages */}
           <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
             {messages.length === 0 ? (
@@ -1035,12 +1027,14 @@ export function GroupChat({
                       : message.content;
 
                   if (message.messageType === "system") {
-                    const metaAction =
-                      message.metadata &&
-                      typeof message.metadata === "object" &&
-                      "action" in message.metadata
-                        ? String((message.metadata as Record<string, unknown>).action)
-                        : "";
+                    const metaAction = messageAction(message);
+                    const offerId = messageOfferId(message);
+                    const inlineOffer =
+                      offerId &&
+                      latestOfferMessageIndexByOfferId.get(offerId) === idx &&
+                      inlineOfferIds.has(offerId)
+                        ? offerById.get(offerId)
+                        : null;
                     const isOfferMsg = metaAction.startsWith("offer_");
                     const isPaymentMsg = metaAction.startsWith("payment_");
                     const isSafetyWarning = metaAction === "safety_warning";
@@ -1069,6 +1063,27 @@ export function GroupChat({
                             {message.content}
                           </span>
                         </div>
+                        {inlineOffer && (
+                          <div
+                            id={`offer-card-${inlineOffer.id}`}
+                            data-inline-offer-card="true"
+                            className="mx-auto mt-2 w-full max-w-lg"
+                          >
+                            <OfferCard
+                              compact
+                              offer={inlineOffer}
+                              isCreator={isCreator}
+                              isAgency={isAgency}
+                              onAccept={handleAcceptOffer}
+                              onCounter={(nextOfferId, seedPrice) => {
+                                setCounterSheetOfferId(nextOfferId);
+                                setCounterSheetInitialPrice(seedPrice ?? null);
+                              }}
+                              onReject={handleRejectOffer}
+                              onWithdraw={handleWithdrawOffer}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -1395,68 +1410,6 @@ export function GroupChat({
                 </div>
               )}
 
-              {/* Compact offers — only for user-plan groups */}
-              {isPlanGroup && offers.length > 0 && (
-                <div id="offers-section" className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-                      Offers ({offers.length})
-                    </p>
-                    {!showAllOffers && offers.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllOffers(true)}
-                        className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
-                      >
-                        Show all
-                      </button>
-                    )}
-                  </div>
-
-                  {visibleOffers.map((offer) => (
-                    <div key={offer.id} className="space-y-2">
-                      <CardInset className="p-3.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-                              {offer.agency.name}
-                            </p>
-                            <p className="text-xs text-[var(--color-ink-500)]">
-                              ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
-                            </p>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() =>
-                              setExpandedOfferId((current) =>
-                                current === offer.id ? null : offer.id,
-                              )
-                            }
-                          >
-                            {expandedOfferId === offer.id ? "Hide details" : "Show details"}
-                          </Button>
-                        </div>
-                      </CardInset>
-                      {expandedOfferId === offer.id && (
-                        <OfferCard
-                          offer={offer}
-                          isCreator={isCreator}
-                          isAgency={isAgency}
-                          onAccept={handleAcceptOffer}
-                          onCounter={(offerId, seedPrice) => {
-                            setCounterSheetOfferId(offerId);
-                            setCounterSheetInitialPrice(seedPrice ?? null);
-                          }}
-                          onReject={handleRejectOffer}
-                          onWithdraw={handleWithdrawOffer}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Messages */}
               <div
                 className={cn(
@@ -1484,14 +1437,14 @@ export function GroupChat({
                         new Date(prevMsg.createdAt).toDateString();
 
                     if (message.messageType === "system") {
-                      const metaAction =
-                        message.metadata &&
-                        typeof message.metadata === "object" &&
-                        "action" in message.metadata
-                          ? String(
-                              (message.metadata as Record<string, unknown>).action,
-                            )
-                          : "";
+                      const metaAction = messageAction(message);
+                      const offerId = messageOfferId(message);
+                      const inlineOffer =
+                        offerId &&
+                        latestOfferMessageIndexByOfferId.get(offerId) === idx &&
+                        inlineOfferIds.has(offerId)
+                          ? offerById.get(offerId)
+                          : null;
                       const isOfferMsg = metaAction.startsWith("offer_");
                       const isPaymentMsg = metaAction.startsWith("payment_");
                       const isSafetyWarning = metaAction === "safety_warning";
@@ -1521,6 +1474,27 @@ export function GroupChat({
                             {isOfferMsg && <Receipt className="size-3.5 shrink-0 mt-0.5" />}
                             <span className={cn("leading-relaxed", isSafetyWarning && "font-medium")}>{message.content}</span>
                           </div>
+                          {inlineOffer && (
+                            <div
+                              id={`offer-card-${inlineOffer.id}`}
+                              data-inline-offer-card="true"
+                              className="mx-auto mt-2 w-full max-w-lg"
+                            >
+                              <OfferCard
+                                compact
+                                offer={inlineOffer}
+                                isCreator={isCreator}
+                                isAgency={isAgency}
+                                onAccept={handleAcceptOffer}
+                                onCounter={(nextOfferId, seedPrice) => {
+                                  setCounterSheetOfferId(nextOfferId);
+                                  setCounterSheetInitialPrice(seedPrice ?? null);
+                                }}
+                                onReject={handleRejectOffer}
+                                onWithdraw={handleWithdrawOffer}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     }

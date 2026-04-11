@@ -77,6 +77,7 @@ export interface OfferCardProps {
   offer: Offer;
   isCreator: boolean;
   isAgency?: boolean;
+  compact?: boolean;
   onAccept?: (offerId: string) => void;
   onCounter?: (offerId: string, seedPrice?: number) => void;
   onReject?: (offerId: string) => void;
@@ -87,6 +88,7 @@ export function OfferCard({
   offer,
   isCreator,
   isAgency = false,
+  compact = false,
   onAccept,
   onCounter,
   onReject,
@@ -167,6 +169,146 @@ export function OfferCard({
     isCreator &&
     creatorCanCounter &&
     quoteTimeline.some((quote) => !quote.isLive && quote.senderType === "agency");
+
+  if (compact) {
+    return (
+      <article className="overflow-hidden rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]">
+        <div className="flex items-start justify-between gap-2 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-3.5 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-[var(--color-sea-800)]">
+              {agencyName}
+              <span className="ml-1.5 inline-flex items-center gap-1 text-[var(--color-sea-700)]">
+                <Star className="size-3 fill-current" />
+                {agencyRating}
+              </span>
+            </p>
+            <p className="text-[10px] text-[var(--color-ink-500)]">
+              {formatCompactDate(offer.updatedAt)} · Round {Math.min(roundsUsed + 1, 3)}/3
+            </p>
+          </div>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${statusInfo.tone}`}
+          >
+            {statusInfo.label}
+          </span>
+        </div>
+
+        <div className="space-y-2.5 px-3.5 py-3">
+          <div className="flex items-end justify-between gap-2">
+            <p className="font-display text-2xl leading-none text-[var(--color-ink-950)]">
+              {formatCurrency(offer.pricePerPerson)}
+            </p>
+            <p className="text-xs font-medium text-[var(--color-ink-500)]">/ person</p>
+          </div>
+
+          {validityText && (
+            <p className="inline-flex items-center gap-1 text-[11px] text-[var(--color-ink-500)]">
+              <Clock3 className="size-3.5" />
+              {validityText}
+            </p>
+          )}
+
+          {quoteTimeline.length > 0 && (
+            <div className="space-y-1.5 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-surface-2)] p-2">
+              {quoteTimeline.slice(0, 2).map((quote) => (
+                <div key={quote.id} className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="truncate text-[var(--color-ink-600)]">
+                    {quote.senderType === "agency" ? "Agency" : "Creator"} · {quote.label}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-[var(--color-ink-900)]">
+                      {formatCurrency(quote.price)}
+                    </span>
+                    {canReuseQuoteAsCounter && !quote.isLive && (
+                      <button
+                        type="button"
+                        onClick={() => onCounter?.(offer.id, quote.price)}
+                        className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-lavender-500)]"
+                      >
+                        Use
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {latestAgencyNote && (
+            <p className="rounded-[8px] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--color-ink-600)]">
+              <span className="font-semibold text-[var(--color-ink-700)]">Note:</span>{" "}
+              {latestAgencyNote}
+            </p>
+          )}
+
+          {creatorCanAccept && !isTerminal && (
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => onAccept?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sea-700)] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--color-sea-800)]"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => onCounter?.(offer.id)}
+                disabled={!creatorCanCounter || roundsLeft === 0}
+                className="rounded-[8px] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creatorCanCounter ? `Counter${roundsLeft > 0 ? ` (${roundsLeft})` : ""}` : "Await"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onReject?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sunset-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)]"
+              >
+                Decline
+              </button>
+            </div>
+          )}
+
+          {agencyCanAct && !isTerminal && (
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => onCounter?.(offer.id)}
+                disabled={roundsLeft === 0}
+                className="rounded-[8px] bg-[var(--color-surface-2)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Counter{roundsLeft > 0 ? ` (${roundsLeft})` : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => onWithdraw?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sunset-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)]"
+              >
+                Withdraw
+              </button>
+            </div>
+          )}
+
+          {offer.status === "ACCEPTED" && (
+            <div className="rounded-[8px] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-sea-700)]">
+              Offer accepted. Move to payment.
+            </div>
+          )}
+
+          {offer.status === "REJECTED" && (
+            <div className="rounded-[8px] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-2.5 py-1.5 text-xs text-[var(--color-sunset-700)]">
+              This offer was declined.
+            </div>
+          )}
+
+          {canReconfirmOldAgencyQuote && (
+            <p className="text-[10px] text-[var(--color-ink-500)]">
+              Reconfirm an older agency quote, then accept the latest quote.
+            </p>
+          )}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className="overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">

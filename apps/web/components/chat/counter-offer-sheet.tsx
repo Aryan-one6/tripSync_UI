@@ -115,17 +115,23 @@ export function CounterOfferSheet({
 
       {/* Sheet */}
       <div
-        className={`${embedded ? "absolute bottom-0 left-0 right-0 z-30" : "fixed bottom-0 left-0 right-0 z-50"} rounded-t-[var(--radius-2xl)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-transform duration-350 ease-out ${
+        className={`${
+          embedded
+            ? "absolute inset-x-3 bottom-3 z-30 rounded-[var(--radius-xl)] border border-[var(--color-border)]"
+            : "fixed bottom-0 left-0 right-0 z-50 rounded-t-[var(--radius-2xl)]"
+        } bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-transform duration-350 ease-out ${
           open ? "translate-y-0" : "translate-y-full"
         }`}
-        style={{ maxHeight: embedded ? "75%" : "90dvh", overflowY: "auto" }}
+        style={{ maxHeight: embedded ? "min(560px, calc(100% - 1.5rem))" : "90dvh", overflowY: "auto" }}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-4 pb-2">
-          <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
-        </div>
+        {!embedded && (
+          <div className="flex justify-center pb-2 pt-4">
+            <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
+          </div>
+        )}
 
-        <div className="px-5 pb-8 sm:px-8 space-y-6">
+        <div className={`space-y-6 ${embedded ? "px-4 pb-5 pt-4 sm:px-5" : "px-5 pb-8 sm:px-8"}`}>
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
