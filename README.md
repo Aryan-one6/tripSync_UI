@@ -97,6 +97,26 @@ docker compose up -d redis
 
 If `REDIS_URL` is left empty, the API falls back to in-memory behavior for the parts of the app that support it.
 
+For live/production deployments, use a managed Redis URL with TLS:
+
+```env
+REDIS_URL="rediss://default:<password>@<host>:6379"
+```
+
+If you set `NODE_ENV=production` with a `redis://` URL, the API now intentionally disables Redis and falls back to in-memory semantics to avoid non-TLS production traffic.
+
+Quick production validation:
+
+```bash
+cd apps/api
+npm run redis:check
+```
+
+The `/health` endpoint now includes Redis runtime status under `redis`.
+
+Important runtime note:
+When `VERCEL` is set, this codebase intentionally disables Socket.IO server runtime and BullMQ queues. If you need always-on realtime sockets or background workers, deploy `apps/api` on a long-running Node host (for example Render, Railway, Fly.io, or a VM/container) and keep Redis enabled there.
+
 ## Prisma Workflow
 
 Use these commands from the repo root:
@@ -115,6 +135,15 @@ Notes:
 ## Deployment Notes
 
 `apps/api` already runs `prisma migrate deploy` during `vercel-build`, so once the same env vars are configured in Vercel, the API can boot against the Supabase database without additional code changes.
+
+If deploying with Vercel CLI, set Redis for all environments:
+
+```bash
+cd apps/api
+vercel env add REDIS_URL production
+vercel env add REDIS_URL preview
+vercel env add REDIS_URL development
+```
 
 ## References
 

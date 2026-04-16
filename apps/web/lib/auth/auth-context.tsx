@@ -7,7 +7,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { apiFetch, ApiError } from "@/lib/api/client";
+import { apiFetch, ApiError, type ApiRequestInit } from "@/lib/api/client";
 import type { AuthSession } from "@/lib/api/types";
 
 const STORAGE_KEY = "tripsync.session";
@@ -16,6 +16,7 @@ const SERVER_HYDRATION_SNAPSHOT = false;
 const authListeners = new Set<() => void>();
 let cachedSession: AuthSession | null = null;
 let hasLoadedSession = false;
+let refreshPromise: Promise<AuthSession> | null = null;
 
 type SignupTravelerInput = {
   fullName: string;
@@ -56,7 +57,7 @@ interface AuthContextValue {
   refreshAuthSession: () => Promise<AuthSession | null>;
   updateUser: (user: AuthSession["user"]) => void;
   logout: () => void;
-  apiFetchWithAuth: <T>(path: string, init?: RequestInit) => Promise<T>;
+  apiFetchWithAuth: <T>(path: string, init?: ApiRequestInit) => Promise<T>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -189,14 +190,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshSession(currentSession: AuthSession) {
-    const nextSession = await apiFetch<AuthSession>("/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
-    });
+    if (!refreshPromise) {
+      refreshPromise = apiFetch<AuthSession>("/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+      })
+        .then((nextSession) => {
+          persistSession(nextSession);
+          return nextSession;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+    }
 
-    persistSession(nextSession);
-
-    return nextSession;
+    return refreshPromise;
   }
 
   async function refreshAuthSession() {
@@ -204,26 +212,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return refreshSession(session);
   }
 
-  async function apiFetchWithAuth<T>(path: string, init: RequestInit = {}) {
+  async function apiFetchWithAuth<T>(path: string, init: ApiRequestInit = {}) {
     if (!session) {
       throw new ApiError(401, ["Please log in to continue"]);
     }
 
-    try {
-      return await apiFetch<T>(path, {
+    const requestWithToken = (token: string) =>
+      apiFetch<T>(path, {
         ...init,
-        token: session.accessToken,
+        token,
       });
+
+    try {
+      return await requestWithToken(session.accessToken);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) {
         throw error;
       }
 
-      const refreshed = await refreshSession(session);
-      return apiFetch<T>(path, {
-        ...init,
-        token: refreshed.accessToken,
-      });
+      let refreshed: AuthSession;
+      try {
+        refreshed = await refreshSession(session);
+      } catch {
+        persistSession(null);
+        throw new ApiError(401, ["Session expired. Please log in again."]);
+      }
+
+      try {
+        return await requestWithToken(refreshed.accessToken);
+      } catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 401) {
+          persistSession(null);
+          throw new ApiError(401, ["Session expired. Please log in again."]);
+        }
+        throw retryError;
+      }
     }
   }
 

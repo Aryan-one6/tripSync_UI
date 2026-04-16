@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState, useTransition } from "react";
 import { Check, Clock3, Star } from "lucide-react";
 import { formatCompactDate, formatCurrency } from "@/lib/format";
 import type { Offer } from "@/lib/api/types";
@@ -73,10 +74,46 @@ function inclusionCoverage(inclusions?: Record<string, unknown> | null) {
   ];
 }
 
+const COUNTER_ADDITIONS = [
+  { key: "transport", label: "Transport" },
+  { key: "hotel", label: "Hotels" },
+  { key: "meals", label: "Meals" },
+  { key: "guide", label: "Guide" },
+  { key: "visa", label: "Visa" },
+  { key: "insurance", label: "Insurance" },
+  { key: "activities", label: "Activities" },
+];
+
+const COUNTER_STEP = 500;
+const ADDITION_LABELS = new Map(COUNTER_ADDITIONS.map((item) => [item.key, item.label]));
+
+function normalizeAmenityLabel(raw: string) {
+  const key = raw.trim().toLowerCase();
+  return ADDITION_LABELS.get(key) ?? raw;
+}
+
+function extractRequestedAdditions(delta?: Record<string, unknown> | null) {
+  if (!delta || typeof delta !== "object") return [] as string[];
+  const requested = (delta as Record<string, unknown>).requestedAdditions;
+  if (!Array.isArray(requested)) return [] as string[];
+  return requested
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+}
+
+export interface OfferCounterPayload {
+  price: number;
+  requestedAdditions: string[];
+  message: string;
+}
+
 export interface OfferCardProps {
   offer: Offer;
   isCreator: boolean;
   isAgency?: boolean;
+  compact?: boolean;
+  enableInlineCounterComposer?: boolean;
+  onCounterSubmit?: (offerId: string, payload: OfferCounterPayload) => Promise<void>;
   onAccept?: (offerId: string) => void;
   onCounter?: (offerId: string, seedPrice?: number) => void;
   onReject?: (offerId: string) => void;
@@ -87,6 +124,9 @@ export function OfferCard({
   offer,
   isCreator,
   isAgency = false,
+  compact = false,
+  enableInlineCounterComposer = false,
+  onCounterSubmit,
   onAccept,
   onCounter,
   onReject,
@@ -168,7 +208,312 @@ export function OfferCard({
     creatorCanCounter &&
     quoteTimeline.some((quote) => !quote.isLive && quote.senderType === "agency");
 
+  const [inlineCounterOpen, setInlineCounterOpen] = useState(false);
+  const [counterPrice, setCounterPrice] = useState(offer.pricePerPerson);
+  const [counterMessage, setCounterMessage] = useState("");
+  const [counterAdditions, setCounterAdditions] = useState<string[]>([]);
+  const [counterError, setCounterError] = useState<string | null>(null);
+  const [isCounterSubmitting, startCounterTransition] = useTransition();
+
+  const latestRequested = useMemo(() => {
+    const latestWithRequest = [...(offer.negotiations ?? [])]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .find((entry) => extractRequestedAdditions(entry.inclusionsDelta).length > 0);
+
+    if (!latestWithRequest) {
+      return {
+        senderType: null as Offer["negotiations"][number]["senderType"] | null,
+        additions: [] as string[],
+      };
+    }
+
+    return {
+      senderType: latestWithRequest.senderType,
+      additions: extractRequestedAdditions(latestWithRequest.inclusionsDelta),
+    };
+  }, [offer.negotiations]);
+
+  function toggleCounterAddition(key: string) {
+    setCounterAdditions((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
+  }
+
+  function openInlineCounter(seedPrice?: number) {
+    setInlineCounterOpen(true);
+    setCounterPrice(seedPrice ?? offer.pricePerPerson);
+    setCounterMessage("");
+    setCounterAdditions([]);
+    setCounterError(null);
+  }
+
+  function triggerCounter(seedPrice?: number) {
+    if (enableInlineCounterComposer && onCounterSubmit) {
+      openInlineCounter(seedPrice);
+      return;
+    }
+    onCounter?.(offer.id, seedPrice);
+  }
+
+  function submitInlineCounter() {
+    if (!enableInlineCounterComposer || !onCounterSubmit) return;
+    setCounterError(null);
+    startCounterTransition(async () => {
+      try {
+        await onCounterSubmit(offer.id, {
+          price: counterPrice,
+          requestedAdditions: counterAdditions,
+          message: counterMessage,
+        });
+        setInlineCounterOpen(false);
+      } catch (err) {
+        setCounterError(err instanceof Error ? err.message : "Could not send counter offer.");
+      }
+    });
+  }
+
+  if (compact) {
+    return (
+      <article className="overflow-hidden rounded-[16px] bg-[var(--color-surface-raised)]">
+        {/* ── Header band ── */}
+        <div className="flex items-start justify-between gap-2 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-3.5 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold text-[var(--color-sea-800)]">
+              {agencyName}
+              <span className="ml-1.5 inline-flex items-center gap-0.5 font-semibold text-[var(--color-sea-700)]">
+                <Star className="size-3 fill-current" />
+                {agencyRating}
+              </span>
+            </p>
+            {offer.plan?.title && (
+              <p className="truncate text-[10px] text-[var(--color-ink-500)]">{offer.plan.title}</p>
+            )}
+          </div>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] ${statusInfo.tone}`}>
+            {statusInfo.label}
+          </span>
+        </div>
+
+        {/* ── Price block ── */}
+        <div className="px-3.5 pb-0 pt-3">
+          <div className="flex items-baseline gap-1.5">
+            <p className="font-display text-[1.65rem] font-extrabold leading-none text-[var(--color-ink-950)]">
+              {formatCurrency(offer.pricePerPerson)}
+            </p>
+            <p className="text-sm font-semibold text-[var(--color-ink-500)]">⁄ person</p>
+          </div>
+
+          {/* Inclusions */}
+          {includes.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              {includes.slice(0, 6).map((item) => (
+                <span key={item} className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-sea-700)]">
+                  <Check className="size-3 shrink-0" />
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {latestRequested.additions.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
+                {latestRequested.senderType === "user" ? "Traveler requested" : "Requested additions"}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {latestRequested.additions.map((item) => (
+                  <span
+                    key={`${offer.id}-requested-${item}`}
+                    className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-lavender-500)]"
+                  >
+                    {normalizeAmenityLabel(item)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Meta row */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--color-ink-400)]">
+            {offer.plan?.destination && <span>{offer.plan.destination}</span>}
+            {validityText && (
+              <>
+                {offer.plan?.destination && <span>·</span>}
+                <span className="inline-flex items-center gap-0.5">
+                  <Clock3 className="size-3" />
+                  {validityText}
+                </span>
+              </>
+            )}
+            {roundsUsed > 0 && (
+              <>
+                <span>·</span>
+                <span>Round {Math.min(roundsUsed + 1, 3)}/3</span>
+              </>
+            )}
+          </div>
+
+          {/* Agency note */}
+          {latestAgencyNote && (
+            <p className="mt-2 rounded-[8px] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--color-ink-600)]">
+              <span className="font-semibold text-[var(--color-ink-700)]">Note: </span>
+              {latestAgencyNote}
+            </p>
+          )}
+        </div>
+
+        {/* ── Action buttons ── */}
+        <div className="px-3.5 pb-3.5 pt-3">
+          {creatorCanAccept && !isTerminal && (
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => onAccept?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sea-700)] py-2 text-xs font-bold text-white transition hover:bg-[var(--color-sea-800)] active:scale-[0.97]"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerCounter()}
+                disabled={!creatorCanCounter || roundsLeft === 0}
+                className="rounded-[8px] bg-[var(--color-surface-2)] py-2 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {creatorCanCounter ? "Counter" : "Await"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onReject?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sunset-50)] py-2 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)] active:scale-[0.97]"
+              >
+                Decline
+              </button>
+            </div>
+          )}
+
+          {agencyCanAct && !isTerminal && (
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => triggerCounter()}
+                disabled={roundsLeft === 0}
+                className="rounded-[8px] bg-[var(--color-surface-2)] py-2 text-xs font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Counter{roundsLeft > 0 ? ` (${roundsLeft})` : ""}
+              </button>
+              <button
+                type="button"
+                onClick={() => onWithdraw?.(offer.id)}
+                className="rounded-[8px] bg-[var(--color-sunset-50)] py-2 text-xs font-semibold text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-100)] active:scale-[0.97]"
+              >
+                Withdraw
+              </button>
+            </div>
+          )}
+
+          {offer.status === "ACCEPTED" && (
+            <div className="rounded-[8px] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] px-2.5 py-2 text-xs font-semibold text-[var(--color-sea-700)]">
+              ✓ Offer accepted — proceed to payment
+            </div>
+          )}
+
+          {offer.status === "REJECTED" && (
+            <div className="rounded-[8px] border border-[var(--color-sunset-200)] bg-[var(--color-sunset-50)] px-2.5 py-2 text-xs text-[var(--color-sunset-700)]">
+              This offer was declined.
+            </div>
+          )}
+
+          {offer.status === "WITHDRAWN" && (
+            <div className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface-2)] px-2.5 py-2 text-xs text-[var(--color-ink-500)]">
+              Offer withdrawn by agency.
+            </div>
+          )}
+
+          {inlineCounterOpen && enableInlineCounterComposer && (
+            <div className="space-y-3 rounded-[10px] border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] p-3">
+              <p className="text-[11px] font-semibold text-[var(--color-sea-800)]">Counter this offer</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCounterPrice((value) => Math.max(0, value - COUNTER_STEP))}
+                  className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white text-[var(--color-ink-700)]"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  step={COUNTER_STEP}
+                  value={counterPrice}
+                  onChange={(event) => setCounterPrice(Math.max(0, Number(event.target.value || 0)))}
+                  className="h-9 w-full rounded-[8px] border border-[var(--color-sea-200)] bg-white px-3 text-sm font-semibold text-[var(--color-ink-900)] focus:border-[var(--color-sea-400)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCounterPrice((value) => value + COUNTER_STEP)}
+                  className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white text-[var(--color-ink-700)]"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {COUNTER_ADDITIONS.map((item) => {
+                  const selected = counterAdditions.includes(item.key);
+                  return (
+                    <button
+                      key={`${offer.id}-counter-${item.key}`}
+                      type="button"
+                      onClick={() => toggleCounterAddition(item.key)}
+                      className={selected
+                        ? "rounded-full border border-[var(--color-sea-300)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[var(--color-sea-700)]"
+                        : "rounded-full border border-[var(--color-sea-200)] bg-white/80 px-2.5 py-1 text-[10px] font-medium text-[var(--color-ink-600)]"
+                      }
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <textarea
+                value={counterMessage}
+                onChange={(event) => setCounterMessage(event.target.value)}
+                rows={2}
+                placeholder="Optional message"
+                className="w-full rounded-[8px] border border-[var(--color-sea-200)] bg-white px-3 py-2 text-xs text-[var(--color-ink-800)] focus:border-[var(--color-sea-400)] focus:outline-none"
+              />
+
+              {counterError && (
+                <p className="text-[11px] text-[var(--color-sunset-700)]">{counterError}</p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInlineCounterOpen(false)}
+                  className="rounded-[8px] border border-[var(--color-sea-200)] bg-white px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-700)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitInlineCounter}
+                  disabled={isCounterSubmitting || counterPrice <= 0}
+                  className="rounded-[8px] bg-[var(--color-sea-700)] px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {isCounterSubmitting ? "Sending..." : "Send counter"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  }
+
   return (
+
     <article className="overflow-hidden rounded-[18px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-md)]">
       <div className="flex items-center justify-between gap-3 border-b border-[var(--color-sea-100)] bg-[var(--color-sea-50)] px-4 py-2.5">
         <div className="min-w-0">
@@ -310,7 +655,7 @@ export function OfferCard({
                     {canReuseQuoteAsCounter && !quote.isLive && (
                       <button
                         type="button"
-                        onClick={() => onCounter?.(offer.id, quote.price)}
+                        onClick={() => triggerCounter(quote.price)}
                         className="rounded-full border border-[var(--color-lavender-200)] bg-[var(--color-lavender-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-lavender-500)] transition hover:bg-[var(--color-lavender-100)]"
                       >
                         {isCreator && quote.senderType === "agency"
@@ -349,7 +694,7 @@ export function OfferCard({
             </button>
             <button
               type="button"
-              onClick={() => onCounter?.(offer.id)}
+              onClick={() => triggerCounter()}
               disabled={!creatorCanCounter || roundsLeft === 0}
               className="rounded-[10px] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -369,7 +714,7 @@ export function OfferCard({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => onCounter?.(offer.id)}
+              onClick={() => triggerCounter()}
               disabled={roundsLeft === 0}
               className="rounded-[10px] bg-[var(--color-surface-2)] px-3 py-2.5 text-sm font-semibold text-[var(--color-ink-700)] transition hover:bg-[var(--color-line)] disabled:cursor-not-allowed disabled:opacity-50"
             >

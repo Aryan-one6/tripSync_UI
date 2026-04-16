@@ -13,6 +13,33 @@ import { emitDirectConversationEvent, emitGroupEvent, emitUserEvent } from '../.
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
 import { createStoredNotificationsBulk } from '../notifications/service.js';
+import { redisGetSafe, redisSetexSafe, redisDelSafe } from '../../lib/redis.js';
+
+// ─── Chat Access Cache ────────────────────────────────────────────────────────
+// Caches the result of assertChatAccess for 30 seconds.
+// Key: chat_access:{groupId}:{userId}
+// Value: JSON-serialised minimal membership stub (just enough for sendMessage)
+const CHAT_ACCESS_TTL_S = 30;
+const DM_ACCESS_TTL_S = 30;
+const SHOULD_USE_CHAT_CACHE = env.NODE_ENV !== 'test';
+
+function chatAccessKey(groupId: string, userId: string) {
+  return `chat_access:${groupId}:${userId}`;
+}
+
+function dmAccessKey(conversationId: string, userId: string) {
+  return `dm_access:${conversationId}:${userId}`;
+}
+
+/** Invalidate the access cache when a member's status changes. */
+export async function invalidateChatAccessCache(groupId: string, userId: string) {
+  await redisDelSafe(chatAccessKey(groupId, userId));
+}
+
+/** Invalidate DM access cache when a conversation participant changes. */
+export async function invalidateDmAccessCache(conversationId: string, userId: string) {
+  await redisDelSafe(dmAccessKey(conversationId, userId));
+}
 
 const CHAT_MEMBER_STATUSES = ['APPROVED', 'COMMITTED'] as const;
 
@@ -234,32 +261,41 @@ async function assertDirectConversationEligibility(leftUserId: string, rightUser
   }
 }
 
-async function assertDirectConversationAccess(conversationId: string, userId: string) {
+type DirectConversationAccess = {
+  id: string;
+  conversationId: string;
+  userId: string;
+};
+
+async function assertDirectConversationAccess(
+  conversationId: string,
+  userId: string,
+): Promise<DirectConversationAccess> {
+  const cacheKey = dmAccessKey(conversationId, userId);
+  if (SHOULD_USE_CHAT_CACHE) {
+    const cached = await redisGetSafe(cacheKey);
+    if (cached) {
+      try {
+        const minimal = JSON.parse(cached) as DirectConversationAccess;
+        if (
+          minimal.conversationId === conversationId &&
+          minimal.userId === userId &&
+          typeof minimal.id === 'string'
+        ) {
+          return minimal;
+        }
+      } catch {
+        // Invalid cache entry, fallback to DB.
+      }
+    }
+  }
+
   const participant = await prisma.directConversationParticipant.findUnique({
-    where: {
-      conversationId_userId: { conversationId, userId },
-    },
-    include: {
-      conversation: {
-        include: {
-          participants: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  fullName: true,
-                  avatarUrl: true,
-                  city: true,
-                  verification: true,
-                  avgRating: true,
-                  completedTrips: true,
-                },
-              },
-            },
-          },
-        },
-      },
+    where: { conversationId_userId: { conversationId, userId } },
+    select: {
+      id: true,
+      conversationId: true,
+      userId: true,
     },
   });
 
@@ -267,10 +303,38 @@ async function assertDirectConversationAccess(conversationId: string, userId: st
     throw new ForbiddenError('You cannot access this conversation');
   }
 
+  if (SHOULD_USE_CHAT_CACHE) {
+    await redisSetexSafe(cacheKey, DM_ACCESS_TTL_S, JSON.stringify(participant));
+  }
   return participant;
 }
 
 async function assertChatAccess(groupId: string, userId: string) {
+  // ── Cache check (Redis, 30-second TTL) ─────────────────────────────────────
+  const cacheKey = chatAccessKey(groupId, userId);
+  if (SHOULD_USE_CHAT_CACHE) {
+    const cached = await redisGetSafe(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as {
+          id: string; groupId: string; userId: string;
+          role: string; status: string;
+          user: { id: string; fullName: string; avatarUrl: string | null };
+        };
+        // Re-hydrate dates so callers get a consistent shape
+        return {
+          ...parsed,
+          joinedAt: new Date(),
+          committedAt: null,
+          leftAt: null,
+        };
+      } catch {
+        // ignore invalid cache entry, fall through
+      }
+    }
+  }
+
+  // ── DB lookup ───────────────────────────────────────────────────────────────
   const membership = await prisma.groupMember.findUnique({
     where: { groupId_userId: { groupId, userId } },
     include: {
@@ -282,46 +346,47 @@ async function assertChatAccess(groupId: string, userId: string) {
     membership &&
     CHAT_MEMBER_STATUSES.includes(membership.status as (typeof CHAT_MEMBER_STATUSES)[number])
   ) {
-    return membership;
+      // Cache the happy path
+      if (SHOULD_USE_CHAT_CACHE) {
+        await redisSetexSafe(
+          cacheKey,
+          CHAT_ACCESS_TTL_S,
+          JSON.stringify({
+            id: membership.id,
+            groupId: membership.groupId,
+            userId: membership.userId,
+            role: membership.role,
+            status: membership.status,
+            user: membership.user,
+          }),
+        );
+      }
+      return membership;
   }
 
-  // Agency owners can access a trip room when they have an active offer on that plan.
-  const agency = await prisma.agency.findUnique({
-    where: { ownerId: userId },
-    select: { id: true },
-  });
-
-  if (agency) {
-    const group = await prisma.group.findUnique({
+  // Both DB queries run in parallel to minimize latency
+  const [agency, group] = await Promise.all([
+    prisma.agency.findUnique({ where: { ownerId: userId }, select: { id: true } }),
+    prisma.group.findUnique({
       where: { id: groupId },
       select: {
         planId: true,
-        plan: {
-          select: {
-            status: true,
-          },
-        },
+        plan: { select: { status: true } },
         package: {
           select: {
             status: true,
-            agency: {
-              select: {
-                ownerId: true,
-              },
-            },
+            agency: { select: { ownerId: true } },
           },
         },
       },
-    });
+    }),
+  ]);
 
+  if (agency) {
     const planStatuses: string[] = [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED];
     if (group?.planId && group.plan && planStatuses.includes(group.plan.status)) {
       const activeOffer = await prisma.offer.findFirst({
-        where: {
-          planId: group.planId,
-          agencyId: agency.id,
-          status: { in: ['ACCEPTED'] },
-        },
+        where: { planId: group.planId, agencyId: agency.id, status: { in: ['ACCEPTED'] } },
         select: { id: true },
       });
 
@@ -330,51 +395,29 @@ async function assertChatAccess(groupId: string, userId: string) {
           where: { id: userId },
           select: { id: true, fullName: true, avatarUrl: true },
         });
+        if (!agencyUser) throw new NotFoundError('User');
 
-        if (!agencyUser) {
-          throw new NotFoundError('User');
+        const stub = { id: `agency:${groupId}:${userId}`, groupId, userId, role: 'MEMBER', status: 'APPROVED', user: agencyUser };
+        if (SHOULD_USE_CHAT_CACHE) {
+          await redisSetexSafe(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
         }
-
-        return {
-          id: `agency:${groupId}:${userId}`,
-          groupId,
-          userId,
-          role: 'MEMBER',
-          status: 'APPROVED',
-          joinedAt: new Date(),
-          committedAt: null,
-          leftAt: null,
-          user: agencyUser,
-        };
+        return { ...stub, joinedAt: new Date(), committedAt: null, leftAt: null };
       }
     }
 
     const pkgStatuses: string[] = [PlanStatus.CONFIRMING, PlanStatus.CONFIRMED];
-    if (
-      group?.package &&
-      pkgStatuses.includes(group.package.status) &&
-      group.package.agency.ownerId === userId
-    ) {
+    if (group?.package && pkgStatuses.includes(group.package.status) && group.package.agency.ownerId === userId) {
       const agencyUser = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, fullName: true, avatarUrl: true },
       });
+      if (!agencyUser) throw new NotFoundError('User');
 
-      if (!agencyUser) {
-        throw new NotFoundError('User');
+      const stub = { id: `agency:${groupId}:${userId}`, groupId, userId, role: 'MEMBER', status: 'APPROVED', user: agencyUser };
+      if (SHOULD_USE_CHAT_CACHE) {
+        await redisSetexSafe(cacheKey, CHAT_ACCESS_TTL_S, JSON.stringify(stub));
       }
-
-      return {
-        id: `agency:${groupId}:${userId}`,
-        groupId,
-        userId,
-        role: 'MEMBER',
-        status: 'APPROVED',
-        joinedAt: new Date(),
-        committedAt: null,
-        leftAt: null,
-        user: agencyUser,
-      };
+      return { ...stub, joinedAt: new Date(), committedAt: null, leftAt: null };
     }
   }
 
@@ -385,33 +428,73 @@ function normalizeContent(content: string) {
   return sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} }).trim();
 }
 
-async function getNotificationRecipients(groupId: string, excludeUserId?: string) {
+/**
+ * PERF: merged into a single DB query (was 2 sequential queries).
+ * Returns recipients + their inbox hrefs in one round trip.
+ */
+async function getNotificationRecipientsWithHref(
+  groupId: string,
+  excludeUserId?: string,
+): Promise<Array<{ userId: string; inboxHref: string }>> {
   const members = await prisma.groupMember.findMany({
     where: {
       groupId,
       status: { in: ['APPROVED', 'COMMITTED'] },
       ...(excludeUserId ? { userId: { not: excludeUserId } } : {}),
     },
-    select: { userId: true },
-  });
-
-  return members.map((member) => member.userId);
-}
-
-async function getRoleAwareInboxHrefMap(userIds: string[]) {
-  if (userIds.length === 0) return new Map<string, string>();
-
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
     select: {
-      id: true,
-      agency: { select: { id: true } },
+      userId: true,
+      user: {
+        select: {
+          agency: { select: { id: true } },
+        },
+      },
     },
   });
 
-  return new Map(
-    users.map((user) => [user.id, user.agency?.id ? '/agency/inbox' : '/dashboard/messages']),
-  );
+  return members.map((m) => ({
+    userId: m.userId,
+    inboxHref: m.user.agency?.id ? '/agency/inbox' : '/dashboard/messages',
+  }));
+}
+
+async function getNotificationRecipients(groupId: string, excludeUserId?: string): Promise<string[]> {
+  const recipientsWithHref = await getNotificationRecipientsWithHref(groupId, excludeUserId);
+  return recipientsWithHref.map((entry) => entry.userId);
+}
+
+async function getRoleAwareInboxHrefMap(userIds: string[]): Promise<Map<string, string>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      id: { in: userIds },
+    },
+    select: {
+      id: true,
+      agency: {
+        select: { id: true },
+      },
+    },
+  });
+
+  const hrefByUserId = new Map<string, string>();
+  for (const user of users) {
+    hrefByUserId.set(
+      user.id,
+      user.agency?.id ? '/agency/inbox' : '/dashboard/messages',
+    );
+  }
+
+  for (const userId of userIds) {
+    if (!hrefByUserId.has(userId)) {
+      hrefByUserId.set(userId, '/dashboard/messages');
+    }
+  }
+
+  return hrefByUserId;
 }
 
 export async function listMessages(groupId: string, userId: string, cursor?: string, limit = 30) {
@@ -828,6 +911,8 @@ export async function listDirectConversations(userId: string) {
       },
     },
     orderBy: { updatedAt: 'desc' },
+    // PERF: cap list to avoid unbounded full-table returns for power users
+    take: 50,
     include: {
       participants: {
         include: {
@@ -845,22 +930,15 @@ export async function listDirectConversations(userId: string) {
           },
         },
       },
+      // PERF FIX: load only 1 message (last-message preview) not 20
       messages: {
         orderBy: { createdAt: 'desc' },
-        take: 20,
-        include: {
-          sender: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-              avatarUrl: true,
-              city: true,
-              verification: true,
-              avgRating: true,
-              completedTrips: true,
-            },
-          },
+        take: 1,
+        select: {
+          id: true,
+          content: true,
+          senderId: true,
+          createdAt: true,
         },
       },
     },
@@ -874,17 +952,18 @@ export async function listDirectMessages(conversationId: string, userId: string,
 
   const messages = await prisma.directMessage.findMany({
     where: { conversationId },
-    include: {
+    select: {
+      id: true,
+      conversationId: true,
+      senderId: true,
+      content: true,
+      createdAt: true,
       sender: {
         select: {
           id: true,
           username: true,
           fullName: true,
           avatarUrl: true,
-          city: true,
-          verification: true,
-          avgRating: true,
-          completedTrips: true,
         },
       },
     },
@@ -951,9 +1030,16 @@ export async function sendDirectMessage(
     return created;
   });
 
-  const recipientIds = participant.conversation.participants
-    .map((entry) => entry.user.id)
-    .filter((id) => id !== userId);
+  const recipientParticipants = await prisma.directConversationParticipant.findMany({
+    where: {
+      conversationId,
+      userId: { not: userId },
+    },
+    select: {
+      userId: true,
+    },
+  });
+  const recipientIds = recipientParticipants.map((entry) => entry.userId);
 
   emitUserEvent(userId, 'direct:message_created', { conversationId, message });
   for (const recipientId of recipientIds) {

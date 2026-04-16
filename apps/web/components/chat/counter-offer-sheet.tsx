@@ -22,6 +22,7 @@ interface CounterOfferSheetProps {
   initialPrice?: number;
   counterRound?: number;
   maxRounds?: number;
+  embedded?: boolean;
 }
 
 // ─── Available additions ──────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export function CounterOfferSheet({
   initialPrice,
   counterRound = 1,
   maxRounds = 3,
+  embedded = false,
 }: CounterOfferSheetProps) {
   const [counterPrice, setCounterPrice] = useState(currentPrice);
   const [selectedAdditions, setSelectedAdditions] = useState<string[]>([]);
@@ -102,28 +104,32 @@ export function CounterOfferSheet({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — always fixed to viewport so it covers everything */}
       <div
         ref={overlayRef}
         onClick={handleOverlayClick}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
           open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       />
 
-      {/* Sheet */}
+      {/* Sheet — always fixed, slides up from bottom of viewport */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-50 rounded-t-[var(--radius-2xl)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-transform duration-350 ease-out ${
-          open ? "translate-y-0" : "translate-y-full"
+        className={`fixed bottom-0 left-0 right-0 z-[70] ${
+          embedded
+            ? "mx-auto max-w-lg rounded-t-[var(--radius-2xl)] sm:bottom-6 sm:left-1/2 sm:right-auto sm:w-[min(480px,90vw)] sm:-translate-x-1/2 sm:rounded-[var(--radius-xl)]"
+            : "rounded-t-[var(--radius-2xl)]"
+        } bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] transition-[transform,opacity] duration-350 ease-out ${
+          open ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
         }`}
-        style={{ maxHeight: "90dvh", overflowY: "auto" }}
+        style={{ maxHeight: "min(86dvh, 640px)", overflowY: "auto" }}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-4 pb-2">
+        <div className="flex justify-center pb-2 pt-4">
           <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
         </div>
 
-        <div className="px-5 pb-8 sm:px-8 space-y-6">
+        <div className={`space-y-6 ${embedded ? "px-4 pb-5 pt-4 sm:px-5" : "px-5 pb-8 sm:px-8"}`}>
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>

@@ -116,9 +116,14 @@ export function MobileBottomNav() {
   const { session, status } = useAuth();
   const pathname = usePathname();
   const { unreadDirectCount } = useUnreadDirectCount();
+  const hideForMessengerRoute =
+    pathname === "/dashboard/messages" ||
+    pathname === "/agency/inbox" ||
+    pathname.startsWith("/dashboard/messages/") ||
+    pathname.startsWith("/agency/inbox/");
 
   // Only show for authenticated users on mobile
-  if (status !== "authenticated" || !session) return null;
+  if (status !== "authenticated" || !session || hideForMessengerRoute) return null;
 
   const isAgency = session.role === "agency_admin";
   const tabs = isAgency ? AGENCY_TABS : USER_TABS;

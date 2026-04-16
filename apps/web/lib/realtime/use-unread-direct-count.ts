@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { DirectConversation } from "@/lib/api/types";
 import { useSocket } from "@/lib/realtime/use-socket";
@@ -10,34 +10,49 @@ function sumUnread(conversations: DirectConversation[]) {
   return conversations.reduce((total, conversation) => total + conversation.unreadCount, 0);
 }
 
-export function useUnreadDirectCount() {
+export function useUnreadDirectCount(options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
   const { session, status, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
   const userId = session?.user?.id ?? null;
   const [count, setCount] = useState(0);
+  const refreshInFlightRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
 
-  const refreshUnreadDirectCount = useCallback(async () => {
-    if (status !== "authenticated" || !userId) {
+  const refreshUnreadDirectCount = useCallback(async (force = false) => {
+    if (!enabled || status !== "authenticated" || !userId) {
       setCount(0);
       return;
     }
 
+    const now = Date.now();
+    if (!force) {
+      if (refreshInFlightRef.current) return;
+      if (now - lastRefreshAtRef.current < 1_500) return;
+    }
+
+    refreshInFlightRef.current = true;
     try {
       const conversations = await apiFetchWithAuth<DirectConversation[]>(
         "/chat/direct/conversations",
+        { timeoutMs: 5_000 },
       );
       setCount(sumUnread(conversations));
     } catch {
       setCount(0);
+    } finally {
+      refreshInFlightRef.current = false;
+      lastRefreshAtRef.current = Date.now();
     }
-  }, [apiFetchWithAuth, status, userId]);
+  }, [apiFetchWithAuth, enabled, status, userId]);
 
   useEffect(() => {
-    void refreshUnreadDirectCount();
-  }, [refreshUnreadDirectCount]);
+    if (!enabled) return;
+    void refreshUnreadDirectCount(true);
+  }, [enabled, refreshUnreadDirectCount]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !socket || !userId) return;
+    if (!enabled || status !== "authenticated" || !socket || !userId) return;
 
     const refresh = () => {
       void refreshUnreadDirectCount();
@@ -47,9 +62,10 @@ export function useUnreadDirectCount() {
     return () => {
       socket.off("direct:message_created", refresh);
     };
-  }, [refreshUnreadDirectCount, socket, status, userId]);
+  }, [enabled, refreshUnreadDirectCount, socket, status, userId]);
 
   useEffect(() => {
+    if (!enabled) return;
     const refresh = () => {
       void refreshUnreadDirectCount();
     };
@@ -60,7 +76,7 @@ export function useUnreadDirectCount() {
       window.removeEventListener("focus", refresh);
       window.removeEventListener(CONVERSATION_READ_EVENT, refresh);
     };
-  }, [refreshUnreadDirectCount]);
+  }, [enabled, refreshUnreadDirectCount]);
 
   return useMemo(
     () => ({
@@ -70,4 +86,3 @@ export function useUnreadDirectCount() {
     [count, refreshUnreadDirectCount],
   );
 }
-

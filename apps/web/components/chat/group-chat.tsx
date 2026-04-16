@@ -34,8 +34,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/lib/realtime/use-socket";
-import { OfferCard } from "@/components/chat/offer-card";
-import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
+import { OfferCard, type OfferCounterPayload } from "@/components/chat/offer-card";
 import { PollCard } from "@/components/chat/poll-card";
 import type { ChatMessage, Group, GroupMember, Offer } from "@/lib/api/types";
 
@@ -63,6 +62,30 @@ function chatMsgTime(dateStr: string): string {
   if (isToday(d)) return format(d, "HH:mm");
   if (isYesterday(d)) return "Yesterday";
   return format(d, "dd MMM");
+}
+
+function messageAction(message: ChatMessage): string {
+  if (!message.metadata || typeof message.metadata !== "object" || !("action" in message.metadata)) {
+    return "";
+  }
+  return String((message.metadata as Record<string, unknown>).action ?? "");
+}
+
+const GROUP_CHAT_CACHE_TTL_MS = 20_000;
+
+type GroupChatCacheEntry = {
+  group: Group | null;
+  members: GroupMember[];
+  resolvedPlanId: string | null;
+  messages: ChatMessage[];
+  offers: Offer[];
+  cachedAt: number;
+};
+
+const groupChatCache = new Map<string, GroupChatCacheEntry>();
+
+function hasFreshGroupChatCache(cacheEntry: GroupChatCacheEntry | undefined) {
+  return Boolean(cacheEntry && Date.now() - cacheEntry.cachedAt < GROUP_CHAT_CACHE_TTL_MS);
 }
 
 /** Render message content with @mention highlighting */
@@ -338,6 +361,105 @@ function PollModal({
   );
 }
 
+function GroupChatOffersDrawer({
+  offers,
+  isCreator,
+  isAgency,
+  onClose,
+  onAccept,
+  onReject,
+  onWithdraw,
+  onCounterSubmit,
+}: {
+  offers: Offer[];
+  isCreator: boolean;
+  isAgency: boolean;
+  onClose: () => void;
+  onAccept: (offerId: string) => void;
+  onReject: (offerId: string) => void;
+  onWithdraw: (offerId: string) => void;
+  onCounterSubmit: (offerId: string, payload: OfferCounterPayload) => Promise<void>;
+}) {
+  const orderedOffers = useMemo(
+    () => offers.slice().sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    [offers],
+  );
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[90]">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[var(--color-ink-900)]/45 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Close offers panel"
+      />
+      <aside className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-xl)] md:w-[430px] lg:w-[480px]">
+        <div className="flex items-center justify-between border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#e9f9ef] to-[#f5fffa] px-4 py-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+              Offers
+            </p>
+            <p className="font-display text-lg text-[var(--color-ink-950)]">
+              {orderedOffers.length} received
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white text-[var(--color-ink-600)] transition hover:bg-[var(--color-sea-50)]"
+            aria-label="Close offers panel"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          {orderedOffers.length === 0 ? (
+            <CardInset className="p-5 text-center">
+              <p className="text-sm font-medium text-[var(--color-ink-700)]">No offers yet</p>
+              <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                New agency offers and negotiations will appear here.
+              </p>
+            </CardInset>
+          ) : (
+            orderedOffers.map((offer) => (
+              <article key={offer.id} className="rounded-[16px] border border-[var(--color-border)] bg-white/90 shadow-[var(--shadow-sm)]">
+                <OfferCard
+                  compact
+                  enableInlineCounterComposer
+                  offer={offer}
+                  isCreator={isCreator}
+                  isAgency={isAgency}
+                  onAccept={onAccept}
+                  onReject={onReject}
+                  onWithdraw={onWithdraw}
+                  onCounterSubmit={onCounterSubmit}
+                />
+              </article>
+            ))
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 // ── Main GroupChat Component ──────────────────────────────────────────────────
 
 export function GroupChat({
@@ -356,25 +478,34 @@ export function GroupChat({
   const router = useRouter();
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
+  const cachedGroupChat = groupChatCache.get(groupId);
+  const hasWarmCache = hasFreshGroupChatCache(cachedGroupChat);
 
-  const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<GroupMember[]>([]);
-  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(planId ?? null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [offers, setOffers] = useState<Offer[]>([]);
+  const [group, setGroup] = useState<Group | null>(() =>
+    hasWarmCache ? (cachedGroupChat?.group ?? null) : null,
+  );
+  const [members, setMembers] = useState<GroupMember[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.members ?? []) : [],
+  );
+  const [resolvedPlanId, setResolvedPlanId] = useState<string | null>(
+    () => planId ?? (hasWarmCache ? (cachedGroupChat?.resolvedPlanId ?? null) : null),
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.messages ?? []) : [],
+  );
+  const [offers, setOffers] = useState<Offer[]>(() =>
+    hasWarmCache ? (cachedGroupChat?.offers ?? []) : [],
+  );
   const [draft, setDraft] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pollOpen, setPollOpen] = useState(false);
   const [offerModalOpen, setOfferModalOpen] = useState(false);
-  const [counterSheetOfferId, setCounterSheetOfferId] = useState<string | null>(null);
-  const [counterSheetInitialPrice, setCounterSheetInitialPrice] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [offersDrawerOpen, setOffersDrawerOpen] = useState(false);
+  const [loading, setLoading] = useState(!hasWarmCache);
   const [isPending, startTransition] = useTransition();
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showAllOffers, setShowAllOffers] = useState(false);
-  const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
@@ -409,6 +540,17 @@ export function GroupChat({
       )
       .slice(0, 6);
   }, [mentionQuery, activeMembers, userId]);
+
+  useEffect(() => {
+    groupChatCache.set(groupId, {
+      group,
+      members,
+      resolvedPlanId,
+      messages,
+      offers,
+      cachedAt: Date.now(),
+    });
+  }, [groupId, group, members, offers, resolvedPlanId, messages]);
 
   useEffect(() => {
     setShowMentionDropdown(mentionQuery !== null && mentionSuggestions.length > 0);
@@ -469,19 +611,41 @@ export function GroupChat({
   }, [apiFetchWithAuth, planId, resolvedPlanId]);
 
   useEffect(() => {
+    let cancelled = false;
+    const cached = groupChatCache.get(groupId);
+    const hasFreshCache = hasFreshGroupChatCache(cached);
+    if (hasFreshCache && cached) {
+      setGroup(cached.group);
+      setMembers(cached.members);
+      setMessages(cached.messages);
+      setOffers(cached.offers);
+      setResolvedPlanId((current) => current ?? cached.resolvedPlanId ?? null);
+      setLoading(false);
+    }
+
     void (async () => {
       try {
-        setLoading(true);
-        await Promise.all([loadMembers(), loadMessages()]);
-      } catch (err) {
-        setFeedback(
-          err instanceof Error ? err.message : "Unable to load the trip chat.",
-        );
-      } finally {
+        if (!hasFreshCache) {
+          setLoading(true);
+        }
+        await loadMessages();
+        if (cancelled) return;
         setLoading(false);
+        await loadMembers();
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback(
+            err instanceof Error ? err.message : "Unable to load the trip chat.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [loadMembers, loadMessages]);
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, loadMembers, loadMessages]);
 
   useEffect(() => {
     void loadOffers();
@@ -687,7 +851,7 @@ export function GroupChat({
     }
   }
 
-  async function handleCounterOffer(offerId: string, payload: CounterOfferPayload) {
+  async function handleCounterOffer(offerId: string, payload: OfferCounterPayload) {
     await apiFetchWithAuth(`/offers/${offerId}/counter`, {
       method: "POST",
       body: JSON.stringify({
@@ -699,8 +863,6 @@ export function GroupChat({
             : undefined,
       }),
     });
-    setCounterSheetInitialPrice(null);
-    setCounterSheetOfferId(null);
     await loadOffers();
   }
 
@@ -738,15 +900,13 @@ export function GroupChat({
     }
   }
 
-  function handleShowAllOffers() {
-    if (offers.length === 0) {
-      setFeedback("No offers are available in this group yet.");
-      setMenuOpen(false);
-      return;
-    }
-    setShowAllOffers(true);
+  function openOffersDrawer() {
+    setOffersDrawerOpen(true);
     setMenuOpen(false);
-    document.getElementById("offers-section")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function closeOffersDrawer() {
+    setOffersDrawerOpen(false);
   }
 
   function handlePayNow() {
@@ -759,9 +919,6 @@ export function GroupChat({
     router.push(checkoutHref);
   }
 
-  const counteringOffer = counterSheetOfferId
-    ? offers.find((o) => o.id === counterSheetOfferId)
-    : null;
   const creatorUserId = planCreatorId ?? members.find((member) => member.role === "CREATOR")?.user.id;
   const isCreator = creatorUserId ? userId === creatorUserId : false;
   const groupTitle = group?.plan?.title ?? group?.package?.title ?? "Trip group";
@@ -773,7 +930,6 @@ export function GroupChat({
     ? `/packages/${group.package.slug}`
     : "/dashboard/trips";
   const checkoutHref = `/dashboard/groups/${groupId}/checkout`;
-  const visibleOffers = showAllOffers ? offers : offers.slice(0, 2);
   const isPlanGroup = Boolean(group?.plan);
 
   // ── Loading state ───────────────────────────────────────────────────────────
@@ -802,7 +958,7 @@ export function GroupChat({
   if (embedded) {
     return (
       <>
-        <div className="flex h-full flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Header — same style as DM header */}
           <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
             {onBack && (
@@ -846,16 +1002,14 @@ export function GroupChat({
                     <BarChart3 className="size-4 text-[var(--color-sea-600)]" />
                     Create poll
                   </button>
-                  {isPlanGroup && (
-                    <button
-                      type="button"
-                      onClick={handleShowAllOffers}
-                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                    >
-                      <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                      View offers
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={openOffersDrawer}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                    See offers
+                  </button>
                   {isAgency && isPlanGroup && (
                     <button
                       type="button"
@@ -896,63 +1050,8 @@ export function GroupChat({
             </div>
           )}
 
-          {/* Offers — only for user-plan groups */}
-          {isPlanGroup && offers.length > 0 && (
-            <div id="offers-section" className="space-y-2 border-b border-[var(--color-sea-100)] bg-white/60 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-                  Offers ({offers.length})
-                </p>
-                {!showAllOffers && offers.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllOffers(true)}
-                    className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
-                  >
-                    Show all
-                  </button>
-                )}
-              </div>
-              {visibleOffers.map((offer) => (
-                <div key={offer.id} className="space-y-2">
-                  <CardInset className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">{offer.agency.name}</p>
-                        <p className="text-xs text-[var(--color-ink-500)]">
-                          ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
-                        </p>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setExpandedOfferId((c) => c === offer.id ? null : offer.id)}
-                      >
-                        {expandedOfferId === offer.id ? "Hide" : "Details"}
-                      </Button>
-                    </div>
-                  </CardInset>
-                  {expandedOfferId === offer.id && (
-                    <OfferCard
-                      offer={offer}
-                      isCreator={isCreator}
-                      isAgency={isAgency}
-                      onAccept={handleAcceptOffer}
-                      onCounter={(offerId, seedPrice) => {
-                        setCounterSheetOfferId(offerId);
-                        setCounterSheetInitialPrice(seedPrice ?? null);
-                      }}
-                      onReject={handleRejectOffer}
-                      onWithdraw={handleWithdrawOffer}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Messages */}
-          <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-sm text-[var(--color-ink-400)]">No messages yet — say hello!</p>
@@ -973,12 +1072,7 @@ export function GroupChat({
                       : message.content;
 
                   if (message.messageType === "system") {
-                    const metaAction =
-                      message.metadata &&
-                      typeof message.metadata === "object" &&
-                      "action" in message.metadata
-                        ? String((message.metadata as Record<string, unknown>).action)
-                        : "";
+                    const metaAction = messageAction(message);
                     const isOfferMsg = metaAction.startsWith("offer_");
                     const isPaymentMsg = metaAction.startsWith("payment_");
                     const isSafetyWarning = metaAction === "safety_warning";
@@ -1221,21 +1315,18 @@ export function GroupChat({
             apiFetchWithAuth={apiFetchWithAuth}
           />
         )}
-        <CounterOfferSheet
-          open={counterSheetOfferId !== null}
-          onClose={() => {
-            setCounterSheetOfferId(null);
-            setCounterSheetInitialPrice(null);
-          }}
-          onSubmit={async (payload) => {
-            if (!counterSheetOfferId) return;
-            await handleCounterOffer(counterSheetOfferId, payload);
-          }}
-          currentPrice={counteringOffer?.pricePerPerson ?? 0}
-          initialPrice={counterSheetInitialPrice ?? undefined}
-          counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
-          maxRounds={3}
-        />
+        {offersDrawerOpen && (
+          <GroupChatOffersDrawer
+            offers={offers}
+            isCreator={isCreator}
+            isAgency={isAgency}
+            onClose={closeOffersDrawer}
+            onAccept={handleAcceptOffer}
+            onReject={handleRejectOffer}
+            onWithdraw={handleWithdrawOffer}
+            onCounterSubmit={handleCounterOffer}
+          />
+        )}
       </>
     );
   }
@@ -1302,16 +1393,14 @@ export function GroupChat({
                           <LogOut className="size-4 text-[var(--color-sunset-600)]" />
                           Leave group
                         </button>
-                        {isPlanGroup && (
-                          <button
-                            type="button"
-                            onClick={handleShowAllOffers}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
-                          >
-                            <Receipt className="size-4 text-[var(--color-lavender-500)]" />
-                            Show all offers
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={openOffersDrawer}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                        >
+                          <Receipt className="size-4 text-[var(--color-lavender-500)]" />
+                          See offers
+                        </button>
                         <button
                           type="button"
                           onClick={handlePayNow}
@@ -1332,68 +1421,6 @@ export function GroupChat({
                 </div>
               )}
 
-              {/* Compact offers — only for user-plan groups */}
-              {isPlanGroup && offers.length > 0 && (
-                <div id="offers-section" className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-                      Offers ({offers.length})
-                    </p>
-                    {!showAllOffers && offers.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllOffers(true)}
-                        className="text-xs font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)]"
-                      >
-                        Show all
-                      </button>
-                    )}
-                  </div>
-
-                  {visibleOffers.map((offer) => (
-                    <div key={offer.id} className="space-y-2">
-                      <CardInset className="p-3.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
-                              {offer.agency.name}
-                            </p>
-                            <p className="text-xs text-[var(--color-ink-500)]">
-                              ₹{offer.pricePerPerson.toLocaleString("en-IN")} / person · {offer.status}
-                            </p>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() =>
-                              setExpandedOfferId((current) =>
-                                current === offer.id ? null : offer.id,
-                              )
-                            }
-                          >
-                            {expandedOfferId === offer.id ? "Hide details" : "Show details"}
-                          </Button>
-                        </div>
-                      </CardInset>
-                      {expandedOfferId === offer.id && (
-                        <OfferCard
-                          offer={offer}
-                          isCreator={isCreator}
-                          isAgency={isAgency}
-                          onAccept={handleAcceptOffer}
-                          onCounter={(offerId, seedPrice) => {
-                            setCounterSheetOfferId(offerId);
-                            setCounterSheetInitialPrice(seedPrice ?? null);
-                          }}
-                          onReject={handleRejectOffer}
-                          onWithdraw={handleWithdrawOffer}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* Messages */}
               <div
                 className={cn(
@@ -1406,7 +1433,8 @@ export function GroupChat({
                     No messages yet. Coordinate arrivals, budget, and votes here.
                   </CardInset>
                 ) : (
-                  messages.map((message, idx) => {
+                  <>
+                    {messages.map((message, idx) => {
                     const mine = session?.user.id === message.senderId;
                     const pollOptionsData = message.metadata?.options ?? [];
                     const pollQuestion =
@@ -1421,14 +1449,7 @@ export function GroupChat({
                         new Date(prevMsg.createdAt).toDateString();
 
                     if (message.messageType === "system") {
-                      const metaAction =
-                        message.metadata &&
-                        typeof message.metadata === "object" &&
-                        "action" in message.metadata
-                          ? String(
-                              (message.metadata as Record<string, unknown>).action,
-                            )
-                          : "";
+                      const metaAction = messageAction(message);
                       const isOfferMsg = metaAction.startsWith("offer_");
                       const isPaymentMsg = metaAction.startsWith("payment_");
                       const isSafetyWarning = metaAction === "safety_warning";
@@ -1530,7 +1551,8 @@ export function GroupChat({
                         </div>
                       </div>
                     );
-                  })
+                  })}
+                  </>
                 )}
                 <div ref={messageEndRef} />
               </div>
@@ -1766,22 +1788,18 @@ export function GroupChat({
         />
       )}
 
-      {/* Counter Offer sheet */}
-      <CounterOfferSheet
-        open={counterSheetOfferId !== null}
-        onClose={() => {
-          setCounterSheetOfferId(null);
-          setCounterSheetInitialPrice(null);
-        }}
-        onSubmit={async (payload) => {
-          if (!counterSheetOfferId) return;
-          await handleCounterOffer(counterSheetOfferId, payload);
-        }}
-        currentPrice={counteringOffer?.pricePerPerson ?? 0}
-        initialPrice={counterSheetInitialPrice ?? undefined}
-        counterRound={(counteringOffer?.negotiations?.length ?? 0) + 1}
-        maxRounds={3}
-      />
+      {offersDrawerOpen && (
+        <GroupChatOffersDrawer
+          offers={offers}
+          isCreator={isCreator}
+          isAgency={isAgency}
+          onClose={closeOffersDrawer}
+          onAccept={handleAcceptOffer}
+          onReject={handleRejectOffer}
+          onWithdraw={handleWithdrawOffer}
+          onCounterSubmit={handleCounterOffer}
+        />
+      )}
     </>
   );
 }

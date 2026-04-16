@@ -10,6 +10,15 @@ datasource db {
 
 // ─── Enums ──────────────────────────────────────────────
 
+enum LoyaltyEventType {
+  referral_inviter_bonus
+  referral_new_user_bonus
+  successful_trip_bonus
+  redemption
+  expiry
+  manual_adjustment
+}
+
 enum VerificationTier {
   BASIC
   VERIFIED
@@ -122,48 +131,54 @@ enum RiskFlagType {
 // ─── User & Agency ──────────────────────────────────────
 
 model User {
-  id              String           @id @default(uuid())
-  phone           String           @unique
-  username        String?          @unique
-  email           String?          @unique
-  passwordHash    String?
-  fullName        String
-  avatarUrl       String?
-  dateOfBirth     DateTime?
-  gender          String?          // male | female | other
-  city            String?
+  id                String           @id @default(uuid())
+  phone             String           @unique
+  username          String?          @unique
+  email             String?          @unique
+  passwordHash      String?
+  fullName          String
+  avatarUrl         String?
+  dateOfBirth       DateTime?
+  gender            String?          // male | female | other
+  city              String?
   travelPreferences String?
-  bio             String?
-  verification    VerificationTier @default(BASIC)
-  aadhaarHash     String?          // SHA-256, never raw
-  completedTrips  Int              @default(0)
-  avgRating       Float            @default(0)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  bio               String?
+  verification      VerificationTier @default(BASIC)
+  aadhaarHash       String?          // SHA-256, never raw
+  completedTrips    Int              @default(0)
+  avgRating         Float            @default(0)
+  isActive          Boolean          @default(true)
+  // Referral / Loyalty
+  referralCode      String?          @unique  // user's own shareable code
+  referredByUserId  String?                   // set once on signup if they used a code
+  referralBonusPaid Boolean          @default(false)  // guard: inviter paid once
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   // Relations
-  agency          Agency?
-  createdPlans    Plan[]
-  groupMembers    GroupMember[]
-  payments        Payment[]
-  reviewsGiven    Review[]         @relation("ReviewerRel")
-  reviewsReceived Review[]         @relation("TargetUserRel")
-  chatMessages    ChatMessage[]
+  agency            Agency?
+  createdPlans      Plan[]
+  groupMembers      GroupMember[]
+  payments          Payment[]
+  reviewsGiven      Review[]         @relation("ReviewerRel")
+  reviewsReceived   Review[]         @relation("TargetUserRel")
+  chatMessages      ChatMessage[]
   directConversationParticipants DirectConversationParticipant[]
   directMessagesSent DirectMessage[] @relation("DirectMessageSender")
-  following       Follow[]         @relation("FollowFollowerRel")
-  followers       Follow[]         @relation("FollowTargetUserRel")
-  notifications   Notification[]
-  profileViewsMade ProfileView[]   @relation("ProfileViewViewerRel")
-  profileViewsOwned ProfileView[]  @relation("ProfileViewOwnerRel")
+  following         Follow[]         @relation("FollowFollowerRel")
+  followers         Follow[]         @relation("FollowTargetUserRel")
+  notifications     Notification[]
+  profileViewsMade  ProfileView[]    @relation("ProfileViewViewerRel")
+  profileViewsOwned ProfileView[]    @relation("ProfileViewOwnerRel")
   profileViewsAsTarget ProfileView[] @relation("ProfileViewTargetUserRel")
   agencyMemberships AgencyMember[]
-  disputesCreated Dispute[]        @relation("DisputeCreatorRel")
-  disputesUpdated Dispute[]        @relation("DisputeResolverRel")
-  crmProfiles     AgencyCustomer[]
-  riskFlagsRaised FraudRiskFlag[]  @relation("RiskFlagRaisedByRel")
+  disputesCreated   Dispute[]        @relation("DisputeCreatorRel")
+  disputesUpdated   Dispute[]        @relation("DisputeResolverRel")
+  crmProfiles       AgencyCustomer[]
+  riskFlagsRaised   FraudRiskFlag[]  @relation("RiskFlagRaisedByRel")
+  loyaltyLedger     LoyaltyPointsLedger[]
 
+  @@index([referralCode])
   @@map("users")
 }
 
@@ -333,6 +348,8 @@ model GroupMember {
   leftAt      DateTime?
 
   @@unique([groupId, userId])
+  @@index([groupId, status])
+  @@index([userId, status])
   @@map("group_members")
 }
 
@@ -465,7 +482,16 @@ model Payment {
 
   invoice            Invoice?
   dispute            Dispute?
+  // Payout tracking (denormalized for display)
+  agencyNetAmount    Int           @default(0)  // tripAmount * 0.9 (after 10% commission)
+  initialPayout      Int           @default(0)  // 30% of agencyNetAmount released before trip
+  finalPayout        Int           @default(0)  // 70% of agencyNetAmount released after trip
+  // Loyalty / redemption tracking
+  pointsRedeemed     Int           @default(0)  // in points (1 point = 1 INR)
+  tripBonusIssued    Boolean       @default(false)  // guard: successful_trip_bonus
 
+  @@index([userId, status])
+  @@index([groupId, status])
   @@map("payments")
 }
 
@@ -503,6 +529,7 @@ model ChatMessage {
   createdAt   DateTime @default(now())
 
   @@index([groupId, createdAt(sort: Desc)])
+  @@index([groupId, messageType])
   @@map("chat_messages")
 }
 
@@ -748,4 +775,31 @@ model FraudRiskFlag {
   @@index([userId, type, createdAt(sort: Desc)])
   @@index([groupId, createdAt(sort: Desc)])
   @@map("fraud_risk_flags")
+}
+
+// ─── Loyalty Points Ledger ───────────────────────────────
+
+model LoyaltyPointsLedger {
+  id          String           @id @default(uuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType   LoyaltyEventType
+  points      Int              // positive = earn, negative = redeem/expire
+  description String
+  // Idempotency guard - prevents double-crediting the same event
+  idempotencyKey String?       @unique
+  // Source references
+  groupId     String?          // trip that triggered the event
+  paymentId   String?          // payment the redemption was applied to
+  referredUserId String?       // for referral events
+  // Expiry tracking
+  expiresAt   DateTime?        // set on earn events; null on redemption/expiry rows
+  expired     Boolean          @default(false)
+  expiredAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, expired, expiresAt])
+  @@index([idempotencyKey])
+  @@map("loyalty_points_ledger")
 }

@@ -17,6 +17,7 @@ export class ApiError extends Error {
 export interface ApiRequestInit extends RequestInit {
   query?: QueryParams;
   token?: string;
+  timeoutMs?: number;
 }
 
 function buildUrl(path: string, query?: QueryParams) {
@@ -60,7 +61,7 @@ function normalizeErrors(payload: unknown) {
 }
 
 export async function apiFetch<T>(path: string, init: ApiRequestInit = {}) {
-  const { query, token, headers, body, ...rest } = init;
+  const { query, token, headers, body, timeoutMs, signal: providedSignal, ...rest } = init;
   const resolvedHeaders = new Headers(headers);
 
   if (body && !resolvedHeaders.has("Content-Type")) {
@@ -71,11 +72,45 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}) {
     resolvedHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(buildUrl(path, query), {
-    ...rest,
-    body,
-    headers: resolvedHeaders,
-  });
+  const timeoutController = typeof timeoutMs === "number" && timeoutMs > 0 ? new AbortController() : null;
+  let didTimeout = false;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  if (timeoutController && providedSignal) {
+    if (providedSignal.aborted) {
+      timeoutController.abort(providedSignal.reason);
+    } else {
+      providedSignal.addEventListener(
+        "abort",
+        () => timeoutController.abort(providedSignal.reason),
+        { once: true },
+      );
+    }
+  }
+
+  if (timeoutController && typeof timeoutMs === "number" && timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      didTimeout = true;
+      timeoutController.abort("request_timeout");
+    }, timeoutMs);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(path, query), {
+      ...rest,
+      body,
+      headers: resolvedHeaders,
+      signal: timeoutController?.signal ?? providedSignal,
+    });
+  } catch (error) {
+    if (didTimeout) {
+      throw new ApiError(408, ["Request timed out. Please retry."]);
+    }
+    throw error;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 
   const payload = await response.json().catch(() => null);
 

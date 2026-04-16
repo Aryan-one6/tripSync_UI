@@ -20,6 +20,7 @@ import { env } from '../../lib/env.js';
 import { syncUserVerificationTier } from '../../lib/verification.js';
 import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
+import { randomUUID } from 'crypto';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 type SafeAgency = {
@@ -104,6 +105,7 @@ const safeUserSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  referralCode: true,   // exposed so user can share their referral link
   agency: {
     select: safeAgencySelect,
   },
@@ -252,7 +254,21 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   const existingUser = await assertUserIdentityAvailable({ username, email, phone });
 
+  // Validate referral code if provided (before creating the user)
+  let inviterUserId: string | null = null;
+  const referralCode = (data as any).referralCode as string | undefined;
+  if (referralCode) {
+    const inviter = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true },
+    });
+    // Silently ignore invalid referral codes — don't fail signup
+    inviterUserId = inviter?.id ?? null;
+  }
+
   const passwordHash = await hashPassword(data.password);
+  // Generate a unique referral code for the new user
+  const newUserReferralCode = `TS${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
   const user = existingUser
     ? await prisma.user.update({
@@ -269,6 +285,8 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
+          referralCode: newUserReferralCode,
+          referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
       })
@@ -285,14 +303,25 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
+          referralCode: newUserReferralCode,
+          referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
       });
+
+  // Fire referral bonuses asynchronously (don't block signup)
+  if (inviterUserId) {
+    // Dynamically import loyalty service to avoid circular deps
+    import('../loyalty/service.js')
+      .then(({ grantReferralBonuses }) => grantReferralBonuses(inviterUserId!, user.id))
+      .catch((err) => console.error('[referral-bonus] failed to grant referral bonuses', err));
+  }
 
   return {
     message: 'Traveler account created successfully. Please log in.',
   };
 }
+
 
 export async function signupAgency(data: AgencySignupInput) {
   const username = normalizeUsername(data.username);

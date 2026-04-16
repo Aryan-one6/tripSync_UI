@@ -16,6 +16,7 @@
     "generate": "prisma generate",
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
+    "redis:check": "node --env-file=.env --import tsx src/scripts/check-redis.ts",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",

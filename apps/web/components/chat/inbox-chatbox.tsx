@@ -1,19 +1,23 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   ArrowLeft,
+  BarChart3,
   ChevronRight,
   CornerUpLeft,
   MapPin,
   MessageSquarePlus,
+  MoreVertical,
   Search,
   Send,
   Smile,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -24,10 +28,13 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { GroupChat } from "@/components/chat/group-chat";
+import { OfferCard } from "@/components/chat/offer-card";
+import { CounterOfferSheet, type CounterOfferPayload } from "@/components/chat/counter-offer-sheet";
 import { useAuth } from "@/lib/auth/auth-context";
+import { ApiError } from "@/lib/api/client";
 import { CONVERSATION_READ_EVENT } from "@/lib/realtime/use-live-notifications";
 import { useSocket } from "@/lib/realtime/use-socket";
-import { formatDateRange, initials } from "@/lib/format";
+import { formatDateRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
   DirectConversation,
@@ -39,13 +46,69 @@ import type {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function upsertDirectMessage(list: DirectMessage[], next: DirectMessage) {
+type ChatMessageDeliveryState = "sent" | "pending" | "failed";
+type LocalDirectMessage = DirectMessage & {
+  clientId?: string;
+  isOptimistic?: boolean;
+  deliveryState?: ChatMessageDeliveryState;
+};
+
+function normalizeDirectMessage(message: DirectMessage): LocalDirectMessage {
+  return {
+    ...message,
+    isOptimistic: false,
+    deliveryState: "sent",
+  };
+}
+
+function upsertDirectMessage(list: LocalDirectMessage[], next: LocalDirectMessage) {
   const idx = list.findIndex((m) => m.id === next.id);
   if (idx === -1)
     return [...list, next].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const clone = [...list];
   clone[idx] = next;
   return clone;
+}
+
+function mergeFetchedWithOptimistic(
+  current: LocalDirectMessage[],
+  fetched: LocalDirectMessage[],
+) {
+  const optimisticPending = current.filter((message) => message.isOptimistic);
+  if (optimisticPending.length === 0) return fetched;
+
+  const pendingWithoutServerEquivalent = optimisticPending.filter((optimisticMessage) => {
+    return !fetched.some((serverMessage) => {
+      const sameAuthor = serverMessage.senderId === optimisticMessage.senderId;
+      const sameContent = serverMessage.content === optimisticMessage.content;
+      const timeDistance = Math.abs(
+        new Date(serverMessage.createdAt).getTime() -
+          new Date(optimisticMessage.createdAt).getTime(),
+      );
+      return sameAuthor && sameContent && timeDistance < 30_000;
+    });
+  });
+
+  return [...fetched, ...pendingWithoutServerEquivalent].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
+}
+
+function mergeIncomingMessage(
+  current: LocalDirectMessage[],
+  incoming: LocalDirectMessage,
+) {
+  const withoutMatchingOptimistic = current.filter((message) => {
+    if (!message.isOptimistic) return true;
+    const sameAuthor = message.senderId === incoming.senderId;
+    const sameContent = message.content === incoming.content;
+    const timeDistance = Math.abs(
+      new Date(message.createdAt).getTime() - new Date(incoming.createdAt).getTime(),
+    );
+    return !(sameAuthor && sameContent && timeDistance < 30_000);
+  });
+
+  return upsertDirectMessage(withoutMatchingOptimistic, incoming);
 }
 
 function sortByUpdatedAtDesc(list: DirectConversation[]) {
@@ -86,56 +149,178 @@ type AgencyOfferThread = {
   destination: string;
   creatorId: string;
   creatorName: string;
+  creatorAvatarUrl?: string | null;
   updatedAt: string;
 };
+
+const CONVERSATION_CACHE_TTL_MS = 30_000;
+const CONTACTS_CACHE_TTL_MS = 60_000;
+const CHAT_FETCH_TIMEOUT_MS = 8_000;
+const CHAT_READ_TIMEOUT_MS = 4_000;
+const CHAT_SEND_TIMEOUT_MS = 8_000;
+const CHAT_MESSAGES_PAGE_LIMIT = 50;
+const CHAT_FETCH_RETRY_DELAYS_MS = [900, 2_000];
+const CHAT_SOCKET_POLL_MS = 4_500;
+const READ_API_THROTTLE_MS = 2_500;
+const READ_EVENT_THROTTLE_MS = 1_500;
+const BLOCKED_DM_CREATE_TTL_MS = 60_000;
+const DEFAULT_CHAT_AVATAR_SRC = "/brand/default-avatar.svg";
+const PERSISTED_DM_CACHE_VERSION = 1;
+const PERSISTED_DM_CACHE_TTL_MS = 24 * 60 * 60_000;
+const PERSISTED_DM_MAX_CONVERSATIONS = 60;
+const PERSISTED_DM_MAX_MESSAGES_PER_CONVERSATION = 80;
+
+type TimedCache<T> = {
+  data: T;
+  cachedAt: number;
+};
+
+let conversationCache: TimedCache<DirectConversation[]> | null = null;
+const contactsCache = new Map<string, TimedCache<MessageableContact[]>>();
+const directMessagesCache = new Map<string, TimedCache<LocalDirectMessage[]>>();
+const blockedDirectCreateCache = new Map<string, number>();
+
+function isCacheFresh(cachedAt: number, ttlMs: number) {
+  return Date.now() - cachedAt < ttlMs;
+}
+
+type PersistedDirectCache = {
+  version: number;
+  userId: string;
+  cachedAt: number;
+  conversations: DirectConversation[];
+  messagesByConversation: Record<string, LocalDirectMessage[]>;
+};
+
+function persistedDirectCacheKey(userId: string) {
+  return `tripsync.dm.cache.v${PERSISTED_DM_CACHE_VERSION}:${userId}`;
+}
+
+function readPersistedDirectCache(userId: string): PersistedDirectCache | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(persistedDirectCacheKey(userId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PersistedDirectCache;
+    if (
+      parsed.version !== PERSISTED_DM_CACHE_VERSION ||
+      parsed.userId !== userId ||
+      !Array.isArray(parsed.conversations) ||
+      !parsed.messagesByConversation ||
+      typeof parsed.cachedAt !== "number"
+    ) {
+      return null;
+    }
+    if (Date.now() - parsed.cachedAt > PERSISTED_DM_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedDirectCache(
+  userId: string,
+  conversations: DirectConversation[],
+  cacheEntries: Array<[string, TimedCache<LocalDirectMessage[]>]>,
+) {
+  if (typeof window === "undefined") return;
+  try {
+    const messagesByConversation: Record<string, LocalDirectMessage[]> = {};
+    const allowedIds = new Set(
+      conversations.slice(0, PERSISTED_DM_MAX_CONVERSATIONS).map((conversation) => conversation.id),
+    );
+    for (const [conversationId, entry] of cacheEntries) {
+      if (!allowedIds.has(conversationId)) continue;
+      const trimmed = entry.data.slice(-PERSISTED_DM_MAX_MESSAGES_PER_CONVERSATION);
+      if (trimmed.length > 0) {
+        messagesByConversation[conversationId] = trimmed;
+      }
+    }
+    const payload: PersistedDirectCache = {
+      version: PERSISTED_DM_CACHE_VERSION,
+      userId,
+      cachedAt: Date.now(),
+      conversations: conversations.slice(0, PERSISTED_DM_MAX_CONVERSATIONS),
+      messagesByConversation,
+    };
+    window.localStorage.setItem(persistedDirectCacheKey(userId), JSON.stringify(payload));
+  } catch {
+    // best-effort only
+  }
+}
 
 // ── Avatar helper ─────────────────────────────────────────────────────────────
 
 function Avatar({
   name,
+  avatarUrl,
   size = "md",
   variant = "sea",
 }: {
   name: string;
+  avatarUrl?: string | null;
   size?: "sm" | "md" | "lg";
   variant?: "sea" | "lavender";
 }) {
   const sizeClass = size === "sm" ? "size-8" : size === "lg" ? "size-12" : "size-10";
-  const textClass = size === "sm" ? "text-[10px]" : "text-sm";
-  const gradientClass =
+  const ringClass =
     variant === "lavender"
-      ? "from-[var(--color-lavender-100)] to-[var(--color-lavender-300)] text-[var(--color-lavender-500)] ring-1 ring-[var(--color-lavender-200)]"
-      : "from-[var(--color-sea-100)] to-[var(--color-sea-300)] text-[var(--color-sea-800)] ring-1 ring-[var(--color-sea-200)]";
+      ? "ring-[var(--color-lavender-200)] bg-[var(--color-lavender-50)]"
+      : "ring-[var(--color-sea-200)] bg-[var(--color-sea-50)]";
+  const resolvedAvatar = avatarUrl?.trim() || DEFAULT_CHAT_AVATAR_SRC;
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-b font-bold",
+        "shrink-0 overflow-hidden rounded-full ring-1",
         sizeClass,
-        textClass,
-        gradientClass,
+        ringClass,
       )}
     >
-      {initials(name)}
+      <img
+        src={resolvedAvatar}
+        alt={name}
+        loading="lazy"
+        className="h-full w-full object-cover"
+        onError={(event) => {
+          const target = event.currentTarget;
+          if (target.src.endsWith(DEFAULT_CHAT_AVATAR_SRC)) return;
+          target.src = DEFAULT_CHAT_AVATAR_SRC;
+        }}
+      />
     </div>
   );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
+export function InboxChatbox({
+  variant,
+  mobileMessengerMode = false,
+}: {
+  variant: "user" | "agency";
+  mobileMessengerMode?: boolean;
+}) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const { session, apiFetchWithAuth } = useAuth();
   const socket = useSocket();
 
   const targetUserId = searchParams.get("userId");
   const initialConversationId = searchParams.get("conversationId");
   const initialGroupId = searchParams.get("groupId");
+  const hasFreshConversationCache =
+    conversationCache && isCacheFresh(conversationCache.cachedAt, CONVERSATION_CACHE_TTL_MS);
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [conversations, setConversations] = useState<DirectConversation[]>([]);
+  const [conversations, setConversations] = useState<DirectConversation[]>(() =>
+    hasFreshConversationCache ? sortByUpdatedAtDesc(conversationCache!.data) : [],
+  );
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [messages, setMessages] = useState<LocalDirectMessage[]>([]);
   const [groupChannels, setGroupChannels] = useState<TripMembership[]>([]);
   const [messageableContacts, setMessageableContacts] = useState<MessageableContact[]>([]);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; fullName: string }>>([]);
@@ -145,20 +330,81 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(!hasFreshConversationCache);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [syncingMessages, setSyncingMessages] = useState(false);
+  const [messageSyncIssue, setMessageSyncIssue] = useState<string | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [agencyOffers, setAgencyOffers] = useState<Offer[]>([]);
-  const [isPending, startTransition] = useTransition();
+  const [dmOffers, setDmOffers] = useState<Offer[]>([]);
+  const [dmCounterSheetOfferId, setDmCounterSheetOfferId] = useState<string | null>(null);
+  const [dmCounterSheetInitialPrice, setDmCounterSheetInitialPrice] = useState<number | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
+  const [directHeaderMenuOpen, setDirectHeaderMenuOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
 
   const routeIntentHandledRef = useRef(false);
+  const persistedCacheHydratedUserRef = useRef<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const dmTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileHeaderMenuRef = useRef<HTMLDivElement>(null);
+  const directHeaderMenuRef = useRef<HTMLDivElement>(null);
+  const conversationsRef = useRef<DirectConversation[]>(conversations);
+  const pendingDirectCreateRef = useRef<Set<string>>(new Set());
+  const readApiAtRef = useRef<Map<string, number>>(new Map());
+  const readEventAtRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+    conversationCache = {
+      data: conversations,
+      cachedAt: Date.now(),
+    };
+  }, [conversations]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) {
+      persistedCacheHydratedUserRef.current = null;
+      return;
+    }
+    if (persistedCacheHydratedUserRef.current === userId) return;
+    persistedCacheHydratedUserRef.current = userId;
+
+    const persisted = readPersistedDirectCache(userId);
+    if (!persisted) return;
+
+    if (conversationsRef.current.length === 0 && persisted.conversations.length > 0) {
+      const restored = sortByUpdatedAtDesc(persisted.conversations);
+      setConversations(restored);
+      setLoadingConversations(false);
+    }
+
+    for (const [conversationId, cachedMessages] of Object.entries(
+      persisted.messagesByConversation,
+    )) {
+      if (!Array.isArray(cachedMessages) || cachedMessages.length === 0) continue;
+      directMessagesCache.set(conversationId, {
+        data: cachedMessages.slice(-PERSISTED_DM_MAX_MESSAGES_PER_CONVERSATION),
+        cachedAt: Date.now(),
+      });
+    }
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+    writePersistedDirectCache(
+      userId,
+      sortByUpdatedAtDesc(conversations),
+      Array.from(directMessagesCache.entries()),
+    );
+  }, [conversations, messages, session?.user.id]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const activeConversation = useMemo(
@@ -222,6 +468,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           destination,
           creatorId,
           creatorName,
+          creatorAvatarUrl: offer.plan?.creator?.avatarUrl ?? null,
           updatedAt: offer.updatedAt,
         };
       })
@@ -250,6 +497,87 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   const counterpartProfileHref = activeCounterpartHandle
     ? `/profile/${encodeURIComponent(activeCounterpartHandle)}`
     : null;
+  const mobileExitHref = variant === "agency" ? "/agency/dashboard" : "/dashboard/trips";
+  const activeGroupChannel = useMemo(
+    () => activeGroupChannels.find((trip) => trip.group.id === activeGroupId) ?? null,
+    [activeGroupChannels, activeGroupId],
+  );
+  const activeGroupTitle = activeGroupChannel
+    ? activeGroupChannel.group.plan?.title ??
+      activeGroupChannel.group.package?.title ??
+      "Trip group"
+    : null;
+  const activeGroupDestination = activeGroupChannel
+    ? activeGroupChannel.group.plan?.destination ??
+      activeGroupChannel.group.package?.destination ??
+      "Group chat"
+    : null;
+  const mobileHeaderTitle = showMobileChat
+    ? activeConversation
+      ? activeConversation.counterpart?.fullName ?? "Direct chat"
+      : activeGroupTitle ?? "Trip chat"
+    : "Chats";
+  const mobileHeaderSubtitle = showMobileChat
+    ? activeConversation
+      ? typingUsers.length > 0
+        ? `${typingUsers.map((e) => e.fullName).join(", ")} typing…`
+        : "Direct message"
+      : activeGroupDestination ?? "Group channel"
+    : totalUnread > 0
+    ? `${totalUnread} unread`
+    : "Your conversations";
+  const mobileShellHeightClass =
+    showMobileChat && activeGroupId ? "h-[100svh]" : "h-[calc(100svh-3.5rem)]";
+
+  const clearRouteIntentQuery = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const hadIntentParams =
+      params.has("userId") || params.has("conversationId") || params.has("groupId");
+    if (!hadIntentParams) return;
+    params.delete("userId");
+    params.delete("conversationId");
+    params.delete("groupId");
+    const nextQuery = params.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  const closeDirectMenus = useCallback(() => {
+    setMobileHeaderMenuOpen(false);
+    setDirectHeaderMenuOpen(false);
+  }, []);
+
+  const handleDirectPollAction = useCallback(() => {
+    setFeedback("Polls are currently available in group chats.");
+    closeDirectMenus();
+  }, [closeDirectMenus]);
+
+  const clearActiveDirectMessages = useCallback(() => {
+    if (!activeConversationId) return;
+    directMessagesCache.delete(activeConversationId);
+    setMessages([]);
+    setLoadingMessages(false);
+    setSyncingMessages(false);
+    setMessageSyncIssue(null);
+    setFeedback("Messages cleared from this view.");
+    closeDirectMenus();
+  }, [activeConversationId, closeDirectMenus]);
+
+  const removeActiveDirectConversation = useCallback(() => {
+    if (!activeConversationId) return;
+    const confirmed = window.confirm("Delete this chat from your inbox?");
+    if (!confirmed) return;
+    directMessagesCache.delete(activeConversationId);
+    readApiAtRef.current.delete(activeConversationId);
+    readEventAtRef.current.delete(activeConversationId);
+    setConversations((current) =>
+      current.filter((conversation) => conversation.id !== activeConversationId),
+    );
+    setMessages([]);
+    setActiveConversationId(null);
+    setShowMobileChat(false);
+    setFeedback("Chat deleted from inbox.");
+    closeDirectMenus();
+  }, [activeConversationId, closeDirectMenus]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const openOrCreateConversation = useCallback(
@@ -258,19 +586,42 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         setFeedback("You cannot start a conversation with yourself.");
         return;
       }
-      const existing = conversations.find((c) => c.counterpart?.id === userId);
+      const viewerId = session?.user.id ?? null;
+      const pendingCreates = pendingDirectCreateRef.current;
+      if (pendingCreates.has(userId)) return;
+      pendingCreates.add(userId);
+
+      const existing = conversationsRef.current.find((c) => c.counterpart?.id === userId);
       if (existing) {
         setActiveGroupId(null);
         setActiveConversationId(existing.id);
         setShowMobileChat(true);
         setShowNewChat(false);
         setFeedback(null);
+        pendingCreates.delete(userId);
         return;
       }
+
+      if (viewerId) {
+        const blockedKey = `${viewerId}:${userId}`;
+        const blockedUntil = blockedDirectCreateCache.get(blockedKey) ?? 0;
+        if (blockedUntil > Date.now()) {
+          setFeedback(
+            "Direct chat is currently locked for this user. Join a shared trip or offer flow first.",
+          );
+          pendingCreates.delete(userId);
+          return;
+        }
+      }
+
       try {
         const created = await apiFetchWithAuth<DirectConversation>(
           "/chat/direct/conversations",
-          { method: "POST", body: JSON.stringify({ targetUserId: userId }) },
+          {
+            method: "POST",
+            body: JSON.stringify({ targetUserId: userId }),
+            timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+          },
         );
         setConversations((cur) => sortByUpdatedAtDesc([created, ...cur]));
         setActiveGroupId(null);
@@ -279,12 +630,28 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         setShowNewChat(false);
         setFeedback(null);
       } catch (err) {
+        if (err instanceof ApiError && err.status === 403) {
+          if (viewerId) {
+            const blockedKey = `${viewerId}:${userId}`;
+            blockedDirectCreateCache.set(
+              blockedKey,
+              Date.now() + BLOCKED_DM_CREATE_TTL_MS,
+            );
+          }
+          setFeedback(
+            err.details[0] ??
+              "Direct chat is locked until both users satisfy message eligibility rules.",
+          );
+          return;
+        }
         setFeedback(
           err instanceof Error ? err.message : "Unable to start a conversation.",
         );
+      } finally {
+        pendingCreates.delete(userId);
       }
     },
-    [apiFetchWithAuth, conversations, session?.user.id],
+    [apiFetchWithAuth, session?.user.id],
   );
 
   const openGroupChannel = useCallback((groupId: string) => {
@@ -302,23 +669,108 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     setAgencyOffers(data);
   }, [apiFetchWithAuth, variant]);
 
-  async function markConversationRead(conversationId: string) {
-    await apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
-      method: "POST",
-    });
+  // ── DM Offer actions ───────────────────────────────────────────────────────
+  const handleDmAcceptOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/accept`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+      setFeedback("Offer accepted!");
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not accept the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmRejectOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/reject`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not decline the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmWithdrawOffer = useCallback(async (offerId: string) => {
+    try {
+      const updated = await apiFetchWithAuth<Offer>(`/offers/${offerId}/withdraw`, { method: "POST" });
+      setDmOffers((cur) => cur.map((o) => o.id === offerId ? updated : o));
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not withdraw the offer.");
+    }
+  }, [apiFetchWithAuth]);
+
+  const handleDmCounterOffer = useCallback(async (offerId: string, payload: CounterOfferPayload) => {
+    try {
+      await apiFetchWithAuth(`/offers/${offerId}/counter`, {
+        method: "POST",
+        body: JSON.stringify({
+          price: payload.price,
+          message: payload.message,
+          inclusionsDelta: payload.requestedAdditions.length > 0
+            ? { requestedAdditions: payload.requestedAdditions }
+            : undefined,
+        }),
+      });
+      setDmCounterSheetOfferId(null);
+      setDmCounterSheetInitialPrice(null);
+      // Refresh offers
+      const counterpartId = activeConversation?.counterpart?.id;
+      if (counterpartId) {
+        const refreshed = await apiFetchWithAuth<Offer[]>(`/offers/by-counterpart/${counterpartId}`).catch(() => [] as Offer[]);
+        setDmOffers(refreshed);
+      }
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Could not send counter offer.");
+    }
+  }, [apiFetchWithAuth, activeConversation?.counterpart?.id]);
+
+  const markConversationRead = useCallback((
+    conversationId: string,
+    options?: { forceRequest?: boolean; forceNotify?: boolean },
+  ) => {
+    let hadUnread = false;
+    const nowIso = new Date().toISOString();
     setConversations((cur) =>
       cur.map((c) =>
         c.id === conversationId
-          ? { ...c, unreadCount: 0, lastReadAt: new Date().toISOString() }
+          ? (() => {
+              hadUnread = hadUnread || c.unreadCount > 0;
+              return c.unreadCount === 0 && c.lastReadAt
+                ? c
+                : { ...c, unreadCount: 0, lastReadAt: nowIso };
+            })()
           : c,
       ),
     );
-    window.dispatchEvent(
-      new CustomEvent(CONVERSATION_READ_EVENT, {
-        detail: { conversationId },
-      }),
-    );
-  }
+    const forceRequest = options?.forceRequest ?? false;
+    const forceNotify = options?.forceNotify ?? false;
+    const shouldRequest = forceRequest || hadUnread;
+    const shouldNotify = forceNotify || hadUnread;
+    const nowMs = Date.now();
+
+    if (shouldNotify) {
+      const lastNotify = readEventAtRef.current.get(conversationId) ?? 0;
+      if (nowMs - lastNotify >= READ_EVENT_THROTTLE_MS) {
+        readEventAtRef.current.set(conversationId, nowMs);
+        window.dispatchEvent(
+          new CustomEvent(CONVERSATION_READ_EVENT, {
+            detail: { conversationId },
+          }),
+        );
+      }
+    }
+
+    if (!shouldRequest) return;
+    const lastApiCall = readApiAtRef.current.get(conversationId) ?? 0;
+    if (nowMs - lastApiCall < READ_API_THROTTLE_MS) return;
+    readApiAtRef.current.set(conversationId, nowMs);
+
+    void apiFetchWithAuth(`/chat/direct/conversations/${conversationId}/read`, {
+      method: "POST",
+      timeoutMs: CHAT_READ_TIMEOUT_MS,
+    }).catch(() => {
+      // Non-blocking by design to keep message rendering instant.
+    });
+  }, [apiFetchWithAuth]);
 
   const emitDirectTyping = (isTyping: boolean) => {
     if (!socket || !activeConversationId) return;
@@ -326,60 +778,194 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     isTypingRef.current = isTyping;
   };
 
-  function sendDirectMessage() {
-    if (!activeConversationId || isPending) return;
+  async function sendDirectMessage() {
+    if (!activeConversationId) return;
+    if (!session?.user.id) {
+      setFeedback("Session expired. Please log in again.");
+      return;
+    }
     const content = draft.trim();
     if (!content) return;
+    const conversationId = activeConversationId;
     const previousDraft = draft;
     const currentReplyTo = replyTo;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const optimisticMessage: LocalDirectMessage = {
+      id: optimisticId,
+      conversationId,
+      senderId: session?.user.id ?? "me",
+      content,
+      createdAt: nowIso,
+      sender: session?.user
+        ? {
+            id: session.user.id,
+            fullName: session.user.fullName,
+            username: session.user.username,
+            avatarUrl: session.user.avatarUrl,
+            city: session.user.city,
+            verification: session.user.verification,
+            avgRating: session.user.avgRating,
+            completedTrips: session.user.completedTrips,
+          }
+        : null,
+      clientId: optimisticId,
+      isOptimistic: true,
+      deliveryState: "pending",
+    };
+
     setDraft("");
     setReplyTo(null);
-    startTransition(async () => {
-      try {
-        await apiFetchWithAuth(
-          `/chat/direct/conversations/${activeConversationId}/messages`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              content,
-              ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
-            }),
-          },
-        );
-        setFeedback(null);
-        emitDirectTyping(false);
-      } catch (err) {
-        setDraft(previousDraft);
-        setFeedback(err instanceof Error ? err.message : "Unable to send message.");
-      }
+    setMessageSyncIssue(null);
+    emitDirectTyping(false);
+
+    setMessages((cur) => {
+      const next = upsertDirectMessage(cur, optimisticMessage);
+      directMessagesCache.set(conversationId, {
+        data: next,
+        cachedAt: Date.now(),
+      });
+      return next;
     });
+
+    setConversations((cur) =>
+      sortByUpdatedAtDesc(
+        cur.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                updatedAt: nowIso,
+                unreadCount: 0,
+                lastMessage: optimisticMessage,
+              }
+            : conversation,
+        ),
+      ),
+    );
+
+    try {
+      const created = await apiFetchWithAuth<DirectMessage>(
+        `/chat/direct/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            content,
+            ...(currentReplyTo ? { metadata: { replyTo: currentReplyTo } } : {}),
+          }),
+          timeoutMs: CHAT_SEND_TIMEOUT_MS,
+        },
+      );
+      const normalized = normalizeDirectMessage(created);
+      setMessages((cur) => {
+        const withoutOptimistic = cur.filter((message) => message.id !== optimisticId);
+        const next = upsertDirectMessage(withoutOptimistic, normalized);
+        directMessagesCache.set(conversationId, {
+          data: next,
+          cachedAt: Date.now(),
+        });
+        return next;
+      });
+      setConversations((cur) =>
+        sortByUpdatedAtDesc(
+          cur.map((conversation) =>
+            conversation.id === conversationId
+              ? {
+                  ...conversation,
+                  updatedAt: normalized.createdAt,
+                  unreadCount: 0,
+                  lastMessage: normalized,
+                }
+              : conversation,
+          ),
+        ),
+      );
+      setFeedback(null);
+    } catch (err) {
+      setDraft(previousDraft);
+      setMessages((cur) => {
+        const next = cur.map((message) =>
+          message.id === optimisticId
+            ? { ...message, deliveryState: "failed" as const, isOptimistic: true }
+            : message,
+        );
+        directMessagesCache.set(conversationId, {
+          data: next,
+          cachedAt: Date.now(),
+        });
+        return next;
+      });
+      setFeedback(err instanceof Error ? err.message : "Unable to send message.");
+    }
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    void (async () => {
+    if (!session?.user.id) {
+      setConversations([]);
+      setLoadingConversations(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const cached = conversationCache;
+    const hasFreshCache = Boolean(
+      cached && isCacheFresh(cached.cachedAt, CONVERSATION_CACHE_TTL_MS),
+    );
+    if (cached && hasFreshCache) {
+      setConversations(sortByUpdatedAtDesc(cached.data));
+      setLoadingConversations(false);
+    }
+
+    const refreshConversations = async () => {
       try {
-        setLoadingConversations(true);
+        if (!hasFreshCache) {
+          setLoadingConversations(true);
+        }
         const data = await apiFetchWithAuth<DirectConversation[]>(
           "/chat/direct/conversations",
-        ).catch(() => [] as DirectConversation[]);
+          { timeoutMs: CHAT_FETCH_TIMEOUT_MS },
+        );
+        if (cancelled) return;
         setConversations(sortByUpdatedAtDesc(data));
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          setFeedback("Session expired. Please log in again.");
+          return;
+        }
+        if (!hasFreshCache && conversationsRef.current.length === 0) {
+          setFeedback(
+            err instanceof Error ? err.message : "Unable to load conversations.",
+          );
+        }
       } finally {
-        if (variant === "user") {
-          try {
-            const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
-            setGroupChannels(trips);
-          } catch {
-            // non-fatal
-          }
-        }
-        if (variant === "agency") {
-          void loadAgencyOffers();
-        }
-        setLoadingConversations(false);
+        if (!cancelled) setLoadingConversations(false);
       }
-    })();
-  }, [apiFetchWithAuth, loadAgencyOffers, variant]);
+    };
+
+    const loadSidebarData = async () => {
+      if (variant === "user") {
+        try {
+          const trips = await apiFetchWithAuth<TripMembership[]>("/groups/my");
+          if (!cancelled) setGroupChannels(trips);
+        } catch {
+          // non-fatal
+        }
+        return;
+      }
+      if (variant === "agency") {
+        void loadAgencyOffers();
+      }
+    };
+
+    void refreshConversations();
+    void loadSidebarData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetchWithAuth, loadAgencyOffers, session?.user.id, variant]);
 
   useEffect(() => {
     if (variant !== "agency" || !socket) return;
@@ -399,10 +985,32 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [loadAgencyOffers, socket, variant]);
 
   useEffect(() => {
-    if (variant !== "user" || !session?.user.id || activeGroupChannels.length === 0) {
+    if (variant !== "user" || !session?.user.id) {
       setMessageableContacts([]);
+      setLoadingContacts(false);
       return;
     }
+
+    if (!showNewChat) {
+      setLoadingContacts(false);
+      return;
+    }
+
+    if (activeGroupChannels.length === 0) {
+      setMessageableContacts([]);
+      setLoadingContacts(false);
+      return;
+    }
+
+    const groupIds = activeGroupChannels.map((trip) => trip.group.id).sort();
+    const cacheKey = `${session.user.id}:${groupIds.join(",")}`;
+    const cached = contactsCache.get(cacheKey);
+    if (cached && isCacheFresh(cached.cachedAt, CONTACTS_CACHE_TTL_MS)) {
+      setMessageableContacts(cached.data);
+      setLoadingContacts(false);
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       try {
@@ -438,6 +1046,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             return b.sharedGroupIds.length - a.sharedGroupIds.length;
           return a.user.fullName.localeCompare(b.user.fullName);
         });
+        contactsCache.set(cacheKey, {
+          data: sorted,
+          cachedAt: Date.now(),
+        });
         setMessageableContacts(sorted);
       } finally {
         if (!cancelled) setLoadingContacts(false);
@@ -446,7 +1058,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     return () => {
       cancelled = true;
     };
-  }, [activeGroupChannels, apiFetchWithAuth, session?.user.id, variant]);
+  }, [activeGroupChannels, apiFetchWithAuth, session?.user.id, showNewChat, variant]);
 
   useEffect(() => {
     if (loadingConversations || routeIntentHandledRef.current) return;
@@ -454,6 +1066,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
     void (async () => {
       if (initialGroupId) {
         openGroupChannel(initialGroupId);
+        clearRouteIntentQuery();
         return;
       }
       if (initialConversationId) {
@@ -462,15 +1075,21 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
           setActiveConversationId(existing.id);
           setActiveGroupId(null);
           setShowMobileChat(true);
-          return;
         }
+        clearRouteIntentQuery();
+        return;
       }
       if (targetUserId) {
-        await openOrCreateConversation(targetUserId);
+        try {
+          await openOrCreateConversation(targetUserId);
+        } finally {
+          clearRouteIntentQuery();
+        }
         return;
       }
     })();
   }, [
+    clearRouteIntentQuery,
     conversations,
     initialGroupId,
     initialConversationId,
@@ -486,45 +1105,205 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
   }, [initialGroupId, openGroupChannel]);
 
   useEffect(() => {
-    if (!activeConversationId || conversations.length === 0) return;
-    void (async () => {
+    if (!session?.user.id || !activeConversationId) {
+      setMessages([]);
+      setLoadingMessages(false);
+      setSyncingMessages(false);
+      setMessageSyncIssue(null);
+      return;
+    }
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const cachedEntry = directMessagesCache.get(activeConversationId);
+    const hasCachedMessages = Boolean(cachedEntry && cachedEntry.data.length > 0);
+
+    if (hasCachedMessages && cachedEntry) {
+      setMessages(cachedEntry.data);
+      setLoadingMessages(false);
+      setSyncingMessages(true);
+      setMessageSyncIssue(null);
+    } else {
+      setMessages([]);
+      setLoadingMessages(true);
+      setSyncingMessages(false);
+      setMessageSyncIssue(null);
+    }
+
+    markConversationRead(activeConversationId);
+
+    const fetchMessages = async (attempt: number) => {
+      let scheduledRetry = false;
       try {
-        setLoadingMessages(true);
         const data = await apiFetchWithAuth<DirectMessage[]>(
           `/chat/direct/conversations/${activeConversationId}/messages`,
+          {
+            timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+            query: { limit: CHAT_MESSAGES_PAGE_LIMIT },
+          },
         );
-        setMessages(data);
-        await markConversationRead(activeConversationId);
-      } catch (err) {
-        setFeedback(
-          err instanceof Error ? err.message : "Unable to load messages.",
-        );
-      } finally {
+        if (cancelled) return;
+        const normalized = data.map(normalizeDirectMessage);
+        setMessages((cur) => {
+          const next = mergeFetchedWithOptimistic(cur, normalized);
+          directMessagesCache.set(activeConversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
+        });
         setLoadingMessages(false);
+        setSyncingMessages(false);
+        setMessageSyncIssue(null);
+        setFeedback(null);
+        markConversationRead(activeConversationId);
+      } catch (err) {
+        if (cancelled) return;
+        const fallback = directMessagesCache.get(activeConversationId)?.data ?? [];
+        const hasFallback = fallback.length > 0;
+        if (hasFallback) {
+          setMessages(fallback);
+          setLoadingMessages(false);
+          setSyncingMessages(true);
+        }
+
+        const retriesLeft = attempt < CHAT_FETCH_RETRY_DELAYS_MS.length;
+        if (retriesLeft) {
+          const retryDelay = CHAT_FETCH_RETRY_DELAYS_MS[attempt];
+          scheduledRetry = true;
+          retryTimer = setTimeout(() => {
+            void fetchMessages(attempt + 1);
+          }, retryDelay);
+        } else {
+          setLoadingMessages(false);
+          setSyncingMessages(false);
+        }
+
+        const timeoutError = err instanceof ApiError && err.status === 408;
+        const unauthorizedError = err instanceof ApiError && err.status === 401;
+        if (hasFallback) {
+          setMessageSyncIssue(
+            unauthorizedError
+              ? "Session expired. Please log in again."
+              : "Reconnecting… showing cached messages.",
+          );
+        } else if (timeoutError && retriesLeft) {
+          setMessageSyncIssue("Network is slow. Retrying…");
+        } else if (unauthorizedError) {
+          setMessageSyncIssue("Session expired. Please log in again.");
+        } else {
+          setMessageSyncIssue(
+            err instanceof Error ? err.message : "Unable to load messages.",
+          );
+        }
+      } finally {
+        if (!scheduledRetry && !cancelled) {
+          setLoadingMessages((current) => (hasCachedMessages ? false : current));
+        }
       }
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversationId, apiFetchWithAuth, conversations.length]);
+    };
+
+    void fetchMessages(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [activeConversationId, apiFetchWithAuth, markConversationRead, session?.user.id]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers.length]);
 
   useEffect(() => {
-    if (!socket || !activeConversationId) return;
+    if (!socket) {
+      setIsSocketConnected(false);
+      return;
+    }
+    const syncConnectionState = () => {
+      setIsSocketConnected(socket.connected);
+    };
+    syncConnectionState();
+    socket.on("connect", syncConnectionState);
+    socket.on("disconnect", syncConnectionState);
+    return () => {
+      socket.off("connect", syncConnectionState);
+      socket.off("disconnect", syncConnectionState);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket || !session?.user.id || !activeConversationId) return;
     socket.emit("direct:subscribe", activeConversationId);
     return () => {
       socket.emit("direct:unsubscribe", activeConversationId);
     };
-  }, [activeConversationId, socket]);
+  }, [activeConversationId, session?.user.id, socket]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!session?.user.id || !activeConversationId || isSocketConnected) return;
+    let cancelled = false;
+
+    const pollMessages = async () => {
+      try {
+        setSyncingMessages(true);
+        const data = await apiFetchWithAuth<DirectMessage[]>(
+          `/chat/direct/conversations/${activeConversationId}/messages`,
+          {
+            timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+            query: { limit: CHAT_MESSAGES_PAGE_LIMIT },
+          },
+        );
+        if (cancelled) return;
+        const normalized = data.map(normalizeDirectMessage);
+        setMessages((cur) => {
+          const next = mergeFetchedWithOptimistic(cur, normalized);
+          directMessagesCache.set(activeConversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
+        });
+        setMessageSyncIssue(null);
+        markConversationRead(activeConversationId);
+      } catch (err) {
+        if (!cancelled) {
+          if (err instanceof ApiError && err.status === 401) {
+            setMessageSyncIssue("Session expired. Please log in again.");
+          } else {
+            setMessageSyncIssue("Reconnecting… showing cached messages.");
+          }
+        }
+      } finally {
+        if (!cancelled) setSyncingMessages(false);
+      }
+    };
+
+    void pollMessages();
+    const intervalId = setInterval(() => {
+      void pollMessages();
+    }, CHAT_SOCKET_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [
+    activeConversationId,
+    apiFetchWithAuth,
+    isSocketConnected,
+    markConversationRead,
+    session?.user.id,
+  ]);
+
+  useEffect(() => {
+    if (!socket || !session?.user.id) return;
 
     const handleMessage = (payload: { conversationId?: string; message?: DirectMessage }) => {
       if (!payload.conversationId || !payload.message) return;
-      const { conversationId, message } = payload;
-      const known = conversations.some((c) => c.id === conversationId);
+      const { conversationId } = payload;
+      const message = normalizeDirectMessage(payload.message);
+      const known = conversationsRef.current.some((c) => c.id === conversationId);
 
       setConversations((cur) => {
         const next = cur.map((c) => {
@@ -543,15 +1322,27 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       });
 
       if (!known) {
-        void apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations")
+        void apiFetchWithAuth<DirectConversation[]>("/chat/direct/conversations", {
+          timeoutMs: CHAT_FETCH_TIMEOUT_MS,
+        })
           .then((r) => setConversations(sortByUpdatedAtDesc(r)))
           .catch(() => {});
       }
 
       if (conversationId === activeConversationId) {
-        setMessages((cur) => upsertDirectMessage(cur, message));
+        setMessages((cur) => {
+          const next = mergeIncomingMessage(cur, message);
+          directMessagesCache.set(conversationId, {
+            data: next,
+            cachedAt: Date.now(),
+          });
+          return next;
+        });
         if (message.senderId !== session?.user.id) {
-          void markConversationRead(conversationId);
+          markConversationRead(conversationId, {
+            forceRequest: true,
+            forceNotify: true,
+          });
         }
       }
     };
@@ -582,7 +1373,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       socket.off("direct:message_created", handleMessage);
       socket.off("direct:typing", handleTyping);
     };
-  }, [activeConversationId, apiFetchWithAuth, conversations, session?.user.id, socket]);
+  }, [activeConversationId, apiFetchWithAuth, markConversationRead, session?.user.id, socket]);
 
   useEffect(() => {
     if (!socket || !activeConversationId) return;
@@ -613,27 +1404,253 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         setShowEmojiPicker(false);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
   }, [showEmojiPicker]);
+
+  useEffect(() => {
+    if (!mobileHeaderMenuOpen) return;
+    const handleClick = (event: PointerEvent) => {
+      if (
+        mobileHeaderMenuRef.current &&
+        !mobileHeaderMenuRef.current.contains(event.target as Node)
+      ) {
+        setMobileHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
+  }, [mobileHeaderMenuOpen]);
+
+  useEffect(() => {
+    if (!directHeaderMenuOpen) return;
+    const handleClick = (event: PointerEvent) => {
+      if (
+        directHeaderMenuRef.current &&
+        !directHeaderMenuRef.current.contains(event.target as Node)
+      ) {
+        setDirectHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handleClick);
+    return () => document.removeEventListener("pointerdown", handleClick);
+  }, [directHeaderMenuOpen]);
+
+  useEffect(() => {
+    if (!showMobileChat) {
+      setMobileHeaderMenuOpen(false);
+      setDirectHeaderMenuOpen(false);
+    }
+  }, [showMobileChat]);
+
+  useEffect(() => {
+    setMobileHeaderMenuOpen(false);
+    setDirectHeaderMenuOpen(false);
+  }, [activeConversationId, activeGroupId]);
 
   // Clear reply state when switching conversations
   useEffect(() => {
     setReplyTo(null);
     setShowEmojiPicker(false);
+    setDmOffers([]);
+    setDmCounterSheetOfferId(null);
+    setDmCounterSheetInitialPrice(null);
   }, [activeConversationId]);
+
+  // Load offers for DM conversations
+  useEffect(() => {
+    if (!activeConversationId || !activeConversation) return;
+    const counterpartId = activeConversation.counterpart?.id;
+    if (!counterpartId) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        // For agency variant: filter existing agencyOffers by counterpart (trip creator)
+        if (variant === "agency") {
+          const relevant = agencyOffers.filter(
+            (o) => o.plan?.creator?.id === counterpartId,
+          );
+          if (!cancelled) setDmOffers(relevant);
+          return;
+        }
+        // Keep direct user chat simple: no inline offer cards in DM flow.
+        if (!cancelled) setDmOffers([]);
+        return;
+      } catch {
+        // Non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeConversationId, activeConversation, variant, agencyOffers]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
+    <div
+      className={cn(
+        mobileMessengerMode &&
+          "flex h-[100svh] min-h-[100svh] min-w-0 flex-col md:h-full md:min-h-0",
+      )}
+    >
+      {mobileMessengerMode && !(showMobileChat && activeGroupId) && (
+        <div className="relative z-40 flex h-14 items-center justify-between overflow-visible border-b border-[var(--color-sea-100)] bg-white/95 px-2.5 backdrop-blur-sm md:hidden">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {showMobileChat ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileChat(false);
+                    setMobileHeaderMenuOpen(false);
+                  }}
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-50)] active:scale-95"
+                  aria-label="Back to chats"
+                >
+                  <ArrowLeft className="size-4.5" />
+                </button>
+                {activeConversation ? (
+                  counterpartProfileHref ? (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setMobileHeaderMenuOpen(false)}
+                      className="shrink-0"
+                      aria-label="Open profile"
+                    >
+                      <Avatar
+                        name={activeConversation.counterpart?.fullName ?? "?"}
+                        avatarUrl={activeConversation.counterpart?.avatarUrl}
+                        size="sm"
+                      />
+                    </Link>
+                  ) : (
+                    <Avatar
+                      name={activeConversation.counterpart?.fullName ?? "?"}
+                      avatarUrl={activeConversation.counterpart?.avatarUrl}
+                      size="sm"
+                    />
+                  )
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-full bg-[var(--color-lavender-100)] text-[var(--color-lavender-600)] ring-1 ring-[var(--color-lavender-200)]">
+                    <Users className="size-4" />
+                  </div>
+                )}
+                <div className="min-w-0 transition-all duration-250">
+                  <p className="truncate text-sm font-semibold text-[var(--color-ink-900)]">
+                    {mobileHeaderTitle}
+                  </p>
+                  <p className="truncate text-[11px] text-[var(--color-ink-500)]">
+                    {mobileHeaderSubtitle}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <Image
+                src="/brand/travellersin.png"
+                alt="Travellersin"
+                width={132}
+                height={28}
+                className="h-6 w-auto"
+                priority={false}
+              />
+            )}
+          </div>
+          <div className="relative" ref={mobileHeaderMenuRef}>
+            {showMobileChat ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileHeaderMenuOpen((open) => !open);
+                    setDirectHeaderMenuOpen(false);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/85 text-[var(--color-sea-700)] transition-all duration-200 hover:bg-white active:scale-95"
+                  aria-label="Open chat options"
+                  aria-expanded={mobileHeaderMenuOpen}
+                >
+                  <MoreVertical className="size-4.5" />
+                </button>
+                <div
+                  className={cn(
+                    "absolute right-0 top-[calc(100%+0.35rem)] z-[90] w-44 origin-top-right rounded-2xl border border-[var(--color-sea-100)] bg-white p-1 shadow-[var(--shadow-lg)] transition-all duration-180",
+                    mobileHeaderMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0",
+                  )}
+                >
+                  {activeConversation && (
+                    <button
+                      type="button"
+                      onClick={handleDirectPollAction}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    >
+                      <BarChart3 className="size-4 text-[var(--color-sea-700)]" />
+                      Polls
+                    </button>
+                  )}
+                  {counterpartProfileHref && (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setMobileHeaderMenuOpen(false)}
+                      className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    >
+                      View profile
+                    </Link>
+                  )}
+                  {activeConversation && (
+                    <button
+                      type="button"
+                      onClick={clearActiveDirectMessages}
+                      className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    >
+                      Delete messages
+                    </button>
+                  )}
+                  {activeConversation && (
+                    <button
+                      type="button"
+                      onClick={removeActiveDirectConversation}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-50)]"
+                    >
+                      <Trash2 className="size-4" />
+                      Delete chat
+                    </button>
+                  )}
+                  <Link
+                    href={mobileExitHref}
+                    onClick={() => setMobileHeaderMenuOpen(false)}
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    Close messenger
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <Link
+                href={mobileExitHref}
+                aria-label="Close messenger"
+                className="inline-flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)] transition-all duration-200 hover:bg-[var(--color-sea-100)] active:scale-95"
+              >
+                <X className="size-3.5" />
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
       <div
-        className="flex min-h-[calc(100dvh-8rem)] overflow-hidden border-y border-[var(--color-sea-100)] bg-[var(--color-surface-raised)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]"
+        className={cn(
+          "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
+          mobileMessengerMode
+            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-full md:min-h-0 md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]`
+            : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
+        )}
       >
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "flex w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)]",
-          showMobileChat ? "hidden md:flex" : "flex",
+          "absolute inset-0 z-20 flex min-h-0 w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)] md:transition-none",
+          showMobileChat
+            ? "-translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto"
+            : "translate-x-0 opacity-100",
         )}
       >
         {/* Header */}
@@ -699,7 +1716,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         </div>
 
         {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {/* New chat: contacts to message */}
           {showNewChat && (
             <div>
@@ -724,7 +1741,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                       onClick={() => void openOrCreateConversation(contact.user.id)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-sea-50)]"
                     >
-                      <Avatar name={contact.user.fullName} size="md" />
+                      <Avatar
+                        name={contact.user.fullName}
+                        avatarUrl={contact.user.avatarUrl}
+                        size="md"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
                           {contact.user.fullName}
@@ -750,7 +1771,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                       onClick={() => void openOrCreateConversation(thread.creatorId)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-sea-50)]"
                     >
-                      <Avatar name={thread.creatorName} size="md" />
+                      <Avatar
+                        name={thread.creatorName}
+                        avatarUrl={thread.creatorAvatarUrl}
+                        size="md"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-[var(--color-ink-900)]">
                           {thread.creatorName}
@@ -812,7 +1837,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                         : "hover:bg-[var(--color-sea-50)]",
                     )}
                   >
-                    <Avatar name={name} size="md" />
+                    <Avatar
+                      name={name}
+                      avatarUrl={conversation.counterpart?.avatarUrl}
+                      size="md"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-1">
                         <p
@@ -937,8 +1966,10 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)]",
-          showMobileChat ? "flex" : "hidden md:flex",
+          "absolute inset-0 z-30 flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:transition-none",
+          showMobileChat
+            ? "translate-x-0 opacity-100"
+            : "translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto",
         )}
       >
         {feedback && (
@@ -948,7 +1979,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         )}
 
         {activeGroupId ? (
-          <div className="flex h-full flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <GroupChat
               groupId={activeGroupId}
               embedded
@@ -985,7 +2016,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
         ) : (
           <>
             {/* Conversation header */}
-            <div className="flex items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3">
+            <div
+              className={cn(
+                "relative z-20 shrink-0 items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3",
+                mobileMessengerMode ? "hidden md:flex" : "flex",
+              )}
+            >
               <button
                 type="button"
                 onClick={() => setShowMobileChat(false)}
@@ -993,10 +2029,26 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
               >
                 <ArrowLeft className="size-5" />
               </button>
-              <Avatar
-                name={activeConversation.counterpart?.fullName ?? "?"}
-                size="md"
-              />
+              {counterpartProfileHref ? (
+                <Link
+                  href={counterpartProfileHref}
+                  onClick={() => setDirectHeaderMenuOpen(false)}
+                  className="shrink-0"
+                  aria-label="Open profile"
+                >
+                  <Avatar
+                    name={activeConversation.counterpart?.fullName ?? "?"}
+                    avatarUrl={activeConversation.counterpart?.avatarUrl}
+                    size="md"
+                  />
+                </Link>
+              ) : (
+                <Avatar
+                  name={activeConversation.counterpart?.fullName ?? "?"}
+                  avatarUrl={activeConversation.counterpart?.avatarUrl}
+                  size="md"
+                />
+              )}
               <div className="min-w-0 flex-1">
                 {counterpartProfileHref ? (
                   <Link
@@ -1016,23 +2068,117 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                     : "Direct message"}
                 </p>
               </div>
-              {counterpartProfileHref && (
-                <Link
-                  href={counterpartProfileHref}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-sea-200)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--color-sea-700)] transition hover:bg-white"
+              <div className="relative shrink-0" ref={directHeaderMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDirectHeaderMenuOpen((open) => !open);
+                    setMobileHeaderMenuOpen(false);
+                  }}
+                  className="flex size-9 items-center justify-center rounded-full border border-[var(--color-sea-200)] bg-white/85 text-[var(--color-sea-700)] transition hover:bg-white"
+                  aria-label="Direct chat actions"
+                  aria-expanded={directHeaderMenuOpen}
                 >
-                  View profile
-                  <ChevronRight className="size-3.5" />
-                </Link>
-              )}
+                  <MoreVertical className="size-4.5" />
+                </button>
+                <div
+                  className={cn(
+                    "absolute right-0 top-11 z-[90] w-48 origin-top-right rounded-xl border border-[var(--color-sea-100)] bg-white p-1.5 shadow-[var(--shadow-lg)] transition-all duration-150",
+                    directHeaderMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={handleDirectPollAction}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    <BarChart3 className="size-4 text-[var(--color-sea-700)]" />
+                    Polls
+                  </button>
+                  {counterpartProfileHref && (
+                    <Link
+                      href={counterpartProfileHref}
+                      onClick={() => setDirectHeaderMenuOpen(false)}
+                      className="block rounded-lg px-3 py-2 text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                    >
+                      View profile
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearActiveDirectMessages}
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--color-ink-800)] transition hover:bg-[var(--color-sea-50)]"
+                  >
+                    Delete messages
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeActiveDirectConversation}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--color-sunset-700)] transition hover:bg-[var(--color-sunset-50)]"
+                  >
+                    <Trash2 className="size-4" />
+                    Delete chat
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
+              {/* Offer cards as messages */}
+              {dmOffers.length > 0 && (
+                <div className="space-y-3 pb-1">
+                  {dmOffers.map((offer) => (
+                    <div key={`dm-offer-${offer.id}`} className="flex justify-start">
+                      <div className="w-full max-w-[92%] sm:max-w-[75%]">
+                        <p className="mb-1 pl-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)]">
+                          {offer.agency?.name ?? "Agency"} · Offer
+                        </p>
+                        <div className="overflow-hidden rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 shadow-sm">
+                          <OfferCard
+                            compact
+                            offer={offer}
+                            isCreator={variant === "user"}
+                            isAgency={variant === "agency"}
+                            onAccept={handleDmAcceptOffer}
+                            onCounter={(offerId, seedPrice) => {
+                              setDmCounterSheetOfferId(offerId);
+                              setDmCounterSheetInitialPrice(seedPrice ?? null);
+                            }}
+                            onReject={handleDmRejectOffer}
+                            onWithdraw={handleDmWithdrawOffer}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(syncingMessages || messageSyncIssue || (socket && !isSocketConnected)) && (
+                <div className="sticky top-0 z-10 mx-auto mb-3 w-fit rounded-full border border-[var(--color-sea-200)] bg-white/85 px-3 py-1 text-[11px] text-[var(--color-sea-700)] shadow-[var(--shadow-sm)] backdrop-blur">
+                  {messageSyncIssue
+                    ? messageSyncIssue
+                    : syncingMessages
+                    ? "Syncing latest messages…"
+                    : "Realtime reconnecting…"}
+                </div>
+              )}
               {loadingMessages ? (
-                <p className="py-10 text-center text-sm text-[var(--color-ink-400)]">
-                  Loading messages…
-                </p>
+                <div className="space-y-3 py-6">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <div
+                      key={`dm-skeleton-${idx}`}
+                      className={cn("flex", idx % 2 === 0 ? "justify-start" : "justify-end")}
+                    >
+                      <div className="w-[68%] max-w-[360px] animate-pulse rounded-2xl border border-white/70 bg-white/70 px-3 py-3">
+                        <div className="h-2.5 w-3/4 rounded bg-[var(--color-ink-200)]/70" />
+                        <div className="mt-2 h-2.5 w-1/2 rounded bg-[var(--color-ink-200)]/60" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : messages.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-sm text-[var(--color-ink-400)]">
@@ -1078,11 +2224,12 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                               mine
                                 ? "rounded-tr-[6px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
                                 : "rounded-tl-[6px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
+                              message.deliveryState === "failed" && "border-[var(--color-sunset-400)]",
                             )}
                           >
                             {/* Reply quote */}
-                            {(message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata?.replyTo ? (() => {
-                              const rt = (message as DirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata!.replyTo!;
+                            {(message as LocalDirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata?.replyTo ? (() => {
+                              const rt = (message as LocalDirectMessage & { metadata?: { replyTo?: { senderName?: string; content?: string } } }).metadata!.replyTo!;
                               return (
                                 <div className={cn("mb-2 rounded-[10px] border-l-2 px-2.5 py-1.5", mine ? "border-white/50 bg-black/10" : "border-[var(--color-sea-400)] bg-[var(--color-sea-50)]")}>
                                   <p className={cn("text-[10px] font-semibold", mine ? "text-white/70" : "text-[var(--color-sea-700)]")}>{rt.senderName ?? ""}</p>
@@ -1099,7 +2246,11 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                                 mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
                               )}
                             >
-                              {format(new Date(message.createdAt), "HH:mm")}
+                              {message.deliveryState === "pending"
+                                ? "Sending…"
+                                : message.deliveryState === "failed"
+                                ? "Failed"
+                                : format(new Date(message.createdAt), "HH:mm")}
                             </p>
                           </div>
                           {!mine && (
@@ -1132,7 +2283,7 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
             </div>
 
             {/* Input bar */}
-            <div className="border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
+            <div className="shrink-0 border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
               {/* Reply preview */}
               {replyTo && (
                 <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
@@ -1189,17 +2340,36 @@ export function InboxChatbox({ variant }: { variant: "user" | "agency" }) {
                   type="button"
                   size="icon"
                   onClick={sendDirectMessage}
-                  disabled={isPending || !draft.trim()}
+                  disabled={!draft.trim()}
                   className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
                 >
                   <Send className="size-3.5" />
                 </Button>
               </div>
             </div>
+            {/* Counter offer sheet for DM offers */}
+            {dmCounterSheetOfferId !== null && (
+              <CounterOfferSheet
+                open
+                onClose={() => {
+                  setDmCounterSheetOfferId(null);
+                  setDmCounterSheetInitialPrice(null);
+                }}
+                onSubmit={async (payload) => {
+                  if (!dmCounterSheetOfferId) return;
+                  await handleDmCounterOffer(dmCounterSheetOfferId, payload);
+                }}
+                currentPrice={dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.pricePerPerson ?? 0}
+                initialPrice={dmCounterSheetInitialPrice ?? undefined}
+                counterRound={(dmOffers.find((o) => o.id === dmCounterSheetOfferId)?.negotiations?.length ?? 0) + 1}
+                maxRounds={3}
+                embedded
+              />
+            )}
           </>
         )}
       </div>
       </div>
-    </>
+    </div>
   );
 }
