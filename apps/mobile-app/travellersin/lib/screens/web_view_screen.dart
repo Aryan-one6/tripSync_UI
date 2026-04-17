@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class MainWebView extends StatefulWidget {
@@ -12,9 +13,16 @@ class _MainWebViewState extends State<MainWebView> {
   InAppWebViewController?
   _webViewController; // Handles navigation inside the webview
   bool isLoading = true;
+
   @override
   void initState() {
     super.initState();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
   }
 
   @override
@@ -53,7 +61,10 @@ class _MainWebViewState extends State<MainWebView> {
                 },
               ),
 
-              if (isLoading) const Center(child: CircularProgressIndicator(color: Color(0XFF30c99d),)),
+              if (isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: Color(0XFF30c99d)),
+                ),
             ],
           ),
         ),
