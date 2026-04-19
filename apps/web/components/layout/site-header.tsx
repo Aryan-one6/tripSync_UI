@@ -235,7 +235,7 @@ export function SiteHeader() {
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center">
             <Image
-              src="/brand/travellersin.png"
+              src={isTransparent ? "/brand/travellersin-light.png" : "/brand/travellersin.png"}
               alt="TravellersIn"
               width={312}
               height={92}
@@ -255,12 +255,13 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  style={isTransparent ? { color: "#ffffff" } : undefined}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     isTransparent
                       ? active
-                        ? "bg-white/20 text-white"
-                        : "text-white/80 hover:bg-white/15 hover:text-white"
+                        ? "bg-white/20 !text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
+                        : "!text-white hover:bg-white/15 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
                       : active
                         ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
                         : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
@@ -398,10 +399,16 @@ export function SiteHeader() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="ghost" size="sm" className={isTransparent ? "text-white hover:bg-white/15" : ""}>Log In</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={isTransparent ? "text-white hover:bg-white/15" : ""}
+                  >
+                    Log In
+                  </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button size="sm" className={isTransparent ? "border border-white/30 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25" : ""}>
+                  <Button size="sm">
                     <UserRoundPlus className="size-4" />
                     Sign Up
                   </Button>
@@ -414,10 +421,10 @@ export function SiteHeader() {
             <button
               type="button"
               className={cn(
-                "flex size-10 items-center justify-center rounded-xl border shadow-sm transition-colors md:hidden",
+                "flex size-10 items-center justify-center  md:hidden",
                 isTransparent
-                  ? "border-white/20 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
-                  : "border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] hover:bg-[var(--color-surface-2)]"
+                  ? " text-white "
+                  : " text-[var(--color-ink-700)] "
               )}
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"

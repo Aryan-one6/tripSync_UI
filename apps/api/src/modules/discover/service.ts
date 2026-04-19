@@ -275,23 +275,35 @@ async function getDiscoverCursorRow(
 }
 
 function getSearchRankExpression(term: string): Prisma.Sql {
+  const likeTerm = `%${term}%`;
   return Prisma.sql`
-    ts_rank_cd(
-      to_tsvector(
-        'simple',
-        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-      ),
-      websearch_to_tsquery('simple', ${term})
+    (
+      ts_rank_cd(
+        to_tsvector(
+          'simple',
+          concat_ws(' ', title, destination, COALESCE("destinationState", ''))
+        ),
+        websearch_to_tsquery('simple', ${term})
+      )
+      + CASE WHEN title ILIKE ${likeTerm} THEN 0.8 ELSE 0 END
+      + CASE WHEN destination ILIKE ${likeTerm} THEN 0.5 ELSE 0 END
+      + CASE WHEN COALESCE("destinationState", '') ILIKE ${likeTerm} THEN 0.3 ELSE 0 END
     )
   `;
 }
 
 function getSearchFilter(term: string): Prisma.Sql {
+  const likeTerm = `%${term}%`;
   return Prisma.sql`
-    to_tsvector(
-      'simple',
-      concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-    ) @@ websearch_to_tsquery('simple', ${term})
+    (
+      to_tsvector(
+        'simple',
+        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
+      ) @@ websearch_to_tsquery('simple', ${term})
+      OR title ILIKE ${likeTerm}
+      OR destination ILIKE ${likeTerm}
+      OR COALESCE("destinationState", '') ILIKE ${likeTerm}
+    )
   `;
 }
 
@@ -305,10 +317,7 @@ async function getSearchCursorRow(cursorId: string, term: string): Promise<Curso
       ${rankExpr} AS "sortValue"
     FROM discover_feed
     WHERE id = ${cursorId}
-      AND to_tsvector(
-        'simple',
-        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-      ) @@ websearch_to_tsquery('simple', ${term})
+      AND ${getSearchFilter(term)}
     LIMIT 1
   `);
 
