@@ -280,15 +280,15 @@ export function SiteHeader() {
                 <button
                   type="button"
                   onClick={() => setNotificationMenuOpen((v) => !v)}
-                  className="relative flex size-9 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
+                  className={cn(
+                    "relative flex size-9 items-center justify-center rounded-full transition",
+                    isTransparent
+                      ? "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] hover:bg-white/15 hover:text-white"
+                      : "text-[var(--color-ink-500)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]",
+                  )}
                   aria-label="Notifications"
                 >
-                  <Bell className={cn("size-4", isTransparent
-                    ? "border-b border-transparent bg-transparent shadow-none"
-                    : "border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
-                    isMobileMessengerRoute && "hidden md:block",
-                  )}>
-                     </Bell> "
+                  <Bell className="size-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -345,85 +345,93 @@ export function SiteHeader() {
                 <>
                   <WalletMenu />
                   <div ref={avatarRef} className="flex items-center gap-2">
-                    <Link href={inboxHref}>
-                      <Button type="button" variant="ghost" size="sm">
-                        <span className="relative">
-                          <Inbox className="size-4" />
-                          {unreadDirectCount > 0 && (
-                            <span className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
-                              {unreadDirectCount > 9 ? "9+" : unreadDirectCount}
-                            </span>
-                          )}
-                        </span>
-                        Inbox
-                      </Button>
-                    </Link>
-                    {!isAgency && (
-                      <Link href="/dashboard/refer-and-earn">
-                        <Button type="button" variant="soft" size="sm">
-                          <Gift className="size-4" />
-                          Refer &amp; Earn
-                        </Button>
-                      </Link>
+                <Link href={inboxHref}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      isTransparent &&
+                        "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] hover:bg-white/15 hover:text-white",
                     )}
+                  >
+                    <span className="relative">
+                      <Inbox className="size-4" />
+                      {unreadDirectCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
+                          {unreadDirectCount > 9 ? "9+" : unreadDirectCount}
+                        </span>
+                      )}
+                    </span>
+                    Inbox
+                  </Button>
+                </Link>
+                {!isAgency && (
+                  <Link href="/dashboard/refer-and-earn">
+                    <Button type="button" variant="soft" size="sm">
+                      <Gift className="size-4" />
+                      Refer &amp; Earn
+                    </Button>
+                  </Link>
+                )}
 
-                    {/* Avatar dropdown */}
-                    <div className="relative">
+                {/* Avatar dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAvatarMenuOpen((v) => !v)}
+                    className="flex items-center rounded-full border border-[var(--color-border)] shadow-[var(--shadow-sm)] transition hover:shadow-[var(--shadow-md)]"
+                    aria-label="Account menu"
+                  >
+                    <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={9} />
+                  </button>
+                  {avatarMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-white py-1.5 shadow-[var(--shadow-lg)] animate-scale-in">
+                      <div className="border-b border-[var(--color-border)] px-4 pb-2 pt-1">
+                        <p className="truncate text-xs font-semibold text-[var(--color-ink-950)]">{userName}</p>
+                        <p className="truncate text-[11px] text-[var(--color-ink-500)]">{userEmail}</p>
+                      </div>
+                      <Link href={dashboardHref} className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]">
+                        <LayoutDashboard className="size-4 text-[var(--color-sea-600)]" />
+                        {isAgency ? "Agency Dashboard" : "Dashboard"}
+                      </Link>
+                      <Link href={settingsHref} className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]">
+                        <Settings className="size-4 text-[var(--color-sea-600)]" />
+                        Settings
+                      </Link>
+                      <div className="my-1 border-t border-[var(--color-border)]" />
                       <button
                         type="button"
-                        onClick={() => setAvatarMenuOpen((v) => !v)}
-                        className="flex items-center rounded-full border border-[var(--color-border)] shadow-[var(--shadow-sm)] transition hover:shadow-[var(--shadow-md)]"
-                        aria-label="Account menu"
+                        onClick={() => { setAvatarMenuOpen(false); logout(); }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-sunset-600)] transition hover:bg-[var(--color-sunset-50)]"
                       >
-                        <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={9} />
+                        <LogOut className="size-4" />
+                        Logout
                       </button>
-                      {avatarMenuOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[var(--color-border)] bg-white py-1.5 shadow-[var(--shadow-lg)] animate-scale-in">
-                          <div className="border-b border-[var(--color-border)] px-4 pb-2 pt-1">
-                            <p className="truncate text-xs font-semibold text-[var(--color-ink-950)]">{userName}</p>
-                            <p className="truncate text-[11px] text-[var(--color-ink-500)]">{userEmail}</p>
-                          </div>
-                          <Link href={dashboardHref} className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]">
-                            <LayoutDashboard className="size-4 text-[var(--color-sea-600)]" />
-                            {isAgency ? "Agency Dashboard" : "Dashboard"}
-                          </Link>
-                          <Link href={settingsHref} className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]">
-                            <Settings className="size-4 text-[var(--color-sea-600)]" />
-                            Settings
-                          </Link>
-                          <div className="my-1 border-t border-[var(--color-border)]" />
-                          <button
-                            type="button"
-                            onClick={() => { setAvatarMenuOpen(false); logout(); }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-sunset-600)] transition hover:bg-[var(--color-sunset-50)]"
-                          >
-                            <LogOut className="size-4" />
-                            Logout
-                          </button>
-                        </div>
-                      )}
                     </div>
+                  )}
+                </div>
                   </div>
                 </>
-              ) : (
-                <>
-                  <Link href="/login">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={isTransparent ? "text-white hover:bg-white/15" : ""}
-                    >
-                      Log In
-                    </Button>
-                  </Link>
-                  <Link href="/signup">
-                    <Button size="sm">
-                      <UserRoundPlus className="size-4" />
-                      Sign Up
-                    </Button>
-                  </Link>
-                </>
-              )}
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={isTransparent ? "text-white hover:bg-white/15" : ""}
+                  >
+                    Log In
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm">
+                    <UserRoundPlus className="size-4" />
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
             </div>
 
             {/* Mobile: hamburger */}
@@ -454,156 +462,156 @@ export function SiteHeader() {
           aria-modal="true"
           role="dialog"
         >
-          <div
-            className={cn(
-              "absolute inset-0 bg-[var(--color-ink-950)]/50 backdrop-blur-sm transition-opacity duration-200",
-              sidebarOpen ? "opacity-100" : "opacity-0",
-            )}
-            onClick={() => setSidebarOpen(false)}
-          />
+        <div
+          className={cn(
+            "absolute inset-0 bg-[var(--color-ink-950)]/50 backdrop-blur-sm transition-opacity duration-200",
+            sidebarOpen ? "opacity-100" : "opacity-0",
+          )}
+          onClick={() => setSidebarOpen(false)}
+        />
 
-          <div
-            className={cn(
-              "absolute inset-y-0 left-0 flex w-[86vw] max-w-[340px] flex-col border-r border-[var(--color-border)] bg-white shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out",
-              sidebarOpen ? "translate-x-0" : "-translate-x-full",
-            )}
-          >
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4">
-              <Image
-                src="/brand/travellersin.png"
-                alt="TravellersIn"
-                width={312}
-                height={92}
-                className="h-7 w-auto"
-              />
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(false)}
-                className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-600)]"
-                aria-label="Close menu"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+        <div
+          className={cn(
+            "absolute inset-y-0 left-0 flex w-[86vw] max-w-[340px] flex-col border-r border-[var(--color-border)] bg-white shadow-[var(--shadow-xl)] transition-transform duration-300 ease-out",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4">
+            <Image
+              src="/brand/travellersin.png"
+              alt="TravellersIn"
+              width={312}
+              height={92}
+              className="h-7 w-auto"
+            />
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="flex size-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-600)]"
+              aria-label="Close menu"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
 
-            <div className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-              {status === "authenticated" && session ? (
-                <>
-                  <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-3">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={10} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-[var(--color-ink-950)]">{userName}</p>
-                        <p className="truncate text-[11px] text-[var(--color-ink-500)]">{userEmail}</p>
-                      </div>
-                      {unreadCount > 0 && (
-                        <span className="ml-auto flex min-w-5 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                          {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
-                      )}
+          <div className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+            {status === "authenticated" && session ? (
+              <>
+                <div className="mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar name={userName} avatarUrl={userAvatarUrl} size={10} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[var(--color-ink-950)]">{userName}</p>
+                      <p className="truncate text-[11px] text-[var(--color-ink-500)]">{userEmail}</p>
                     </div>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto flex min-w-5 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
                   </div>
+                </div>
 
-                  <div className="mb-1 flex items-center gap-2 px-3">
-                    <div className="flex size-6 items-center justify-center rounded-md bg-[var(--color-surface-2)] text-[var(--color-ink-700)]">
-                      <SidebarIcon className="size-3.5" />
-                    </div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-ink-400)]">
-                      {sidebarTitle}
-                    </p>
+                <div className="mb-1 flex items-center gap-2 px-3">
+                  <div className="flex size-6 items-center justify-center rounded-md bg-[var(--color-surface-2)] text-[var(--color-ink-700)]">
+                    <SidebarIcon className="size-3.5" />
                   </div>
-
-                  {mainNav.map((item) => (
-                    <SidebarNavItem
-                      key={item.href}
-                      href={item.href === "/discover" ? discoverHref : item.href}
-                      label={item.label}
-                      icon={item.icon}
-                      pathname={pathname}
-                      onClick={() => setSidebarOpen(false)}
-                    />
-                  ))}
-
-                  <div className="my-2 border-t border-[var(--color-border)]" />
-                  <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-ink-400)]">
-                    Account
+                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-ink-400)]">
+                    {sidebarTitle}
                   </p>
+                </div>
 
-                  {secondaryNav.map((item) => (
-                    <SidebarNavItem
-                      key={item.href}
-                      {...item}
-                      pathname={pathname}
-                      onClick={() => setSidebarOpen(false)}
-                    />
-                  ))}
+                {mainNav.map((item) => (
+                  <SidebarNavItem
+                    key={item.href}
+                    href={item.href === "/discover" ? discoverHref : item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    pathname={pathname}
+                    onClick={() => setSidebarOpen(false)}
+                  />
+                ))}
 
-                  <div className="my-2 border-t border-[var(--color-border)]" />
+                <div className="my-2 border-t border-[var(--color-border)]" />
+                <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-ink-400)]">
+                  Account
+                </p>
 
-                  {publicNavLinks.map((link) => {
-                    const activePath = link.href.split("?")[0] ?? link.href;
-                    const active =
-                      pathname === activePath ||
-                      pathname.startsWith(`${activePath}/`);
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setSidebarOpen(false)}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
-                          active
-                            ? "border-[var(--color-sea-100)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
-                            : "border-transparent text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)]",
-                        )}
-                      >
-                        <Compass className="size-4 shrink-0" />
-                        {link.label}
-                      </Link>
-                    );
-                  })}
-                </>
-              ) : (
-                <>
-                  {publicNavLinks.map((link) => (
+                {secondaryNav.map((item) => (
+                  <SidebarNavItem
+                    key={item.href}
+                    {...item}
+                    pathname={pathname}
+                    onClick={() => setSidebarOpen(false)}
+                  />
+                ))}
+
+                <div className="my-2 border-t border-[var(--color-border)]" />
+
+                {publicNavLinks.map((link) => {
+                  const activePath = link.href.split("?")[0] ?? link.href;
+                  const active =
+                    pathname === activePath ||
+                    pathname.startsWith(`${activePath}/`);
+                  return (
                     <Link
                       key={link.href}
                       href={link.href}
                       onClick={() => setSidebarOpen(false)}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                        active
+                          ? "border-[var(--color-sea-100)] bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                          : "border-transparent text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)]",
+                      )}
                     >
                       <Compass className="size-4 shrink-0" />
                       {link.label}
                     </Link>
-                  ))}
-                  <div className="mt-4 space-y-2 px-1">
-                    <Link href="/login" onClick={() => setSidebarOpen(false)}>
-                      <Button variant="ghost" className="w-full">Log In</Button>
-                    </Link>
-                    <Link href="/signup/traveler" onClick={() => setSidebarOpen(false)}>
-                      <Button className="w-full">
-                        <UserRoundPlus className="size-4" />
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {status === "authenticated" && session && (
-              <div className="safe-bottom shrink-0 border-t border-[var(--color-border)] px-3 py-3">
-                <button
-                  type="button"
-                  onClick={() => { setSidebarOpen(false); logout(); }}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-sunset-600)] transition hover:bg-[var(--color-sunset-50)]"
-                >
-                  <LogOut className="size-4" />
-                  Logout
-                </button>
-              </div>
+                  );
+                })}
+              </>
+            ) : (
+              <>
+                {publicNavLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-ink-700)] transition hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Compass className="size-4 shrink-0" />
+                    {link.label}
+                  </Link>
+                ))}
+                <div className="mt-4 space-y-2 px-1">
+                  <Link href="/login" onClick={() => setSidebarOpen(false)}>
+                    <Button variant="ghost" className="w-full">Log In</Button>
+                  </Link>
+                  <Link href="/signup/traveler" onClick={() => setSidebarOpen(false)}>
+                    <Button className="w-full">
+                      <UserRoundPlus className="size-4" />
+                      Sign Up
+                    </Button>
+                  </Link>
+                </div>
+              </>
             )}
           </div>
+
+          {status === "authenticated" && session && (
+            <div className="safe-bottom shrink-0 border-t border-[var(--color-border)] px-3 py-3">
+              <button
+                type="button"
+                onClick={() => { setSidebarOpen(false); logout(); }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-sunset-600)] transition hover:bg-[var(--color-sunset-50)]"
+              >
+                <LogOut className="size-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
         </div>
       )}
     </>

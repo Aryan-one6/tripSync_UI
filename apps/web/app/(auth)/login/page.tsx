@@ -26,6 +26,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
     params.signup === "traveler" ? "Account created! Sign in to start exploring." :
     params.signup === "agency" ? "Agency account created. Sign in to your dashboard." :
     undefined;
+  const referralCode =
+    typeof params.ref === "string" && /^[A-Za-z0-9]{6,8}$/.test(params.ref.trim())
+      ? params.ref.trim().toUpperCase()
+      : "";
 
   return (
     <div className="min-h-[100dvh] grid lg:grid-cols-[1fr_480px]">
@@ -103,7 +107,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
 
         <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
           <div className="w-full max-w-sm">
-            <LoginForm nextPath={nextPath} defaultIdentifier={defaultIdentifier} successMessage={successMessage} />
+            <LoginForm
+              nextPath={nextPath}
+              defaultIdentifier={defaultIdentifier}
+              successMessage={successMessage}
+              referralCode={referralCode}
+            />
           </div>
         </div>
 

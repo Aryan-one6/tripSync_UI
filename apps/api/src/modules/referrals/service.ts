@@ -107,10 +107,18 @@ async function generateUniqueReferralCode(): Promise<string> {
 
   do {
     code = generateReferralCode();
-    const exists = await prisma.referralLink.findUnique({
-      where: { code },
-    });
-    if (!exists) break;
+    const [existingLink, existingUserCode] = await Promise.all([
+      prisma.referralLink.findUnique({
+        where: { code },
+        select: { id: true },
+      }),
+      prisma.user.findFirst({
+        where: { referralCode: code },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!existingLink && !existingUserCode) break;
     attempts++;
   } while (attempts < maxAttempts);
 
@@ -121,41 +129,76 @@ async function generateUniqueReferralCode(): Promise<string> {
   return code;
 }
 
+function buildReferralShareUrls(code: string) {
+  const webUrl = process.env.WEB_URL || 'https://tripsync.app';
+  const shareUrl = `${webUrl}/signup?ref=${code}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+  return { shareUrl, qrUrl };
+}
+
+function getDefaultReferralExpiry() {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + REFERRAL_LINK_EXPIRY_DAYS);
+  return expiresAt;
+}
+
 /**
- * Generate a new referral link for a user.
- * Returns the code and a shareable URL.
+ * Returns a stable personal referral link for the user.
+ * One user keeps one code, and that code can be reused for multiple invites.
  */
-export async function generateReferralLink(userId: string) {
-  // Verify user exists
+export async function getOrCreateReferralLink(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true },
+    select: { id: true, referralCode: true },
   });
 
   if (!user) {
     throw new NotFoundError('User not found');
   }
 
-  // Generate unique code
-  const code = await generateUniqueReferralCode();
+  let code = user.referralCode ? normalizeReferralCode(user.referralCode) : '';
 
-  // Calculate expiry (90 days from now)
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + REFERRAL_LINK_EXPIRY_DAYS);
+  if (!code) {
+    const existingLink = await prisma.referralLink.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      select: { code: true },
+    });
 
-  // Create referral link
-  const link = await prisma.referralLink.create({
-    data: {
-      userId,
-      code,
-      expiresAt,
-    },
+    code = existingLink?.code ?? (await generateUniqueReferralCode());
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { referralCode: code },
+    });
+  }
+
+  const now = new Date();
+  let link = await prisma.referralLink.findFirst({
+    where: { userId, code },
+    orderBy: { createdAt: 'asc' },
   });
 
-  // Build shareable URL
-  const webUrl = process.env.WEB_URL || 'https://tripsync.app';
-  const shareUrl = `${webUrl}/signup?ref=${code}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+  if (!link) {
+    link = await prisma.referralLink.create({
+      data: {
+        userId,
+        code,
+        expiresAt: getDefaultReferralExpiry(),
+      },
+    });
+  } else if (link.expiresAt <= now || link.usedAt || link.usedByUserId) {
+    link = await prisma.referralLink.update({
+      where: { id: link.id },
+      data: {
+        expiresAt: getDefaultReferralExpiry(),
+        usedAt: null,
+        usedByUserId: null,
+      },
+    });
+  }
+
+  const { shareUrl, qrUrl } = buildReferralShareUrls(code);
 
   return {
     id: link.id,
@@ -164,6 +207,14 @@ export async function generateReferralLink(userId: string) {
     qrUrl,
     expiresAt: link.expiresAt,
   };
+}
+
+/**
+ * Generate a new referral link for a user.
+ * Returns the code and a shareable URL.
+ */
+export async function generateReferralLink(userId: string) {
+  return getOrCreateReferralLink(userId);
 }
 
 /**
@@ -182,21 +233,28 @@ export async function validateReferralCode(
     return null;
   }
 
-  const now = new Date();
+  const byUserCode = await prisma.user.findFirst({
+    where: { referralCode: normalizedCode },
+    select: { id: true, email: true, isActive: true },
+  });
+
+  if (byUserCode?.isActive) {
+    return {
+      referrerId: byUserCode.id,
+      referrerEmail: byUserCode.email,
+    };
+  }
 
   const link = await prisma.referralLink.findUnique({
     where: { code: normalizedCode },
     include: {
       user: {
-        select: { id: true, email: true },
+        select: { id: true, email: true, isActive: true },
       },
     },
   });
 
-  // Not found, expired, or already used
-  if (!link) return null;
-  if (link.expiresAt < now) return null;
-  if (link.usedAt !== null) return null;
+  if (!link || !link.user.isActive) return null;
 
   return {
     referrerId: link.user.id,
@@ -218,7 +276,6 @@ export async function registerReferralInvite(input: {
   }
 
   const inviteResult = await prisma.$transaction(async (tx) => {
-    const now = new Date();
     const idempotencyKey = `referral_invite:${referrerId}:${referredUserId}`;
 
     const existing = await tx.referralTransaction.findUnique({
@@ -251,19 +308,8 @@ export async function registerReferralInvite(input: {
           },
         });
 
-    if (input.referralLinkId) {
-      await tx.referralLink.updateMany({
-        where: {
-          id: input.referralLinkId,
-          userId: referrerId,
-          usedByUserId: null,
-          expiresAt: { gt: now },
-        },
-        data: {
-          usedByUserId: referredUserId,
-        },
-      });
-    }
+    // Intentionally do not "consume" referral link here.
+    // A user's referral code should be stable and reusable across invites.
 
     return {
       referralTransactionId: referralTx.id,
@@ -382,17 +428,6 @@ export async function completeReferral(referrerId: string, referredUserId: strin
         `wallet_referral_credit_referred:${referralTx.id}:${referredUserId}`,
       ),
     ]);
-
-    await tx.referralLink.updateMany({
-      where: {
-        userId: referrerId,
-        usedByUserId: referredUserId,
-        usedAt: null,
-      },
-      data: {
-        usedAt: new Date(),
-      },
-    });
 
     return {
       alreadyCompleted: false,

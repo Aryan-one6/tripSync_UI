@@ -178,7 +178,7 @@ export default async function DiscoverPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-10">
-          <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-[var(--shadow-md)] sm:p-6">
+          <section className="  p-4 sm:p-6">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">

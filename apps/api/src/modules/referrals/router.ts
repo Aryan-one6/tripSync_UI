@@ -20,11 +20,22 @@ referralsRouter.get(
 
 // ─── User-to-User Referrals ───────────────────────────────────────────────────
 
+// GET /referrals/my-link — Get stable personal referral link
+referralsRouter.get(
+  '/my-link',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const link = await referralService.getOrCreateReferralLink(req.userId!);
+    res.json({ data: link });
+  }),
+);
+
 // POST /referrals/generate-link — Generate a new referral link
 referralsRouter.post(
   '/generate-link',
   authenticate,
   asyncHandler(async (req, res) => {
+    // Backward-compatible route: now returns stable personal link instead of rotating code.
     const link = await referralService.generateReferralLink(req.userId!);
     res.json({ data: link });
   }),

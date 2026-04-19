@@ -26,6 +26,10 @@ const VIBES = [
 export default async function TravelerSignupPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const nextPath = typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/discover?audience=traveler";
+  const referralCode =
+    typeof params.ref === "string" && /^[A-Za-z0-9]{6,8}$/.test(params.ref.trim())
+      ? params.ref.trim().toUpperCase()
+      : "";
 
   return (
     <div className="min-h-[100dvh] grid lg:grid-cols-[1fr_520px]">
@@ -85,12 +89,17 @@ export default async function TravelerSignupPage({ searchParams }: { searchParam
         {/* Mobile brand */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 lg:hidden">
           <Link href="/" className="font-display text-lg font-black text-gray-950">TravellersIn</Link>
-          <Link href="/login" className="text-sm font-semibold text-emerald-600">Sign In</Link>
+          <Link
+            href={`/login${referralCode ? `?ref=${encodeURIComponent(referralCode)}` : ""}`}
+            className="text-sm font-semibold text-emerald-600"
+          >
+            Sign In
+          </Link>
         </div>
 
         <div className="flex flex-1 items-start justify-center p-4 sm:p-7 sm:pt-8">
           <div className="w-full max-w-md">
-            <TravelerSignupForm nextPath={nextPath} />
+            <TravelerSignupForm nextPath={nextPath} initialReferralCode={referralCode} />
           </div>
         </div>
 

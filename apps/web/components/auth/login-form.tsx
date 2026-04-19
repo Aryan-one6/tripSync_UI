@@ -25,10 +25,12 @@ export function LoginForm({
   nextPath = "/",
   defaultIdentifier = "",
   successMessage,
+  referralCode = "",
 }: {
   nextPath?: string;
   defaultIdentifier?: string;
   successMessage?: string;
+  referralCode?: string;
 }) {
   const router = useRouter();
   const { login } = useAuth();
@@ -42,8 +44,11 @@ export function LoginForm({
     defaultValues: { identifier: defaultIdentifier, password: "" },
   });
 
-  const travelerSignupHref = `/signup/traveler?next=${encodeURIComponent(nextPath)}`;
-  const agencySignupHref = `/signup/agency?next=${encodeURIComponent(nextPath)}`;
+  const signupQuery = new URLSearchParams();
+  signupQuery.set("next", nextPath);
+  if (referralCode) signupQuery.set("ref", referralCode);
+  const travelerSignupHref = `/signup/traveler?${signupQuery.toString()}`;
+  const agencySignupHref = `/signup/agency?${signupQuery.toString()}`;
 
   return (
     <div className="w-full">

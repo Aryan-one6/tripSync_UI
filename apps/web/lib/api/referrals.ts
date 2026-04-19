@@ -51,7 +51,18 @@ export interface ReferralMetrics extends ReferralStats {
 // ─── Public API calls ────────────────────────────────────────────────────────
 
 /**
- * Generate a new referral link for the current user
+ * Get stable referral link for the current user
+ */
+export async function getMyReferralLink(token: string): Promise<ReferralLink> {
+  return apiFetch("/referrals/my-link", {
+    token,
+    method: "GET",
+  });
+}
+
+/**
+ * Backward-compatible alias.
+ * Server now returns a stable personal link instead of generating a new code each call.
  */
 export async function generateReferralLink(token: string): Promise<ReferralLink> {
   return apiFetch("/referrals/generate-link", {
@@ -110,6 +121,22 @@ export async function getMyReferralsSafe(
     token,
     method: "GET",
     query: { page, pageSize },
+  });
+}
+
+export async function getMyReferralLinkSafe(
+  token: string,
+  fallback: ReferralLink = {
+    id: "",
+    code: "",
+    shareUrl: "",
+    qrUrl: "",
+    expiresAt: "",
+  },
+): Promise<ReferralLink> {
+  return safeApiFetch("/referrals/my-link", fallback, {
+    token,
+    method: "GET",
   });
 }
 

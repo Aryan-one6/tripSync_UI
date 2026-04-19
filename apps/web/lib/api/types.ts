@@ -238,6 +238,7 @@ export interface PackageDetails {
 export interface UserProfile extends UserSummary {
   phone: string;
   email?: string | null;
+  referralCode?: string | null;
   travelPreferences?: string | null;
   bio?: string | null;
   dateOfBirth?: string | null;

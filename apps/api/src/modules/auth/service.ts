@@ -259,19 +259,21 @@ export async function signupTraveler(data: TravelerSignupInput) {
   let referralLinkId: string | null = null;
   const referralCode = data.referralCode?.trim();
   if (referralCode) {
-    const { assertValidReferralCodeFormat } = await import('../referrals/service.js');
+    const { assertValidReferralCodeFormat, validateReferralCode } = await import('../referrals/service.js');
     const normalizedCode = assertValidReferralCodeFormat(referralCode);
-    const referralLink = await prisma.referralLink.findUnique({
-      where: { code: normalizedCode },
-      select: { id: true, userId: true, expiresAt: true, usedAt: true },
-    });
+    const validatedReferral = await validateReferralCode(normalizedCode);
 
-    if (!referralLink || referralLink.expiresAt <= new Date() || referralLink.usedAt) {
+    if (!validatedReferral) {
       throw new BadRequestError('Referral code is invalid or expired');
     }
 
-    inviterUserId = referralLink.userId;
-    referralLinkId = referralLink.id;
+    inviterUserId = validatedReferral.referrerId;
+
+    const existingLink = await prisma.referralLink.findUnique({
+      where: { code: normalizedCode },
+      select: { id: true },
+    });
+    referralLinkId = existingLink?.id ?? null;
   }
 
   const passwordHash = await hashPassword(data.password);
@@ -323,6 +325,9 @@ export async function signupTraveler(data: TravelerSignupInput) {
     });
   }
 
+  const { getOrCreateReferralLink } = await import('../referrals/service.js');
+  await getOrCreateReferralLink(user.id);
+
   // Referral bonus credits are granted in updateProfile() after profile completion.
 
   return {
@@ -369,7 +374,7 @@ export async function signupAgency(data: AgencySignupInput) {
     }
   }
 
-  await prisma.$transaction(async (tx) => {
+  const user = await prisma.$transaction(async (tx) => {
     const user = existingUser
       ? await tx.user.update({
           where: { id: existingUser.id },
@@ -450,6 +455,9 @@ export async function signupAgency(data: AgencySignupInput) {
 
     return user;
   });
+
+  const { getOrCreateReferralLink } = await import('../referrals/service.js');
+  await getOrCreateReferralLink(user.id);
 
   return {
     message: 'Agency account created successfully. Please log in.',

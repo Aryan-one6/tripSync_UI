@@ -17,7 +17,19 @@ const AGENCY_PERKS = [
   "GST-grade payouts via secure escrow",
 ];
 
-export default async function SignupPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function SignupPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const nextParam = typeof params.next === "string" ? params.next : "";
+  const refParam = typeof params.ref === "string" && /^[A-Za-z0-9]{6,8}$/.test(params.ref.trim())
+      ? params.ref.trim().toUpperCase()
+      : "";
+  const commonQuery = new URLSearchParams();
+  if (nextParam.startsWith("/")) commonQuery.set("next", nextParam);
+  if (refParam) commonQuery.set("ref", refParam);
+  const querySuffix = commonQuery.toString() ? `?${commonQuery.toString()}` : "";
+
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 flex flex-col items-center justify-center px-4 py-12">
       {/* Brand */}
@@ -38,7 +50,7 @@ export default async function SignupPage() {
       {/* Cards */}
       <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-2">
         {/* Traveler card */}
-        <Link href="/signup/traveler"
+        <Link href={`/signup/traveler${querySuffix}`}
           className="group relative flex flex-col overflow-hidden rounded-2xl border-2 border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:-translate-y-0.5"
         >
           {/* Icon */}
@@ -74,7 +86,7 @@ export default async function SignupPage() {
         </Link>
 
         {/* Agency card */}
-        <Link href="/signup/agency"
+        <Link href={`/signup/agency${querySuffix}`}
           className="group relative flex flex-col overflow-hidden rounded-2xl border-2 border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:border-violet-400 hover:shadow-lg hover:-translate-y-0.5"
         >
           {/* Icon */}
@@ -113,7 +125,10 @@ export default async function SignupPage() {
       {/* Already have account */}
       <p className="mt-6 text-sm text-gray-500">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-emerald-600 hover:text-emerald-500 transition-colors">
+        <Link
+          href={`/login${refParam ? `?ref=${encodeURIComponent(refParam)}` : ""}`}
+          className="font-semibold text-emerald-600 hover:text-emerald-500 transition-colors"
+        >
           Sign in
         </Link>
       </p>

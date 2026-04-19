@@ -30,6 +30,7 @@ type SignupTravelerInput = {
   travelPreferences: string;
   bio?: string;
   avatarUrl?: string;
+  referralCode?: string;
 };
 
 type SignupAgencyInput = SignupTravelerInput & {

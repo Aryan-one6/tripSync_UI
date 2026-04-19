@@ -29,7 +29,7 @@ const STEPS = [
     title: "Your Account",
     subtitle: "Basic login credentials",
     icon: User,
-    fields: ["fullName", "username", "email", "phone"] as Array<keyof TravelerFormValues>,
+    fields: ["fullName", "username", "email", "phone", "referralCode"] as Array<keyof TravelerFormValues>,
   },
   {
     key: "profile",
@@ -103,7 +103,13 @@ function StepIndicator({ steps, current }: { steps: typeof STEPS; current: numbe
 
 // ─── Main form ────────────────────────────────────────────────────────────────
 
-export function TravelerSignupForm({ nextPath = "/discover?audience=traveler" }: { nextPath?: string }) {
+export function TravelerSignupForm({
+  nextPath = "/discover?audience=traveler",
+  initialReferralCode = "",
+}: {
+  nextPath?: string;
+  initialReferralCode?: string;
+}) {
   const router = useRouter();
   const { signupTraveler } = useAuth();
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -116,6 +122,7 @@ export function TravelerSignupForm({ nextPath = "/discover?audience=traveler" }:
     resolver: zodResolver(travelerFormSchema),
     defaultValues: {
       fullName: "", username: "", email: "", phone: "",
+      referralCode: initialReferralCode,
       dateOfBirth: "", gender: "male", city: "", travelPreferences: "", bio: "",
       password: "", confirmPassword: "",
     },
@@ -158,6 +165,7 @@ export function TravelerSignupForm({ nextPath = "/discover?audience=traveler" }:
                 dateOfBirth: values.dateOfBirth, gender: values.gender,
                 city: values.city, travelPreferences: values.travelPreferences,
                 bio: values.bio || undefined,
+                referralCode: values.referralCode?.trim().toUpperCase() || undefined,
               });
               router.replace(`/login?signup=traveler&email=${encodeURIComponent(values.email)}&next=${encodeURIComponent(loginNextPath)}`);
             } catch (error) {
@@ -181,6 +189,20 @@ export function TravelerSignupForm({ nextPath = "/discover?audience=traveler" }:
             <Field label="Phone" error={form.formState.errors.phone?.message} hint="Indian mobile number">
               <Input placeholder="9876543210" className="h-11" {...form.register("phone")} />
             </Field>
+            <div className="sm:col-span-2">
+              <Field
+                label="Referral code (optional)"
+                error={form.formState.errors.referralCode?.message}
+                hint={initialReferralCode ? "Auto-filled from your invite link." : "Have an invite code? Add it here."}
+              >
+                <Input
+                  placeholder="TSABC123"
+                  className="h-11 uppercase"
+                  autoCapitalize="characters"
+                  {...form.register("referralCode")}
+                />
+              </Field>
+            </div>
           </div>
         )}
 

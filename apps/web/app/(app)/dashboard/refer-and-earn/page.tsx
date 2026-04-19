@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Copy, Gift, Handshake, Link2, MapPin, RefreshCcw, Send, Sparkles, Ticket } from "lucide-react";
+import { Copy, Gift, Handshake, Link2, MapPin, Send, Sparkles, Ticket } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { formatDateRange } from "@/lib/format";
 import type { AgencySummary } from "@/lib/api/types";
 import {
-  generateReferralLink,
+  getMyReferralLinkSafe,
   getMyReferralsSafe,
   getReferralStatsSafe,
   type MyReferral,
@@ -56,12 +56,16 @@ export default function ReferAndEarnPage() {
 
     setIsReferralLoading(true);
     try {
-      const [stats, referrals] = await Promise.all([
+      const [stats, referrals, link] = await Promise.all([
         getReferralStatsSafe(token),
         getMyReferralsSafe(token, 1, 6),
+        getMyReferralLinkSafe(token),
       ]);
       setReferralStats(stats);
       setMyReferrals(referrals.referrals);
+      if (link.id) {
+        setInviteLink(link);
+      }
     } catch (error) {
       console.error("[refer-and-earn] failed to load referral data:", error);
     } finally {
@@ -131,17 +135,6 @@ export default function ReferAndEarnPage() {
           ? current
           : [...current, agencyId],
     );
-  }
-
-  async function handleGenerateInviteLink() {
-    if (!token) return;
-    try {
-      const link = await generateReferralLink(token);
-      setInviteLink(link);
-      setFeedback("Referral invite link generated.");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to generate referral link.");
-    }
   }
 
   async function handleCopyInviteLink() {
@@ -216,25 +209,15 @@ export default function ReferAndEarnPage() {
                 </p>
                 <h2 className="font-display text-lg text-[var(--color-ink-950)]">Your referral code</h2>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleGenerateInviteLink}
-                disabled={!token}
-              >
-                <RefreshCcw className="size-4" />
-                Generate
-              </Button>
             </div>
 
             <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4">
               <p className="text-xs text-[var(--color-ink-600)]">Code</p>
               <p className="mt-1 font-display text-2xl tracking-wide text-[var(--color-ink-950)]">
-                {inviteLink?.code ?? "------"}
+                {inviteLink?.code || session?.user.referralCode || "------"}
               </p>
-              <p className="mt-2 text-xs text-[var(--color-ink-500)]">
-                Expires {inviteLink?.expiresAt ? new Date(inviteLink.expiresAt).toLocaleDateString() : "in 90 days"}
+              <p className="mt-2 break-all text-xs text-[var(--color-ink-500)]">
+                {inviteLink?.shareUrl || "Share link will appear here shortly."}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button type="button" size="sm" onClick={handleCopyInviteLink} disabled={!inviteLink?.shareUrl}>
