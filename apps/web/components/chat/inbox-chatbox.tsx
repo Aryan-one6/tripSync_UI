@@ -1638,81 +1638,73 @@ export function InboxChatbox({
       )}
       <div
         className={cn(
-          "relative flex overflow-hidden bg-[var(--color-surface-raised)]",
+          "relative flex overflow-hidden bg-white",
           mobileMessengerMode
-            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-full md:min-h-0 md:rounded-[var(--radius-xl)] md:border md:border-[var(--color-sea-100)] md:shadow-[var(--shadow-lg)]`
-            : "min-h-[calc(100dvh-8rem)] border-y border-[var(--color-sea-100)] md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
+            ? `${mobileShellHeightClass} min-h-0 flex-1 border-0 md:h-full md:min-h-0 md:rounded-[var(--radius-xl)] md:border md:border-gray-200 md:shadow-[var(--shadow-lg)]`
+            : "min-h-[calc(100dvh-8rem)] border-y border-gray-200 md:min-h-[76vh] md:rounded-[var(--radius-xl)] md:border md:shadow-[var(--shadow-lg)]",
         )}
       >
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "absolute inset-0 z-20 flex min-h-0 w-full flex-col bg-gradient-to-b from-[#f3fff7] via-[var(--color-surface-raised)] to-[#eef8ff] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:w-[320px] lg:w-[360px] md:border-r md:border-[var(--color-sea-100)] md:transition-none",
+          "absolute inset-0 z-20 flex min-h-0 w-full flex-col bg-white transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:w-[300px] lg:w-[340px] md:border-r md:border-gray-100 md:transition-none",
           showMobileChat
             ? "-translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto"
             : "translate-x-0 opacity-100",
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f5fffa] px-4 py-4">
-          <h2 className="font-display text-xl text-[var(--color-sea-800)]">Chats</h2>
+        <div className="flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3.5">
+          <div>
+            <h2 className="font-display text-lg font-black text-gray-950">Messages</h2>
+            {totalUnread > 0 && <p className="text-[10px] text-emerald-600 font-medium">{totalUnread} unread</p>}
+          </div>
           <button
             type="button"
             onClick={() => setShowNewChat((v) => !v)}
             title="New chat"
             className={cn(
-              "flex size-9 items-center justify-center rounded-full border border-transparent transition",
+              "flex size-9 items-center justify-center rounded-full border transition",
               showNewChat
-                ? "border-[var(--color-sea-200)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
-                : "text-[var(--color-sea-700)] hover:border-[var(--color-sea-200)] hover:bg-[var(--color-sea-50)]",
+                ? "border-emerald-200 bg-emerald-500 text-white shadow-sm"
+                : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700",
             )}
           >
-            {showNewChat ? <X className="size-4" /> : <MessageSquarePlus className="size-5" />}
+            {showNewChat ? <X className="size-4" /> : <MessageSquarePlus className="size-4" />}
           </button>
         </div>
 
         {/* Search bar */}
-        <div className="px-3 py-2.5">
+        <div className="px-3 py-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-sea-500)]" />
+            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search chats…"
-              className="w-full rounded-full border border-[var(--color-sea-100)] bg-white/90 py-2 pl-9 pr-3 text-base text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] shadow-[var(--shadow-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--color-sea-300)] md:text-sm"
+              placeholder="Search conversations…"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-8.5 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-300 focus:bg-white transition"
             />
           </div>
         </div>
 
         {/* Filter pills */}
-        <div className="flex gap-2 px-3 pb-2.5">
-          <button
-            type="button"
-            onClick={() => setUnreadOnly(false)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-semibold transition",
-              !unreadOnly
-                ? "border-[var(--color-sea-500)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
-                : "border-[var(--color-sea-100)] bg-white/85 text-[var(--color-sea-700)] hover:bg-[var(--color-sea-50)]",
-            )}
-          >
-            All
-          </button>
-          {totalUnread > 0 && (
+        <div className="flex gap-1.5 px-3 pb-2">
+          {["ALL", "GROUPS", "AGENCIES"].map((filter) => (
             <button
+              key={filter}
               type="button"
-              onClick={() => setUnreadOnly(true)}
+              onClick={() => { if (filter === "ALL") setUnreadOnly(false); }}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                unreadOnly
-                  ? "border-[var(--color-sea-500)] bg-[var(--color-sea-500)] text-white shadow-[var(--shadow-sm)]"
-                  : "border-[var(--color-sea-100)] bg-white/85 text-[var(--color-sea-700)] hover:bg-[var(--color-sea-50)]",
+                "rounded-lg border px-3 py-1 text-[10px] font-bold tracking-wide transition",
+                (!unreadOnly && filter === "ALL")
+                  ? "border-emerald-500 bg-emerald-500 text-white"
+                  : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
               )}
             >
-              Unread ({totalUnread})
+              {filter}
             </button>
-          )}
+          ))}
         </div>
 
         {/* Scrollable list */}
@@ -1966,7 +1958,8 @@ export function InboxChatbox({
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "absolute inset-0 z-30 flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_18%_16%,rgba(37,211,102,0.14),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(18,140,126,0.16),transparent_30%),linear-gradient(180deg,#e8f3ec_0%,#deebf4_100%)] transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:transition-none",
+          "absolute inset-0 z-30 flex min-h-0 flex-1 flex-col transition-[transform,opacity] duration-300 ease-out md:static md:z-auto md:transition-none",
+          "bg-[color:#f0f2f5]",
           showMobileChat
             ? "translate-x-0 opacity-100"
             : "translate-x-10 opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto",
@@ -2018,7 +2011,7 @@ export function InboxChatbox({
             {/* Conversation header */}
             <div
               className={cn(
-                "relative z-20 shrink-0 items-center gap-3 border-b border-[var(--color-sea-100)] bg-gradient-to-r from-[#dcf8e8] via-[#ebfaf3] to-[#f7fffb] px-4 py-3",
+                "relative z-20 shrink-0 items-center gap-3 border-b border-gray-100 bg-white px-4 py-3",
                 mobileMessengerMode ? "hidden md:flex" : "flex",
               )}
             >
@@ -2220,11 +2213,11 @@ export function InboxChatbox({
                           )}
                           <div
                             className={cn(
-                              "w-fit max-w-[82%] rounded-2xl border px-3 py-1.5 shadow-sm",
+                              "w-fit max-w-[82%] rounded-2xl px-3 py-2 shadow-sm",
                               mine
-                                ? "rounded-tr-[6px] border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebf5b_100%)] text-[#063d26]"
-                                : "rounded-tl-[6px] border-white/90 bg-white/95 text-[var(--color-ink-900)]",
-                              message.deliveryState === "failed" && "border-[var(--color-sunset-400)]",
+                                ? "rounded-br-sm bg-emerald-600 text-white"
+                                : "rounded-bl-sm bg-white text-gray-900 border border-gray-100",
+                              message.deliveryState === "failed" && "border-red-300",
                             )}
                           >
                             {/* Reply quote */}
@@ -2237,13 +2230,13 @@ export function InboxChatbox({
                                 </div>
                               );
                             })() : null}
-                            <p className="whitespace-pre-wrap text-[14px] leading-[1.35]">
+                            <p className="whitespace-pre-wrap text-[13.5px] leading-[1.4]">
                               {message.content}
                             </p>
                             <p
                               className={cn(
                                 "mt-1 text-right text-[10px] leading-none",
-                                mine ? "text-[#0a5a34]/70" : "text-[var(--color-ink-400)]",
+                                mine ? "text-white/60" : "text-gray-400",
                               )}
                             >
                               {message.deliveryState === "pending"
@@ -2283,32 +2276,40 @@ export function InboxChatbox({
             </div>
 
             {/* Input bar */}
-            <div className="shrink-0 border-t border-[var(--color-sea-100)] bg-[linear-gradient(180deg,rgba(250,255,252,0.9),rgba(237,249,242,0.95))] backdrop-blur-sm">
+            <div className="shrink-0 border-t border-gray-200 bg-white">
               {/* Reply preview */}
               {replyTo && (
-                <div className="flex items-center gap-2 border-b border-[var(--color-sea-100)] px-3 py-2">
-                  <CornerUpLeft className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+                <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-2 bg-gray-50">
+                  <CornerUpLeft className="size-3.5 shrink-0 text-emerald-600" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold text-[var(--color-sea-700)]">{replyTo.senderName}</p>
-                    <p className="truncate text-xs text-[var(--color-ink-500)]">{replyTo.content.slice(0, 80)}</p>
+                    <p className="text-[10px] font-semibold text-emerald-700">{replyTo.senderName}</p>
+                    <p className="truncate text-xs text-gray-500">{replyTo.content.slice(0, 80)}</p>
                   </div>
-                  <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 text-[var(--color-ink-400)] hover:text-[var(--color-ink-700)]">
+                  <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 text-gray-400 hover:text-gray-700">
                     <X className="size-3.5" />
                   </button>
                 </div>
               )}
               <div className="flex items-center gap-2 px-3 py-2.5">
+                {/* Plus / attach */}
+                <button
+                  type="button"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-gray-500 transition hover:bg-gray-200"
+                  aria-label="Add attachment"
+                >
+                  <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
                 {/* Emoji picker */}
                 <div className="relative shrink-0" ref={emojiPickerRef}>
                   <button
                     type="button"
                     onClick={() => setShowEmojiPicker((v) => !v)}
-                    className="flex size-8 items-center justify-center rounded-full border border-[var(--color-sea-100)] bg-white/90 text-[var(--color-ink-500)] shadow-[var(--shadow-sm)] transition hover:bg-white hover:text-[var(--color-ink-700)]"
+                    className="flex size-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-gray-500 transition hover:bg-gray-200"
                   >
                     <Smile className="size-4" />
                   </button>
                   {showEmojiPicker && (
-                    <div className="absolute bottom-11 left-0 z-30">
+                    <div className="absolute bottom-12 left-0 z-30">
                       <EmojiPicker
                         onEmojiSelect={(emoji: { native: string }) => {
                           setDraft((d) => d + emoji.native);
@@ -2332,18 +2333,18 @@ export function InboxChatbox({
                       sendDirectMessage();
                     }
                   }}
-                  placeholder="Type a message…"
+                  placeholder="Type a message or share an itinerary snippet…"
                   rows={1}
-                  className="min-h-0 flex-1 resize-none rounded-full !border-[var(--color-sea-200)] !bg-white/95 !px-4 !py-2 text-sm leading-5 shadow-[var(--shadow-sm)] focus:!border-[var(--color-sea-300)]"
+                  className="min-h-0 flex-1 resize-none rounded-2xl !border-gray-200 !bg-gray-100 !px-4 !py-2.5 text-sm leading-5 focus:!border-emerald-300 focus:!bg-white transition"
                 />
                 <Button
                   type="button"
                   size="icon"
                   onClick={sendDirectMessage}
                   disabled={!draft.trim()}
-                  className="size-9 shrink-0 rounded-full border border-[#18b85c] bg-[linear-gradient(180deg,#25d366_0%,#1ebe5b_100%)] text-white shadow-[var(--shadow-sm)] transition hover:brightness-[1.05] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-3)]"
+                  className="size-10 shrink-0 rounded-full bg-emerald-600 text-white shadow-sm transition hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400"
                 >
-                  <Send className="size-3.5" />
+                  <Send className="size-4" />
                 </Button>
               </div>
             </div>

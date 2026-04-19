@@ -398,10 +398,10 @@ export function SiteHeader() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">Log In</Button>
+                  <Button variant="ghost" size="sm" className={isTransparent ? "text-white hover:bg-white/15" : ""}>Log In</Button>
                 </Link>
-                <Link href="/signup/traveler">
-                  <Button size="sm">
+                <Link href="/signup">
+                  <Button size="sm" className={isTransparent ? "border border-white/30 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25" : ""}>
                     <UserRoundPlus className="size-4" />
                     Sign Up
                   </Button>
@@ -413,7 +413,12 @@ export function SiteHeader() {
             {/* Mobile: hamburger */}
             <button
               type="button"
-              className="flex size-10 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-2)] md:hidden"
+              className={cn(
+                "flex size-10 items-center justify-center rounded-xl border shadow-sm transition-colors md:hidden",
+                isTransparent
+                  ? "border-white/20 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
+                  : "border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] hover:bg-[var(--color-surface-2)]"
+              )}
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
             >
