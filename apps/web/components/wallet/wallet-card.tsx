@@ -14,7 +14,7 @@ export function WalletCard() {
   return (
     <Link
       href="/dashboard/wallet"
-      className="group rounded-lg border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-4 transition hover:border-[var(--color-sea-200)] hover:shadow-[var(--shadow-md)]"
+      className="group relative block w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-4 transition hover:border-[var(--color-sea-200)] hover:shadow-[var(--shadow-md)]"
     >
       <div className="flex items-start justify-between mb-3">
         <div>

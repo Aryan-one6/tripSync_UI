@@ -1,4 +1,5 @@
 import { apiFetch, safeApiFetch } from "./client";
+import { SITE_URL } from "@/lib/config";
 
 export interface ReferralLink {
   id: string;
@@ -48,16 +49,43 @@ export interface ReferralMetrics extends ReferralStats {
   averageEarningsPerReferral: string; // e.g. "250.00"
 }
 
+function normalizeReferralLink(link: Partial<ReferralLink> | null | undefined): ReferralLink {
+  const code = link?.code?.trim().toUpperCase() ?? "";
+  const shareUrl = link?.shareUrl || (code ? `${SITE_URL}/signup?ref=${code}` : "");
+  const qrUrl =
+    link?.qrUrl ||
+    (shareUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`
+      : "");
+
+  return {
+    id: link?.id ?? "",
+    code,
+    shareUrl,
+    qrUrl,
+    expiresAt: link?.expiresAt ?? "",
+  };
+}
+
 // ─── Public API calls ────────────────────────────────────────────────────────
 
 /**
  * Get stable referral link for the current user
  */
 export async function getMyReferralLink(token: string): Promise<ReferralLink> {
-  return apiFetch("/referrals/my-link", {
-    token,
-    method: "GET",
-  });
+  try {
+    const link = await apiFetch<ReferralLink>("/referrals/my-link", {
+      token,
+      method: "GET",
+    });
+    return normalizeReferralLink(link);
+  } catch {
+    const legacyLink = await apiFetch<ReferralLink>("/referrals/generate-link", {
+      token,
+      method: "POST",
+    });
+    return normalizeReferralLink(legacyLink);
+  }
 }
 
 /**
@@ -65,10 +93,11 @@ export async function getMyReferralLink(token: string): Promise<ReferralLink> {
  * Server now returns a stable personal link instead of generating a new code each call.
  */
 export async function generateReferralLink(token: string): Promise<ReferralLink> {
-  return apiFetch("/referrals/generate-link", {
+  const link = await apiFetch<ReferralLink>("/referrals/generate-link", {
     token,
     method: "POST",
   });
+  return normalizeReferralLink(link);
 }
 
 /**
@@ -134,10 +163,11 @@ export async function getMyReferralLinkSafe(
     expiresAt: "",
   },
 ): Promise<ReferralLink> {
-  return safeApiFetch("/referrals/my-link", fallback, {
-    token,
-    method: "GET",
-  });
+  try {
+    return await getMyReferralLink(token);
+  } catch {
+    return fallback;
+  }
 }
 
 export async function getReferralStatsSafe(
