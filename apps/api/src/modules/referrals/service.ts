@@ -130,7 +130,7 @@ async function generateUniqueReferralCode(): Promise<string> {
 }
 
 function buildReferralShareUrls(code: string) {
-  const webUrl = process.env.WEB_URL || 'https://tripsync.app';
+  const webUrl = process.env.WEB_URL || 'https://travellersin.com';
   const shareUrl = `${webUrl}/signup?ref=${code}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
   return { shareUrl, qrUrl };
