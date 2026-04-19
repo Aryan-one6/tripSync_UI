@@ -217,7 +217,7 @@ function Hero() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/35 to-black/70" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center px-4 pb-10 pt-32 text-center">
+      <div className="relative z-20 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center px-4 pb-10 pt-32 text-center">
         {/* Live badge */}
         <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[10px] font-semibold text-white/90 backdrop-blur-md">
           <span className="flex size-1.5">
@@ -370,7 +370,7 @@ function Hero() {
       </div>
 
       {/* Wave */}
-      <div className="relative z-10">
+      <div className="pointer-events-none relative z-0">
         <svg viewBox="0 0 1440 48" className="w-full" fill="white" preserveAspectRatio="none" style={{ display: "block", marginBottom: -1 }}>
           <path d="M0,48 C480,0 960,0 1440,48 L1440,48 L0,48 Z" />
         </svg>
