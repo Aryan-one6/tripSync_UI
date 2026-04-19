@@ -190,7 +190,9 @@ model Agency {
   slug            String   @unique
   logoUrl         String?
   description     String?
-  gstin           String?
+  gstin           String?          @unique  // must be unique across platform
+  gstVerifiedName String?          // company name fetched from GST API
+  gstVerifiedAt   DateTime?        // when GST was last verified
   pan             String?
   tourismLicense  String?
   address         String?
@@ -489,9 +491,17 @@ model Payment {
   // Loyalty / redemption tracking
   pointsRedeemed     Int           @default(0)  // in points (1 point = 1 INR)
   tripBonusIssued    Boolean       @default(false)  // guard: successful_trip_bonus
+  // ─── Denormalized tracking fields ───────────────────────────────────────────
+  // These make it trivial to query "who paid → for which plan/package → to which agency"
+  agencyId           String?       // denormalized: the agency receiving the payment
+  planId             String?       // denormalized: plan context (null if package booking)
+  packageId          String?       // denormalized: package context (null if plan booking)
 
   @@index([userId, status])
   @@index([groupId, status])
+  @@index([agencyId, status])
+  @@index([planId])
+  @@index([packageId])
   @@map("payments")
 }
 

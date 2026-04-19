@@ -3,7 +3,7 @@
  *
  * Formula:
  *  - 1 point = 1 INR
- *  - Points expire 6 months after being earned
+ *  - Points expire 1 year (12 months) after being earned
  *  - Max redemption per booking = 20% of booking amount (in paise)
  *  - Referral bonus: 250 pts to inviter + 250 pts to new user
  *  - Trip completion bonus: 250 pts
@@ -23,7 +23,7 @@ export const REFERRAL_NEW_USER_POINTS = 250;
 export const TRIP_COMPLETION_POINTS = 250;
 export const POINT_VALUE_PAISE = 100; // 1 point = 1 INR = 100 paise
 export const REDEMPTION_CAP_RATIO = 0.20; // max 20% of booking amount
-export const POINTS_EXPIRY_MONTHS = 6;
+export const POINTS_EXPIRY_MONTHS = 12;
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 

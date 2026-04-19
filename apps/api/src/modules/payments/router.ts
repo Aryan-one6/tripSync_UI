@@ -12,6 +12,8 @@ import {
   ReconcilePaymentsSchema,
   CreateDisputeSchema,
   ResolveDisputeSchema,
+  CreateOrderSchema,
+  AdminPaymentMapSchema,
 } from '@tripsync/shared';
 import * as paymentService from './service.js';
 
@@ -69,8 +71,13 @@ paymentsRouter.get(
 paymentsRouter.post(
   '/groups/:groupId/order',
   authenticate,
+  validate(CreateOrderSchema),
   asyncHandler(async (req, res) => {
-    const order = await paymentService.createOrder(param(req.params.groupId), req.userId!);
+    const order = await paymentService.createOrder(
+      param(req.params.groupId),
+      req.userId!,
+      { pointsToRedeem: req.body.pointsToRedeem },
+    );
     res.json({ data: order });
   }),
 );
@@ -158,6 +165,58 @@ paymentsRouter.post(
     const result = await paymentService.completeTrip(
       param(req.params.groupId),
       req.userId!,
+    );
+    res.json({ data: result });
+  }),
+);
+
+// ─── Payment Tracking ────────────────────────────────────────────────────────
+
+// GET /payments/tracking — full payment map for the current user
+paymentsRouter.get(
+  '/tracking',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const map = await paymentService.getPaymentTrackingMap(req.userId!);
+    res.json({ data: map });
+  }),
+);
+
+// GET /payments/admin/map — platform-level payment tracking (admin only)
+paymentsRouter.get(
+  '/admin/map',
+  authenticate,
+  authorize('platform_admin'),
+  validateQuery(AdminPaymentMapSchema),
+  asyncHandler(async (req, res) => {
+    const query = req.validatedQuery as z.infer<typeof AdminPaymentMapSchema>;
+    const map = await paymentService.getAdminPaymentMap(query);
+    res.json({ data: map.payments, meta: { cursor: map.cursor } });
+  }),
+);
+
+// ─── Agency Payout ───────────────────────────────────────────────────────────
+
+// GET /payments/agency/payouts — agency payout summary & escrow lifecycle
+paymentsRouter.get(
+  '/agency/payouts',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await paymentService.getAgencyPayoutSummary(req.userId!);
+    res.json({ data: result });
+  }),
+);
+
+// POST /payments/agency/payout/:paymentId — trigger automated payout for a specific payment
+paymentsRouter.post(
+  '/agency/payout/:paymentId',
+  authenticate,
+  authorize('platform_admin'),
+  asyncHandler(async (req, res) => {
+    const tranche = (req.body.tranche === 'tranche2' ? 'tranche2' : 'tranche1') as 'tranche1' | 'tranche2';
+    const result = await paymentService.executeAgencyPayout(
+      param(req.params.paymentId),
+      tranche,
     );
     res.json({ data: result });
   }),

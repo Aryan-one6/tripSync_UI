@@ -11,6 +11,10 @@ export const MockCapturePaymentSchema = z.object({
   paymentId: z.string().uuid(),
 });
 
+export const CreateOrderSchema = z.object({
+  pointsToRedeem: z.number().int().min(0).optional().default(0),
+});
+
 export const ResolveConfirmingWindowSchema = z.object({
   groupId: z.string().uuid(),
 });
@@ -29,9 +33,22 @@ export const ResolveDisputeSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+export const AdminPaymentMapSchema = z.object({
+  agencyId: z.string().uuid().optional(),
+  planId: z.string().uuid().optional(),
+  packageId: z.string().uuid().optional(),
+  status: z.enum(['PENDING', 'AUTHORIZED', 'CAPTURED', 'REFUNDED', 'FAILED']).optional(),
+  escrowStatus: z.enum(['HELD', 'PARTIAL_RELEASE', 'RELEASED', 'REFUNDED']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().uuid().optional(),
+});
+
 export type VerifyPaymentInput = z.infer<typeof VerifyPaymentSchema>;
 export type MockCapturePaymentInput = z.infer<typeof MockCapturePaymentSchema>;
+export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 export type ResolveConfirmingWindowInput = z.infer<typeof ResolveConfirmingWindowSchema>;
 export type ReconcilePaymentsInput = z.infer<typeof ReconcilePaymentsSchema>;
 export type CreateDisputeInput = z.infer<typeof CreateDisputeSchema>;
 export type ResolveDisputeInput = z.infer<typeof ResolveDisputeSchema>;
+export type AdminPaymentMapInput = z.infer<typeof AdminPaymentMapSchema>;
+

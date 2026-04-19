@@ -21,6 +21,7 @@ import { syncUserVerificationTier } from '../../lib/verification.js';
 import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
 import { randomUUID } from 'crypto';
+import { isValidGSTIN, assertGstinUnique, verifyGstinFromApi } from '../../lib/gst.js';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 type SafeAgency = {
@@ -332,6 +333,35 @@ export async function signupAgency(data: AgencySignupInput) {
 
   const passwordHash = await hashPassword(data.password);
 
+  // ─── GST Verification for agency signup ─────────────────────────────────
+  let gstVerifiedName: string | null = null;
+  let gstVerifiedAt: Date | null = null;
+  const normalizedGstin = data.gstin?.toUpperCase().trim() || null;
+
+  if (normalizedGstin) {
+    if (!isValidGSTIN(normalizedGstin)) {
+      throw new BadRequestError(
+        `Invalid GSTIN format: ${normalizedGstin}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
+      );
+    }
+
+    // Check uniqueness — throws ConflictError if already registered
+    await assertGstinUnique(normalizedGstin);
+
+    // Verify via public GST API
+    const gstResult = await verifyGstinFromApi(normalizedGstin);
+    if (gstResult.verified) {
+      gstVerifiedName = gstResult.tradeName || gstResult.legalName;
+      gstVerifiedAt = new Date();
+    }
+
+    if (gstResult.status === 'Cancelled' || gstResult.status === 'Suspended') {
+      throw new BadRequestError(
+        `GSTIN ${normalizedGstin} has status "${gstResult.status}". Only active GSTINs are accepted.`,
+      );
+    }
+  }
+
   const created = await prisma.$transaction(async (tx) => {
     const user = existingUser
       ? await tx.user.update({
@@ -399,7 +429,9 @@ export async function signupAgency(data: AgencySignupInput) {
           address: data.agencyAddress.trim(),
           city: data.agencyCity.trim(),
           state: data.agencyState.trim(),
-          gstin: data.gstin?.trim() || undefined,
+          gstin: normalizedGstin || undefined,
+          gstVerifiedName: gstVerifiedName || undefined,
+          gstVerifiedAt: gstVerifiedAt || undefined,
           pan: data.pan?.trim() || undefined,
           tourismLicense: data.tourismLicense?.trim() || undefined,
           specializations: data.specializations,

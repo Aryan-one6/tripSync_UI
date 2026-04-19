@@ -142,8 +142,12 @@ export function SiteHeader() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const isHomepage = pathname === "/";
+  const isTransparent = isHomepage && !scrolled;
 
   const isAgency = session?.role === "agency_admin";
   const discoverHref = `/discover?audience=${isAgency ? "agency" : "traveler"}`;
@@ -173,6 +177,12 @@ export function SiteHeader() {
   const sidebarIcon = isAgency ? Building2 : Compass;
   const sidebarTitle = isAgency ? "Agency Console" : "My Space";
   const SidebarIcon = sidebarIcon;
+
+  useEffect(() => {
+    function onScroll() { setScrolled(window.scrollY > 20); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -213,7 +223,10 @@ export function SiteHeader() {
       {/* ── Sticky header bar ─────────────────────────────────────── */}
       <header
         className={cn(
-          "sticky top-0 z-40 border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
+          "sticky top-0 z-40 transition-all duration-300",
+          isTransparent
+            ? "border-b border-transparent bg-transparent shadow-none"
+            : "border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
           isMobileMessengerRoute && "hidden md:block",
         )}
       >
@@ -244,9 +257,13 @@ export function SiteHeader() {
                   href={link.href}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
-                      : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
+                    isTransparent
+                      ? active
+                        ? "bg-white/20 text-white"
+                        : "text-white/80 hover:bg-white/15 hover:text-white"
+                      : active
+                        ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                        : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
                   )}
                 >
                   {link.label}

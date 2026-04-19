@@ -10,6 +10,7 @@ import type {
 import slugifyModule from 'slugify';
 import { queueNotification } from '../../lib/queue.js';
 import { env } from '../../lib/env.js';
+import { isValidGSTIN, assertGstinUnique, verifyGstinFromApi } from '../../lib/gst.js';
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 
 function generateSlug(name: string): string {
@@ -25,6 +26,36 @@ export async function register(userId: string, data: RegisterAgencyInput) {
 
   const slug = generateSlug(data.name);
 
+  // ─── GST Verification ─────────────────────────────────────────────────
+  let gstVerifiedName: string | null = null;
+  let gstVerifiedAt: Date | null = null;
+  const normalizedGstin = data.gstin?.toUpperCase().trim() || null;
+
+  if (normalizedGstin) {
+    // Validate format
+    if (!isValidGSTIN(normalizedGstin)) {
+      throw new BadRequestError(
+        `Invalid GSTIN format: ${normalizedGstin}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
+      );
+    }
+
+    // Check uniqueness — throws ConflictError if already registered
+    await assertGstinUnique(normalizedGstin);
+
+    // Verify via public GST API to fetch company name
+    const gstResult = await verifyGstinFromApi(normalizedGstin);
+    if (gstResult.verified) {
+      gstVerifiedName = gstResult.tradeName || gstResult.legalName;
+      gstVerifiedAt = new Date();
+    }
+
+    if (gstResult.status === 'Cancelled' || gstResult.status === 'Suspended') {
+      throw new BadRequestError(
+        `GSTIN ${normalizedGstin} has status "${gstResult.status}". Only active GSTINs are accepted.`,
+      );
+    }
+  }
+
   return prisma.agency.create({
     data: {
       ownerId: userId,
@@ -32,7 +63,9 @@ export async function register(userId: string, data: RegisterAgencyInput) {
       slug,
       description: data.description,
       logoUrl: data.logoUrl,
-      gstin: data.gstin,
+      gstin: normalizedGstin,
+      gstVerifiedName,
+      gstVerifiedAt,
       pan: data.pan,
       tourismLicense: data.tourismLicense,
       address: data.address,
@@ -555,8 +588,40 @@ export async function submitVerification(
   });
   if (!owner) throw new NotFoundError('User');
 
+  // ─── GST Verification (if GSTIN is being submitted/updated) ────────────
+  let gstVerifiedName = agency.gstVerifiedName;
+  let gstVerifiedAt = agency.gstVerifiedAt;
+  let normalizedGstin = agency.gstin;
+
+  if (data.gstin) {
+    normalizedGstin = data.gstin.toUpperCase().trim();
+
+    // Validate format
+    if (!isValidGSTIN(normalizedGstin)) {
+      throw new BadRequestError(
+        `Invalid GSTIN format: ${normalizedGstin}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
+      );
+    }
+
+    // Check uniqueness (exclude current agency)
+    await assertGstinUnique(normalizedGstin, agencyId);
+
+    // Verify via public GST API
+    const gstResult = await verifyGstinFromApi(normalizedGstin);
+    if (gstResult.verified) {
+      gstVerifiedName = gstResult.tradeName || gstResult.legalName;
+      gstVerifiedAt = new Date();
+    }
+
+    if (gstResult.status === 'Cancelled' || gstResult.status === 'Suspended') {
+      throw new BadRequestError(
+        `GSTIN ${normalizedGstin} has status "${gstResult.status}". Only active GSTINs are accepted.`,
+      );
+    }
+  }
+
   const verification = resolveAgencyVerificationStatus({
-    hasGstin: Boolean(data.gstin || agency.gstin),
+    hasGstin: Boolean(normalizedGstin),
     hasPan: Boolean(data.pan || agency.pan),
     hasTourismLicense: Boolean(data.tourismLicense || agency.tourismLicense),
     ownerVerified: owner.verification !== 'BASIC',
@@ -565,7 +630,9 @@ export async function submitVerification(
   const updated = await prisma.agency.update({
     where: { id: agencyId },
     data: {
-      gstin: data.gstin ?? undefined,
+      gstin: normalizedGstin ?? undefined,
+      gstVerifiedName: gstVerifiedName ?? undefined,
+      gstVerifiedAt: gstVerifiedAt ?? undefined,
       pan: data.pan ?? undefined,
       tourismLicense: data.tourismLicense ?? undefined,
       address: data.address ?? undefined,
@@ -588,7 +655,11 @@ export async function submitVerification(
     userIds: [userId],
     phoneNumbers: [owner.phone],
     ctaUrl: `${env.FRONTEND_URL}/agency/settings`,
-    metadata: { agencyId: updated.id, verification: updated.verification },
+    metadata: {
+      agencyId: updated.id,
+      verification: updated.verification,
+      gstVerifiedName: updated.gstVerifiedName,
+    },
   });
 
   return updated;

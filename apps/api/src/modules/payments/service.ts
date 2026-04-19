@@ -770,7 +770,11 @@ export async function listMyPayments(userId: string) {
   });
 }
 
-export async function createOrder(groupId: string, userId: string) {
+export async function createOrder(
+  groupId: string,
+  userId: string,
+  options?: { pointsToRedeem?: number },
+) {
   const context = await getGroupPaymentContext(groupId, userId);
 
   if (context.existingPayment?.status === PaymentStatus.CAPTURED) {
@@ -793,6 +797,30 @@ export async function createOrder(groupId: string, userId: string) {
     };
   }
 
+  // ─── Loyalty Points Redemption ──────────────────────────────────────────────
+  // Points can ONLY be redeemed in trip payments (enforced here at order creation)
+  let pointsDiscount = 0;
+  let pointsRedeemed = 0;
+
+  if (options?.pointsToRedeem && options.pointsToRedeem > 0) {
+    const { redeemPoints, computeMaxRedeemablePoints, getLoyaltyBalance } = await import('../loyalty/service.js');
+    const balance = await getLoyaltyBalance(userId);
+    const maxRedeem = computeMaxRedeemablePoints(context.breakdown.tripAmount);
+    const effectiveMax = Math.min(balance, maxRedeem);
+    const requested = options.pointsToRedeem;
+
+    if (requested > effectiveMax) {
+      throw new BadRequestError(
+        `Cannot redeem ${requested} points. Max redeemable: ${effectiveMax} (balance: ${balance}, cap: ${maxRedeem})`,
+      );
+    }
+
+    pointsRedeemed = requested;
+    pointsDiscount = requested * 100; // 1 point = 1 INR = 100 paise
+  }
+
+  const effectiveTotal = context.breakdown.totalAmount - pointsDiscount;
+
   const existingPending =
     context.existingPayment &&
     (context.existingPayment.status === PaymentStatus.PENDING ||
@@ -807,15 +835,17 @@ export async function createOrder(groupId: string, userId: string) {
 
   if (!orderId && client) {
     const order = await client.orders.create({
-      amount: context.breakdown.totalAmount,
+      amount: effectiveTotal,
       currency,
       receipt: `${context.group.id}:${userId}`,
       notes: {
         groupId: context.group.id,
         planId: context.plan?.id,
         packageId: context.package?.id,
+        agencyId: context.agency.id,
         userId,
         source: context.paymentSource,
+        pointsRedeemed: pointsRedeemed.toString(),
       },
     });
 
@@ -824,7 +854,7 @@ export async function createOrder(groupId: string, userId: string) {
   }
 
   const paymentData = {
-    amount: context.breakdown.totalAmount,
+    amount: effectiveTotal,
     tripAmount: context.breakdown.tripAmount,
     platformFeeAmount: context.breakdown.platformFeeAmount,
     feeGstAmount: context.breakdown.feeGstAmount,
@@ -833,6 +863,11 @@ export async function createOrder(groupId: string, userId: string) {
     currency,
     razorpayOrderId: orderId ?? buildMockOrderId(existingPending?.id ?? crypto.randomUUID()),
     status: PaymentStatus.PENDING,
+    pointsRedeemed,
+    // ─── Denormalized tracking fields ───────────────────────────────────────
+    agencyId: context.agency.id,
+    planId: context.plan?.id ?? null,
+    packageId: context.package?.id ?? null,
   };
 
   const payment = existingPending
@@ -848,6 +883,20 @@ export async function createOrder(groupId: string, userId: string) {
         },
       });
 
+  // If points were applied, create the loyalty ledger debit NOW (at order-time)
+  // so they are locked in, even if the payment is later abandoned.
+  // The redeemPoints function is idempotent on paymentId, so re-creating the order is safe.
+  if (pointsRedeemed > 0) {
+    const { redeemPoints } = await import('../loyalty/service.js');
+    await redeemPoints(
+      userId,
+      payment.id,
+      context.group.id,
+      pointsRedeemed,
+      context.breakdown.tripAmount,
+    );
+  }
+
   return {
     payment,
     amount: payment.amount,
@@ -857,6 +906,8 @@ export async function createOrder(groupId: string, userId: string) {
       feeGstAmount: payment.feeGstAmount,
       commissionAmount: payment.commissionAmount,
       totalAmount: payment.amount,
+      pointsRedeemed,
+      pointsDiscount,
     },
     paymentSource: payment.source,
     currency: payment.currency,
@@ -1701,4 +1752,443 @@ export async function completeTrip(groupId: string, triggeredByUserId: string) {
     loyaltyGranted: loyaltyResults.filter((r) => r.granted).length,
     loyaltyErrors: loyaltyResults.filter((r) => !r.granted),
   };
+}
+
+// ─── Comprehensive Payment Tracking ───────────────────────────────────────────
+
+/**
+ * Get full payment map for a user — tracks:
+ *   • Which user paid → to which group → for which plan/package → to which agency
+ *   • Escrow status, payout schedule, loyalty points redeemed/earned
+ *   • Invoice details
+ *
+ * This is the "everything we need to track" endpoint.
+ */
+export async function getPaymentTrackingMap(userId: string) {
+  const payments = await prisma.payment.findMany({
+    where: { userId },
+    include: {
+      group: {
+        include: {
+          plan: {
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              destination: true,
+              startDate: true,
+              endDate: true,
+              status: true,
+              selectedOffer: {
+                select: {
+                  id: true,
+                  pricePerPerson: true,
+                  agency: {
+                    select: { id: true, name: true, slug: true, gstin: true, gstVerifiedName: true },
+                  },
+                },
+              },
+            },
+          },
+          package: {
+            select: {
+              id: true,
+              slug: true,
+              title: true,
+              destination: true,
+              startDate: true,
+              endDate: true,
+              status: true,
+              basePrice: true,
+              agency: {
+                select: { id: true, name: true, slug: true, gstin: true, gstVerifiedName: true },
+              },
+            },
+          },
+          members: {
+            select: { userId: true, status: true, role: true },
+          },
+        },
+      },
+      invoice: true,
+      dispute: {
+        select: { id: true, status: true, resolution: true, createdAt: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return payments.map((payment) => {
+    const agency = payment.source === 'PLAN_OFFER'
+      ? payment.group.plan?.selectedOffer?.agency ?? null
+      : payment.group.package?.agency ?? null;
+
+    return {
+      // \u2500\u2500\u2500 Payment Identity \u2500\u2500\u2500
+      paymentId: payment.id,
+      userId: payment.userId,
+      groupId: payment.groupId,
+      source: payment.source,
+      createdAt: payment.createdAt,
+      paidAt: payment.paidAt,
+
+      // \u2500\u2500\u2500 What they paid for \u2500\u2500\u2500
+      plan: payment.group.plan
+        ? {
+            id: payment.group.plan.id,
+            title: payment.group.plan.title,
+            destination: payment.group.plan.destination,
+            startDate: payment.group.plan.startDate,
+            endDate: payment.group.plan.endDate,
+            status: payment.group.plan.status,
+            offerId: payment.group.plan.selectedOffer?.id ?? null,
+            pricePerPerson: payment.group.plan.selectedOffer?.pricePerPerson ?? null,
+          }
+        : null,
+      package: payment.group.package
+        ? {
+            id: payment.group.package.id,
+            title: payment.group.package.title,
+            destination: payment.group.package.destination,
+            startDate: payment.group.package.startDate,
+            endDate: payment.group.package.endDate,
+            status: payment.group.package.status,
+            basePrice: payment.group.package.basePrice,
+          }
+        : null,
+
+      // \u2500\u2500\u2500 Who receives the money (agency) \u2500\u2500\u2500
+      agency: agency
+        ? {
+            id: agency.id,
+            name: agency.name,
+            slug: agency.slug,
+            gstin: agency.gstin,
+            gstVerifiedName: agency.gstVerifiedName,
+          }
+        : null,
+
+      // \u2500\u2500\u2500 Financial breakdown \u2500\u2500\u2500
+      financial: {
+        totalPaid: payment.amount,
+        tripAmount: payment.tripAmount,
+        platformFee: payment.platformFeeAmount,
+        feeGst: payment.feeGstAmount,
+        commissionAmount: payment.commissionAmount,
+        currency: payment.currency,
+      },
+
+      // \u2500\u2500\u2500 Escrow & payout status \u2500\u2500\u2500
+      escrow: {
+        status: payment.escrowStatus,
+        paymentStatus: payment.status,
+        transferStatus: payment.transferStatus,
+        agencyNetAmount: payment.agencyNetAmount,
+        initialPayout: payment.initialPayout,
+        finalPayout: payment.finalPayout,
+        tranche1Released: payment.tranche1Released,
+        tranche2Released: payment.tranche2Released,
+      },
+
+      // \u2500\u2500\u2500 Loyalty \u2500\u2500\u2500
+      loyalty: {
+        pointsRedeemed: payment.pointsRedeemed,
+        tripBonusIssued: payment.tripBonusIssued,
+      },
+
+      // \u2500\u2500\u2500 Group context \u2500\u2500\u2500
+      group: {
+        memberCount: payment.group.members.length,
+        myRole: payment.group.members.find((m) => m.userId === userId)?.role ?? null,
+        myStatus: payment.group.members.find((m) => m.userId === userId)?.status ?? null,
+      },
+
+      // \u2500\u2500\u2500 Invoice \u2500\u2500\u2500
+      invoice: payment.invoice
+        ? {
+            id: payment.invoice.id,
+            invoiceNumber: payment.invoice.invoiceNumber,
+            totalAmount: payment.invoice.totalAmount,
+            status: payment.invoice.status,
+            pdfUrl: payment.invoice.pdfUrl,
+          }
+        : null,
+
+      // \u2500\u2500\u2500 Dispute \u2500\u2500\u2500
+      dispute: payment.dispute ?? null,
+    };
+  });
+}
+
+/**
+ * Platform-level payment map for admins \u2014 shows all payments with full tracking context.
+ * Helps answer: "Who paid for which travel plan, to whom, through escrow."
+ */
+export async function getAdminPaymentMap(filters?: {
+  agencyId?: string;
+  planId?: string;
+  packageId?: string;
+  status?: PaymentStatus;
+  escrowStatus?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  const where: any = {};
+  if (filters?.agencyId) where.agencyId = filters.agencyId;
+  if (filters?.planId) where.planId = filters.planId;
+  if (filters?.packageId) where.packageId = filters.packageId;
+  if (filters?.status) where.status = filters.status;
+  if (filters?.escrowStatus) where.escrowStatus = filters.escrowStatus;
+
+  const limit = filters?.limit ?? 50;
+
+  const payments = await prisma.payment.findMany({
+    where,
+    include: {
+      user: {
+        select: { id: true, fullName: true, phone: true, email: true },
+      },
+      group: {
+        include: {
+          plan: {
+            select: { id: true, title: true, destination: true, status: true },
+          },
+          package: {
+            select: { id: true, title: true, destination: true, status: true },
+          },
+        },
+      },
+      invoice: {
+        select: { invoiceNumber: true, totalAmount: true, status: true },
+      },
+      dispute: {
+        select: { id: true, status: true, resolution: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    ...(filters?.cursor ? { cursor: { id: filters.cursor }, skip: 1 } : {}),
+  });
+
+  return {
+    payments: payments.map((p) => ({
+      id: p.id,
+      user: p.user,
+      groupId: p.groupId,
+      source: p.source,
+      plan: p.group.plan,
+      package: p.group.package,
+      agencyId: p.agencyId,
+      planId: p.planId,
+      packageId: p.packageId,
+      amount: p.amount,
+      tripAmount: p.tripAmount,
+      commissionAmount: p.commissionAmount,
+      agencyNetAmount: p.agencyNetAmount,
+      status: p.status,
+      escrowStatus: p.escrowStatus,
+      transferStatus: p.transferStatus,
+      tranche1Released: p.tranche1Released,
+      tranche2Released: p.tranche2Released,
+      pointsRedeemed: p.pointsRedeemed,
+      paidAt: p.paidAt,
+      createdAt: p.createdAt,
+      invoice: p.invoice,
+      dispute: p.dispute,
+    })),
+    cursor: payments.length === limit ? payments[payments.length - 1]?.id : null,
+  };
+}
+
+// ─── Automated Agency Payout via Razorpay Route ──────────────────────────────
+
+/**
+ * Execute a Razorpay Route transfer to the agency's linked account.
+ * This automates the payout that's triggered by escrow release.
+ *
+ * Prerequisites:
+ *  - Agency must have a Razorpay linked account set up via Route API
+ *  - The payment must have been captured via Razorpay
+ *
+ * If Razorpay Route is not available (no linked account), the transfer
+ * is marked as MANUAL for the platform to process manually (bank transfer, etc.)
+ */
+export async function executeAgencyPayout(
+  paymentId: string,
+  tranche: 'tranche1' | 'tranche2',
+) {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    include: {
+      group: {
+        include: {
+          plan: {
+            include: {
+              selectedOffer: {
+                include: { agency: { select: { id: true, name: true } } },
+              },
+            },
+          },
+          package: {
+            include: { agency: { select: { id: true, name: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  if (!payment) throw new NotFoundError('Payment');
+  if (payment.status !== PaymentStatus.CAPTURED) {
+    throw new BadRequestError('Payment must be captured for payout');
+  }
+
+  const agency = payment.source === 'PLAN_OFFER'
+    ? payment.group.plan?.selectedOffer?.agency
+    : payment.group.package?.agency;
+
+  if (!agency) throw new BadRequestError('Cannot resolve agency for payout');
+
+  const payoutAmount = tranche === 'tranche1' ? payment.initialPayout : payment.finalPayout;
+
+  if (payoutAmount <= 0) {
+    return { status: 'skipped', reason: 'zero_amount' };
+  }
+
+  const client = await getRazorpayClient();
+
+  if (!client || !payment.razorpayPaymentId) {
+    // No Razorpay client or no Razorpay payment — mark as manual
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        transferStatus: TransferStatus.MANUAL,
+        transferReference: `manual:${tranche}:${paymentId}`,
+      },
+    });
+
+    return {
+      status: 'manual',
+      reason: 'razorpay_not_available',
+      agencyId: agency.id,
+      amount: payoutAmount,
+    };
+  }
+
+  try {
+    // Attempt Razorpay Route transfer
+    // Note: This requires the agency to have a Route-linked account on Razorpay.
+    // The transfer is from the platform's Razorpay account to the agency's linked account.
+    const transfer = await client.payments.transfer(payment.razorpayPaymentId, {
+      transfers: [
+        {
+          account: agency.id, // This should be the Razorpay linked_account_id in production
+          amount: payoutAmount,
+          currency: payment.currency,
+          notes: {
+            paymentId,
+            tranche,
+            agencyId: agency.id,
+            agencyName: agency.name,
+            groupId: payment.groupId,
+          },
+        },
+      ],
+    });
+
+    const transferId = transfer?.items?.[0]?.id ?? `route:${tranche}:${paymentId}`;
+
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        transferStatus: TransferStatus.SETTLED,
+        transferReference: transferId,
+      },
+    });
+
+    // Record the transfer in agency transactions
+    const wallet = await prisma.agencyWallet.findUnique({
+      where: { agencyId: agency.id },
+    });
+
+    if (wallet) {
+      await prisma.agencyTransaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'razorpay_route_transfer',
+          amount: payoutAmount,
+          description: `Automated Razorpay Route transfer (${tranche}) for payment ${paymentId}`,
+          groupId: payment.groupId,
+          paymentId,
+          razorpayTransferId: transferId,
+        },
+      });
+    }
+
+    return { status: 'settled', transferId, amount: payoutAmount };
+  } catch (err) {
+    console.error(`[payout:route] Failed Razorpay transfer for ${paymentId}:`, err);
+
+    // Fallback to manual
+    await prisma.payment.update({
+      where: { id: paymentId },
+      data: {
+        transferStatus: TransferStatus.MANUAL,
+        transferReference: `failed:${tranche}:${paymentId}`,
+      },
+    });
+
+    return {
+      status: 'failed',
+      error: err instanceof Error ? err.message : 'unknown',
+      agencyId: agency.id,
+      amount: payoutAmount,
+    };
+  }
+}
+
+/**
+ * Get agency payout summary — shows all payouts due/completed for an agency.
+ * Used by the agency dashboard to see escrow lifecycle.
+ */
+export async function getAgencyPayoutSummary(userId: string) {
+  const agencyId = await resolveAgencyForActor(userId, ['ADMIN', 'MANAGER', 'FINANCE']);
+
+  const payments = await prisma.payment.findMany({
+    where: { agencyId, status: PaymentStatus.CAPTURED },
+    select: {
+      id: true,
+      groupId: true,
+      tripAmount: true,
+      commissionAmount: true,
+      agencyNetAmount: true,
+      initialPayout: true,
+      finalPayout: true,
+      tranche1Released: true,
+      tranche2Released: true,
+      escrowStatus: true,
+      transferStatus: true,
+      transferReference: true,
+      paidAt: true,
+      createdAt: true,
+      group: {
+        select: {
+          plan: { select: { id: true, title: true, status: true, startDate: true, endDate: true } },
+          package: { select: { id: true, title: true, status: true, startDate: true, endDate: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const summary = {
+    totalBookings: payments.length,
+    totalTripAmount: payments.reduce((s, p) => s + p.tripAmount, 0),
+    totalCommission: payments.reduce((s, p) => s + p.commissionAmount, 0),
+    totalNetAmount: payments.reduce((s, p) => s + p.agencyNetAmount, 0),
+    tranche1Released: payments.filter((p) => p.tranche1Released).length,
+    tranche2Released: payments.filter((p) => p.tranche2Released).length,
+    pendingPayouts: payments.filter((p) => !p.tranche2Released).length,
+  };
+
+  return { summary, payments };
 }
