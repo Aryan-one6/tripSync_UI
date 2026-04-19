@@ -460,20 +460,37 @@ export async function login(
   identifier: LoginInput['identifier'],
   password: LoginInput['password'],
 ) {
-  const normalizedIdentifier = identifier.trim().toLowerCase();
+  const normalizedIdentifier = identifier.trim();
+  if (!normalizedIdentifier) {
+    throw new UnauthorizedError('Email or username is required');
+  }
+
+  const looksLikePhone = /^[6-9]\d{9}$/.test(normalizedIdentifier);
+
   const user = await prisma.user.findFirst({
     where: {
-      OR: [{ email: normalizedIdentifier }, { username: normalizedIdentifier }],
+      OR: [
+        { email: { equals: normalizedIdentifier.toLowerCase(), mode: 'insensitive' } },
+        { username: { equals: normalizedIdentifier.toLowerCase(), mode: 'insensitive' } },
+        ...(looksLikePhone ? [{ phone: normalizedIdentifier }] : []),
+      ],
     },
     select: {
       id: true,
       passwordHash: true,
       isActive: true,
+      email: true,
+      username: true,
+      phone: true,
     },
   });
 
-  if (!user || !user.passwordHash) {
-    throw new UnauthorizedError('Invalid email/username or password');
+  if (!user) {
+    throw new UnauthorizedError('No account found for this email/username');
+  }
+
+  if (!user.passwordHash) {
+    throw new UnauthorizedError('This account has no password set. Please reset password.');
   }
 
   if (!user.isActive) {
@@ -482,7 +499,7 @@ export async function login(
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    throw new UnauthorizedError('Invalid email/username or password');
+    throw new UnauthorizedError('Incorrect password');
   }
 
   return createSession(user.id);
