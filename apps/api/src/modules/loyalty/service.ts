@@ -102,8 +102,8 @@ export async function grantReferralBonuses(inviterUserId: string, newUserId: str
   await prisma.$transaction(async (tx) => {
     // Check idempotency — guard against double-crediting
     const [existingInviter, existingNew] = await Promise.all([
-      tx.loyaltyPointsLedger.findUnique({ where: { idempotencyKey: inviterKey } }),
-      tx.loyaltyPointsLedger.findUnique({ where: { idempotencyKey: newUserKey } }),
+      tx.loyaltyPointsLedger.findFirst({ where: { idempotencyKey: inviterKey } }),
+      tx.loyaltyPointsLedger.findFirst({ where: { idempotencyKey: newUserKey } }),
     ]);
 
     const ops: Promise<unknown>[] = [];
@@ -163,7 +163,7 @@ export async function grantTripCompletionBonus(userId: string, groupId: string, 
       return; // already issued
     }
 
-    const existing = await tx.loyaltyPointsLedger.findUnique({
+    const existing = await tx.loyaltyPointsLedger.findFirst({
       where: { idempotencyKey: key },
     });
 

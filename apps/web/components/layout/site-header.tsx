@@ -35,6 +35,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
 import { useLiveNotifications } from "@/lib/realtime/use-live-notifications";
 import { useUnreadDirectCount } from "@/lib/realtime/use-unread-direct-count";
+import { WalletMenu } from "@/components/wallet/wallet-menu";
 
 // ─── Shared nav config (mirrors app-sidebar) ─────────────────────────────────
 
@@ -336,7 +337,9 @@ export function SiteHeader() {
             {/* Desktop right actions */}
             <div className="hidden items-center gap-2 md:flex">
               {status === "authenticated" && session ? (
-                <div ref={avatarRef} className="flex items-center gap-2">
+                <>
+                  <WalletMenu />
+                  <div ref={avatarRef} className="flex items-center gap-2">
                 <Link href={inboxHref}>
                   <Button type="button" variant="ghost" size="sm">
                     <span className="relative">
@@ -395,7 +398,8 @@ export function SiteHeader() {
                     </div>
                   )}
                 </div>
-              </div>
+                  </div>
+                </>
             ) : (
               <>
                 <Link href="/login">

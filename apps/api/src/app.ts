@@ -19,6 +19,7 @@ import { usersRouter } from './modules/users/router.js';
 import { socialRouter } from './modules/social/router.js';
 import { notificationsRouter } from './modules/notifications/router.js';
 import { loyaltyRouter } from './modules/loyalty/router.js';
+import { walletRouter } from './modules/wallet/router.js';
 import { generalLimiter, authLimiter } from './middleware/rate-limit.js';
 import { isRedisConfigured, redisConfigReason } from './lib/redis.js';
 
@@ -63,6 +64,7 @@ app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/social', socialRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/loyalty', loyaltyRouter);
+app.use('/api/v1/wallet', walletRouter);
 
 app.use(errorHandler);
 

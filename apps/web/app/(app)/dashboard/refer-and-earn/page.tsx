@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Gift, Handshake, MapPin, Send, Sparkles, Ticket } from "lucide-react";
+import { Copy, Gift, Handshake, Link2, MapPin, RefreshCcw, Send, Sparkles, Ticket } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardInset } from "@/components/ui/card";
@@ -14,6 +14,15 @@ import { apiFetch } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatDateRange } from "@/lib/format";
 import type { AgencySummary } from "@/lib/api/types";
+import {
+  generateReferralLink,
+  getMyReferralsSafe,
+  getReferralStatsSafe,
+  type MyReferral,
+  type ReferralLink,
+  type ReferralStats,
+} from "@/lib/api/referrals";
+import { useReferralUpdates } from "@/lib/realtime/use-referral-updates";
 
 interface MyPlan {
   id: string;
@@ -27,15 +36,38 @@ interface MyPlan {
 }
 
 export default function ReferAndEarnPage() {
-  const { apiFetchWithAuth } = useAuth();
+  const { apiFetchWithAuth, session } = useAuth();
   const [plans, setPlans] = useState<MyPlan[]>([]);
   const [agencies, setAgencies] = useState<AgencySummary[]>([]);
+  const [inviteLink, setInviteLink] = useState<ReferralLink | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  const [myReferrals, setMyReferrals] = useState<MyReferral[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [selectedAgencyIds, setSelectedAgencyIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isReferralLoading, setIsReferralLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const token = session?.accessToken ?? "";
+
+  const loadReferralData = useCallback(async () => {
+    if (!token) return;
+
+    setIsReferralLoading(true);
+    try {
+      const [stats, referrals] = await Promise.all([
+        getReferralStatsSafe(token),
+        getMyReferralsSafe(token, 1, 6),
+      ]);
+      setReferralStats(stats);
+      setMyReferrals(referrals.referrals);
+    } catch (error) {
+      console.error("[refer-and-earn] failed to load referral data:", error);
+    } finally {
+      setIsReferralLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     void (async () => {
@@ -53,6 +85,20 @@ export default function ReferAndEarnPage() {
       }
     })();
   }, [apiFetchWithAuth]);
+
+  useEffect(() => {
+    void loadReferralData();
+  }, [loadReferralData]);
+
+  useReferralUpdates({
+    enabled: Boolean(token),
+    onNewInvite: () => {
+      void loadReferralData();
+    },
+    onStatusChanged: () => {
+      void loadReferralData();
+    },
+  });
 
   const openPlans = useMemo(() => plans.filter((plan) => plan.status === "OPEN"), [plans]);
 
@@ -85,6 +131,27 @@ export default function ReferAndEarnPage() {
           ? current
           : [...current, agencyId],
     );
+  }
+
+  async function handleGenerateInviteLink() {
+    if (!token) return;
+    try {
+      const link = await generateReferralLink(token);
+      setInviteLink(link);
+      setFeedback("Referral invite link generated.");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Unable to generate referral link.");
+    }
+  }
+
+  async function handleCopyInviteLink() {
+    if (!inviteLink?.shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink.shareUrl);
+      setFeedback("Referral link copied.");
+    } catch {
+      setFeedback("Unable to copy link. Please copy it manually.");
+    }
   }
 
   return (
@@ -135,6 +202,115 @@ export default function ReferAndEarnPage() {
               </div>
               <p className="mt-2 text-sm font-medium text-[var(--color-ink-700)]">Referral sending is live now.</p>
             </CardInset>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                  Invite travelers
+                </p>
+                <h2 className="font-display text-lg text-[var(--color-ink-950)]">Your referral code</h2>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleGenerateInviteLink}
+                disabled={!token}
+              >
+                <RefreshCcw className="size-4" />
+                Generate
+              </Button>
+            </div>
+
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4">
+              <p className="text-xs text-[var(--color-ink-600)]">Code</p>
+              <p className="mt-1 font-display text-2xl tracking-wide text-[var(--color-ink-950)]">
+                {inviteLink?.code ?? "------"}
+              </p>
+              <p className="mt-2 text-xs text-[var(--color-ink-500)]">
+                Expires {inviteLink?.expiresAt ? new Date(inviteLink.expiresAt).toLocaleDateString() : "in 90 days"}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={handleCopyInviteLink} disabled={!inviteLink?.shareUrl}>
+                  <Copy className="size-4" />
+                  Copy link
+                </Button>
+                {inviteLink?.shareUrl ? (
+                  <a
+                    href={inviteLink.shareUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-xs font-semibold text-[var(--color-ink-700)] hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Link2 className="size-3.5" />
+                    Open link
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                Live referrals
+              </p>
+              <h2 className="font-display text-lg text-[var(--color-ink-950)]">Status & earnings</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <CardInset className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">Sent</p>
+                <p className="mt-1 text-xl font-semibold text-[var(--color-ink-950)]">
+                  {referralStats?.sentReferrals ?? 0}
+                </p>
+              </CardInset>
+              <CardInset className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">Completed</p>
+                <p className="mt-1 text-xl font-semibold text-[var(--color-ink-950)]">
+                  {referralStats?.sentCompleted ?? 0}
+                </p>
+              </CardInset>
+              <CardInset className="p-3">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-ink-500)]">Earned</p>
+                <p className="mt-1 text-xl font-semibold text-[var(--color-sea-700)]">
+                  ₹{(referralStats?.totalEarned ?? 0).toLocaleString("en-IN")}
+                </p>
+              </CardInset>
+            </div>
+            <div className="rounded-[var(--radius-md)] border border-[var(--color-border)]">
+              {isReferralLoading ? (
+                <div className="space-y-2 p-4">
+                  <div className="h-8 animate-pulse rounded bg-[var(--color-surface-2)]" />
+                  <div className="h-8 animate-pulse rounded bg-[var(--color-surface-2)]" />
+                </div>
+              ) : myReferrals.length === 0 ? (
+                <p className="p-4 text-sm text-[var(--color-ink-500)]">No referrals yet.</p>
+              ) : (
+                <div className="divide-y divide-[var(--color-border)]">
+                  {myReferrals.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium text-[var(--color-ink-900)]">
+                          {item.referredUser?.fullName || item.referredUser?.email || "New invite"}
+                        </p>
+                        <p className="text-xs text-[var(--color-ink-500)]">
+                          {new Date(item.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant={item.status === "COMPLETED" ? "sea" : "outline"}>
+                        {item.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>

@@ -10,7 +10,6 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, type TokenPayloa
 import {
   BadRequestError,
   ConflictError,
-  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
 } from '../../lib/errors.js';
@@ -257,19 +256,25 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   // Validate referral code if provided (before creating the user)
   let inviterUserId: string | null = null;
-  const referralCode = (data as any).referralCode as string | undefined;
+  let referralLinkId: string | null = null;
+  const referralCode = data.referralCode?.trim();
   if (referralCode) {
-    const inviter = await prisma.user.findUnique({
-      where: { referralCode },
-      select: { id: true },
+    const { assertValidReferralCodeFormat } = await import('../referrals/service.js');
+    const normalizedCode = assertValidReferralCodeFormat(referralCode);
+    const referralLink = await prisma.referralLink.findUnique({
+      where: { code: normalizedCode },
+      select: { id: true, userId: true, expiresAt: true, usedAt: true },
     });
-    // Silently ignore invalid referral codes — don't fail signup
-    inviterUserId = inviter?.id ?? null;
+
+    if (!referralLink || referralLink.expiresAt <= new Date() || referralLink.usedAt) {
+      throw new BadRequestError('Referral code is invalid or expired');
+    }
+
+    inviterUserId = referralLink.userId;
+    referralLinkId = referralLink.id;
   }
 
   const passwordHash = await hashPassword(data.password);
-  // Generate a unique referral code for the new user
-  const newUserReferralCode = `TS${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
   const user = existingUser
     ? await prisma.user.update({
@@ -286,7 +291,6 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
-          referralCode: newUserReferralCode,
           referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
@@ -304,19 +308,22 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
-          referralCode: newUserReferralCode,
           referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
       });
 
-  // Fire referral bonuses asynchronously (don't block signup)
   if (inviterUserId) {
-    // Dynamically import loyalty service to avoid circular deps
-    import('../loyalty/service.js')
-      .then(({ grantReferralBonuses }) => grantReferralBonuses(inviterUserId!, user.id))
-      .catch((err) => console.error('[referral-bonus] failed to grant referral bonuses', err));
+    const { registerReferralInvite } = await import('../referrals/service.js');
+    await registerReferralInvite({
+      referrerId: inviterUserId,
+      referredUserId: user.id,
+      referredEmail: email,
+      referralLinkId: referralLinkId ?? undefined,
+    });
   }
+
+  // Referral bonus credits are granted in updateProfile() after profile completion.
 
   return {
     message: 'Traveler account created successfully. Please log in.',
@@ -362,7 +369,7 @@ export async function signupAgency(data: AgencySignupInput) {
     }
   }
 
-  const created = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const user = existingUser
       ? await tx.user.update({
           where: { id: existingUser.id },
@@ -450,13 +457,13 @@ export async function signupAgency(data: AgencySignupInput) {
 }
 
 export async function login(
-  email: LoginInput['email'],
+  identifier: LoginInput['identifier'],
   password: LoginInput['password'],
 ) {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedIdentifier = identifier.trim().toLowerCase();
   const user = await prisma.user.findFirst({
     where: {
-      email: normalizedEmail,
+      OR: [{ email: normalizedIdentifier }, { username: normalizedIdentifier }],
     },
     select: {
       id: true,
@@ -466,7 +473,7 @@ export async function login(
   });
 
   if (!user || !user.passwordHash) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError('Invalid email/username or password');
   }
 
   if (!user.isActive) {
@@ -475,7 +482,7 @@ export async function login(
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError('Invalid email/username or password');
   }
 
   return createSession(user.id);
@@ -514,6 +521,34 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     },
     select: safeUserSelect,
   });
+
+  // After profile update, if user has a referrer and hasn't been credited yet, complete the referral
+  const updatedUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      referredByUserId: true,
+      referralBonusPaid: true,
+    },
+  });
+
+  if (updatedUser?.referredByUserId && !updatedUser.referralBonusPaid) {
+    try {
+      // Dynamically import to avoid circular dependencies
+      const { completeReferral } = await import('../referrals/service.js');
+      await completeReferral(updatedUser.referredByUserId, userId);
+
+      // Mark bonus as paid
+      await prisma.user.update({
+        where: { id: userId },
+        data: { referralBonusPaid: true },
+      });
+    } catch (err) {
+      console.error('[auth] Failed to complete referral on profile update', err);
+      // Don't fail the profile update if referral completion fails
+    }
+  }
+
   return user;
 }
 

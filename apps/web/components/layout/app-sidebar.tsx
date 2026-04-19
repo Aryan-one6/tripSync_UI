@@ -18,6 +18,7 @@ import {
   Settings,
   Store,
   Ticket,
+  Wallet,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ const userNavMain = [
 const userNavSecondary = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/storefront", label: "Public Profile", icon: Eye },
+  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { href: "/dashboard/refer-and-earn", label: "Refer & Earn", icon: Gift },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

@@ -76,7 +76,10 @@ paymentsRouter.post(
     const order = await paymentService.createOrder(
       param(req.params.groupId),
       req.userId!,
-      { pointsToRedeem: req.body.pointsToRedeem },
+      {
+        pointsToRedeem: req.body.pointsToRedeem,
+        walletAmountToUse: req.body.walletAmountToUse,
+      },
     );
     res.json({ data: order });
   }),

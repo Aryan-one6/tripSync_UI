@@ -6,6 +6,7 @@ import type {
   ResolveDisputeInput,
 } from '@tripsync/shared';
 import { PaymentStatus, PlanStatus, Prisma, DisputeStatus, WalletPayoutMode, TransferStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../lib/env.js';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
@@ -682,11 +683,14 @@ export async function getGroupPaymentState(groupId: string, userId: string) {
   const context = await getGroupPaymentContext(groupId, userId);
   const committedCount = context.group.members.filter((member) => member.status === 'COMMITTED').length;
 
-  // Fetch loyalty balance for checkout UI
+  // Fetch loyalty + wallet balances for checkout UI
   const { getLoyaltyBalance, computeMaxRedeemablePoints } = await import('../loyalty/service.js');
+  const { getWalletBalance } = await import('../wallet/service.js');
   const loyaltyBalance = await getLoyaltyBalance(userId);
   const maxRedeemablePoints = computeMaxRedeemablePoints(context.breakdown.tripAmount);
   const effectiveMaxRedeem = Math.min(loyaltyBalance, maxRedeemablePoints);
+  const walletBalance = await getWalletBalance(userId);
+  const maxWalletRupees = Math.min(walletBalance, Math.floor(context.breakdown.tripAmount / 100));
 
   return {
     groupId,
@@ -732,6 +736,11 @@ export async function getGroupPaymentState(groupId: string, userId: string) {
       maxDiscountPaise: effectiveMaxRedeem * 100,
       pointValueInr: 1, // 1 point = 1 INR
     },
+    wallet: {
+      availableBalanceRupees: walletBalance,
+      maxUsableRupees: maxWalletRupees,
+      autoApply: walletBalance > 0,
+    },
     currency: 'INR',
     committedCount,
     travelerCount: context.group.members.length,
@@ -773,11 +782,23 @@ export async function listMyPayments(userId: string) {
 export async function createOrder(
   groupId: string,
   userId: string,
-  options?: { pointsToRedeem?: number },
+  options?: { pointsToRedeem?: number; walletAmountToUse?: number },
 ) {
   const context = await getGroupPaymentContext(groupId, userId);
+  const requestedPoints = options?.pointsToRedeem ?? 0;
+  const requestedWallet = options?.walletAmountToUse ?? 0;
+
+  if (!Number.isInteger(requestedPoints) || requestedPoints < 0) {
+    throw new BadRequestError('pointsToRedeem must be a non-negative integer');
+  }
+  if (!Number.isInteger(requestedWallet) || requestedWallet < 0) {
+    throw new BadRequestError('walletAmountToUse must be a non-negative integer');
+  }
 
   if (context.existingPayment?.status === PaymentStatus.CAPTURED) {
+    const capturedWalletAmountUsed = Number(context.existingPayment.walletAmountUsed ?? 0);
+    const capturedPointsRedeemed = context.existingPayment.pointsRedeemed ?? 0;
+
     return {
       payment: context.existingPayment,
       amount: context.existingPayment.amount,
@@ -789,6 +810,10 @@ export async function createOrder(
         commissionAmount:
           context.existingPayment.commissionAmount || context.breakdown.commissionAmount,
         totalAmount: context.existingPayment.amount,
+        pointsRedeemed: capturedPointsRedeemed,
+        pointsDiscount: capturedPointsRedeemed * 100,
+        walletAmountUsed: capturedWalletAmountUsed,
+        walletDiscount: capturedWalletAmountUsed * 100,
       },
       paymentSource: context.paymentSource,
       currency: context.existingPayment.currency,
@@ -797,17 +822,47 @@ export async function createOrder(
     };
   }
 
+  // ─── Wallet Balance Deduction ──────────────────────────────────────────────
+  let walletDiscount = 0; // in paise
+  let walletAmountUsed = 0; // in rupees
+
+  if (requestedWallet > 0) {
+    const { getWalletBalance } = await import('../wallet/service.js');
+    const balance = await getWalletBalance(userId);
+    const requested = requestedWallet;
+
+    if (requested > balance) {
+      throw new BadRequestError(
+        `Cannot use ₹${requested} from wallet. Available balance: ₹${balance}`,
+      );
+    }
+
+    // Also validate that wallet + points don't exceed booking amount
+    const tripAmountRupees = Math.floor(context.breakdown.tripAmount / 100);
+    const pointsRedeemRupees = requestedPoints;
+    const totalDiscountRupees = requested + pointsRedeemRupees;
+
+    if (totalDiscountRupees > tripAmountRupees) {
+      throw new BadRequestError(
+        `Total discount (wallet ₹${requested} + points ₹${pointsRedeemRupees}) cannot exceed booking amount ₹${tripAmountRupees}`,
+      );
+    }
+
+    walletAmountUsed = requested;
+    walletDiscount = requested * 100; // Convert rupees to paise
+  }
+
   // ─── Loyalty Points Redemption ──────────────────────────────────────────────
   // Points can ONLY be redeemed in trip payments (enforced here at order creation)
   let pointsDiscount = 0;
   let pointsRedeemed = 0;
 
-  if (options?.pointsToRedeem && options.pointsToRedeem > 0) {
-    const { redeemPoints, computeMaxRedeemablePoints, getLoyaltyBalance } = await import('../loyalty/service.js');
+  if (requestedPoints > 0) {
+    const { computeMaxRedeemablePoints, getLoyaltyBalance } = await import('../loyalty/service.js');
     const balance = await getLoyaltyBalance(userId);
-    const maxRedeem = computeMaxRedeemablePoints(context.breakdown.tripAmount);
+    const maxRedeem = computeMaxRedeemablePoints(context.breakdown.tripAmount - walletDiscount);
     const effectiveMax = Math.min(balance, maxRedeem);
-    const requested = options.pointsToRedeem;
+    const requested = requestedPoints;
 
     if (requested > effectiveMax) {
       throw new BadRequestError(
@@ -819,7 +874,10 @@ export async function createOrder(
     pointsDiscount = requested * 100; // 1 point = 1 INR = 100 paise
   }
 
-  const effectiveTotal = context.breakdown.totalAmount - pointsDiscount;
+  const effectiveTotal = context.breakdown.totalAmount - walletDiscount - pointsDiscount;
+  if (effectiveTotal < 0) {
+    throw new BadRequestError('Discounts cannot exceed payable amount');
+  }
 
   const existingPending =
     context.existingPayment &&
@@ -827,6 +885,26 @@ export async function createOrder(
       context.existingPayment.status === PaymentStatus.AUTHORIZED)
       ? context.existingPayment
       : null;
+
+  if (
+    existingPending &&
+    Number(existingPending.walletAmountUsed ?? 0) > 0 &&
+    Number(existingPending.walletAmountUsed) !== walletAmountUsed
+  ) {
+    throw new BadRequestError(
+      'Existing checkout already has wallet deduction applied. Continue with current amount.',
+    );
+  }
+
+  if (
+    existingPending &&
+    (existingPending.pointsRedeemed ?? 0) > 0 &&
+    (existingPending.pointsRedeemed ?? 0) !== pointsRedeemed
+  ) {
+    throw new BadRequestError(
+      'Existing checkout already has points redeemed. Continue with current amount.',
+    );
+  }
 
   const client = await getRazorpayClient();
 
@@ -846,6 +924,7 @@ export async function createOrder(
         userId,
         source: context.paymentSource,
         pointsRedeemed: pointsRedeemed.toString(),
+        walletAmountUsed: walletAmountUsed.toString(),
       },
     });
 
@@ -864,6 +943,7 @@ export async function createOrder(
     razorpayOrderId: orderId ?? buildMockOrderId(existingPending?.id ?? crypto.randomUUID()),
     status: PaymentStatus.PENDING,
     pointsRedeemed,
+    walletAmountUsed: new Decimal(walletAmountUsed),
     // ─── Denormalized tracking fields ───────────────────────────────────────
     agencyId: context.agency.id,
     planId: context.plan?.id ?? null,
@@ -883,9 +963,27 @@ export async function createOrder(
         },
       });
 
-  // If points were applied, create the loyalty ledger debit NOW (at order-time)
-  // so they are locked in, even if the payment is later abandoned.
-  // The redeemPoints function is idempotent on paymentId, so re-creating the order is safe.
+  // ─── Deduct wallet and points NOW (at order-time) ──────────────────────────
+  // Both are idempotent operations (use payment ID), so re-creating the order is safe.
+
+  if (walletAmountUsed > 0) {
+    try {
+      const { deductFromWallet } = await import('../wallet/service.js');
+      await deductFromWallet(
+        prisma,
+        userId,
+        walletAmountUsed,
+        payment.id,
+        `wallet_checkout:${payment.id}`,
+      );
+    } catch (err) {
+      console.error('[payment] Failed to deduct from wallet', err);
+      // If wallet deduction fails, the order is still created but wallet isn't deducted
+      // The payment verification process can handle this edge case
+      throw err;
+    }
+  }
+
   if (pointsRedeemed > 0) {
     const { redeemPoints } = await import('../loyalty/service.js');
     await redeemPoints(
@@ -893,7 +991,7 @@ export async function createOrder(
       payment.id,
       context.group.id,
       pointsRedeemed,
-      context.breakdown.tripAmount,
+      context.breakdown.tripAmount - walletDiscount,
     );
   }
 
@@ -908,6 +1006,8 @@ export async function createOrder(
       totalAmount: payment.amount,
       pointsRedeemed,
       pointsDiscount,
+      walletAmountUsed,
+      walletDiscount,
     },
     paymentSource: payment.source,
     currency: payment.currency,

@@ -13,6 +13,7 @@ export const MockCapturePaymentSchema = z.object({
 
 export const CreateOrderSchema = z.object({
   pointsToRedeem: z.number().int().min(0).optional().default(0),
+  walletAmountToUse: z.number().int().min(0).max(200000).optional().default(0),
 });
 
 export const ResolveConfirmingWindowSchema = z.object({
@@ -51,4 +52,3 @@ export type ReconcilePaymentsInput = z.infer<typeof ReconcilePaymentsSchema>;
 export type CreateDisputeInput = z.infer<typeof CreateDisputeSchema>;
 export type ResolveDisputeInput = z.infer<typeof ResolveDisputeSchema>;
 export type AdminPaymentMapInput = z.infer<typeof AdminPaymentMapSchema>;
-

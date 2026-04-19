@@ -337,6 +337,12 @@ export interface PaymentRecord {
   escrowStatus: EscrowStatus;
   tranche1Released: boolean;
   tranche2Released: boolean;
+  pointsRedeemed?: number;
+  walletAmountUsed?: number | string;
+  tripAmount?: number;
+  platformFeeAmount?: number;
+  feeGstAmount?: number;
+  commissionAmount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -370,6 +376,24 @@ export interface GroupPaymentState {
     feeGstAmount: number;
     commissionAmount: number;
     totalAmount: number;
+    pointsRedeemed?: number;
+    pointsDiscount?: number;
+    walletAmountUsed?: number;
+    walletDiscount?: number;
+    agencyNetAmount?: number;
+    initialPayoutAmount?: number;
+    finalPayoutAmount?: number;
+  };
+  loyalty?: {
+    availablePoints: number;
+    maxRedeemablePoints: number;
+    maxDiscountPaise: number;
+    pointValueInr: number;
+  };
+  wallet?: {
+    availableBalanceRupees: number;
+    maxUsableRupees: number;
+    autoApply: boolean;
   };
   currency: string;
   committedCount: number;
@@ -387,6 +411,10 @@ export interface GroupPaymentOrder {
     feeGstAmount: number;
     commissionAmount: number;
     totalAmount: number;
+    pointsRedeemed?: number;
+    pointsDiscount?: number;
+    walletAmountUsed?: number;
+    walletDiscount?: number;
   };
   paymentSource: PaymentSource;
   currency: string;

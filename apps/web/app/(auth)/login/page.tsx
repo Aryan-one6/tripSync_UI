@@ -1,7 +1,7 @@
 import { LoginForm } from "@/components/auth/login-form";
 import Image from "next/image";
 import Link from "next/link";
-import { Shield, Star, Users, CheckCircle2 } from "lucide-react";
+import { Shield, Star, Users } from "lucide-react";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -14,7 +14,14 @@ const TRUST = [
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const nextPath = typeof params.next === "string" && params.next.startsWith("/") ? params.next : "/discover?audience=traveler";
-  const defaultEmail = typeof params.email === "string" ? params.email : "";
+  const defaultIdentifier =
+    typeof params.identifier === "string"
+      ? params.identifier
+      : typeof params.email === "string"
+        ? params.email
+        : typeof params.username === "string"
+          ? params.username
+          : "";
   const successMessage =
     params.signup === "traveler" ? "Account created! Sign in to start exploring." :
     params.signup === "agency" ? "Agency account created. Sign in to your dashboard." :
@@ -96,7 +103,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
 
         <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
           <div className="w-full max-w-sm">
-            <LoginForm nextPath={nextPath} defaultEmail={defaultEmail} successMessage={successMessage} />
+            <LoginForm nextPath={nextPath} defaultIdentifier={defaultIdentifier} successMessage={successMessage} />
           </div>
         </div>
 

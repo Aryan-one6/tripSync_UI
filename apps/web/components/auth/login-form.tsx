@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, UserRoundPlus, Building2, Shield } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema } from "@tripsync/shared";
+import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/auth-context";
 
-type LoginValues = { email: string; password: string };
+type LoginValues = z.input<typeof LoginSchema>;
 
 function resolveDestination(nextPath: string, role: "user" | "agency_admin" | "platform_admin") {
   const defaultPath = role === "agency_admin" ? "/agency/dashboard" : "/discover?audience=traveler";
@@ -23,11 +23,11 @@ function resolveDestination(nextPath: string, role: "user" | "agency_admin" | "p
 
 export function LoginForm({
   nextPath = "/",
-  defaultEmail = "",
+  defaultIdentifier = "",
   successMessage,
 }: {
   nextPath?: string;
-  defaultEmail?: string;
+  defaultIdentifier?: string;
   successMessage?: string;
 }) {
   const router = useRouter();
@@ -39,7 +39,7 @@ export function LoginForm({
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(LoginSchema),
-    defaultValues: { email: defaultEmail, password: "" },
+    defaultValues: { identifier: defaultIdentifier, password: "" },
   });
 
   const travelerSignupHref = `/signup/traveler?next=${encodeURIComponent(nextPath)}`;
@@ -75,7 +75,8 @@ export function LoginForm({
         onSubmit={form.handleSubmit((values) =>
           startTransition(async () => {
             try {
-              const session = await login(values.email, values.password);
+              const identifier = values.identifier ?? values.email ?? "";
+              const session = await login(identifier, values.password);
               router.replace(resolveDestination(nextPath, session.role));
             } catch (error) {
               setIsSuccess(false);
@@ -86,17 +87,17 @@ export function LoginForm({
       >
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-[var(--color-ink-700)]">
-            Email address
+            Email or username
           </label>
           <Input
-            type="email"
-            placeholder="you@example.com"
-            autoComplete="email"
-            {...form.register("email")}
+            type="text"
+            placeholder="you@example.com or naresh_travel"
+            autoComplete="username"
+            {...form.register("identifier")}
             className="h-11"
           />
-          {form.formState.errors.email && (
-            <p className="mt-1.5 text-xs text-red-500">{form.formState.errors.email.message}</p>
+          {form.formState.errors.identifier && (
+            <p className="mt-1.5 text-xs text-red-500">{form.formState.errors.identifier.message}</p>
           )}
         </div>
 
