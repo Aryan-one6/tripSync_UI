@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { CalendarDays, Compass, MapPin, Mountain, Palmtree, Sunrise, Users } from "lucide-react";
+import { CalendarDays, Compass, MapPin, Mountain, Palmtree, Sunrise, Users, Star, Phone, Clock } from "lucide-react";
 import { formatCurrency, formatDuration, formatDateRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { DiscoverItem } from "@/lib/api/types";
 
 const palettes = [
@@ -15,6 +16,15 @@ function hash(input: string) {
   return Array.from(input).reduce((total, char) => total + char.charCodeAt(0), 0);
 }
 
+// Demo data for ratings (in real app, would come from backend)
+function getRandomRating() {
+  return (Math.random() * 2 + 3.5).toFixed(1); // 3.5 - 5.5
+}
+
+function getRatingCount() {
+  return Math.floor(Math.random() * 100) + 10; // 10-110 reviews
+}
+
 export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const href =
     item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
@@ -25,85 +35,157 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const palette = palettes[hash(item.title) % palettes.length];
   const { Icon } = palette;
   const vibe = item.vibes?.[0] ?? "";
+  const rating = getRandomRating();
+  const ratingCount = getRatingCount();
 
   return (
-    <Link href={href} className="group block">
+    <div className="group">
       <div
         className={cn(
-          "relative overflow-hidden rounded-2xl border border-white/8 bg-[#081527]",
-          "shadow-[0_14px_35px_rgba(0,0,0,0.22)] transition-all duration-300",
-          "group-hover:-translate-y-1 group-hover:shadow-[0_20px_45px_rgba(0,0,0,0.3)]",
+          "relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white",
+          "shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all duration-300",
+          "group-hover:-translate-y-1 group-hover:shadow-[0_12px_24px_rgba(0,0,0,0.12)]",
         )}
       >
-        <div className="relative min-h-[21rem] sm:min-h-[24rem]">
-          {item.coverImageUrl ? (
-            <img
-              src={item.coverImageUrl}
-              alt={item.title}
-              className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <div className={cn("absolute inset-0 bg-linear-to-br", palette.gradient)}>
-              <Icon className="absolute right-5 top-5 size-16 text-white/15" />
-              <div className="absolute -bottom-6 -left-6 size-32 rounded-full bg-white/10 blur-2xl" />
-              <div className="absolute -right-4 top-1/3 size-24 rounded-full bg-white/10 blur-xl" />
-            </div>
-          )}
+        {/* Image Container */}
+        <div className="relative overflow-hidden rounded-t-2xl">
+          <div className="relative min-h-[16rem] bg-[var(--color-surface-2)]">
+            {item.coverImageUrl ? (
+              <img
+                src={item.coverImageUrl}
+                alt={item.title}
+                className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-110"
+                loading="lazy"
+              />
+            ) : (
+              <div className={cn("absolute inset-0 bg-linear-to-br", palette.gradient)}>
+                <Icon className="absolute right-5 top-5 size-16 text-white/15" />
+              </div>
+            )}
 
-          <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/45 to-black/15" />
+            {/* Overlay */}
+            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent" />
 
-          <div className="absolute left-3 top-3">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
-                isPlan
-                  ? "bg-emerald-500/95 text-white"
-                  : "bg-sky-500/95 text-white",
-              )}
-            >
-              {isPlan ? "User Plan" : "Agency Package"}
-            </span>
-          </div>
-          {vibe ? (
-            <div className="absolute right-3 top-3 rounded-full border border-white/25 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/90 backdrop-blur-sm">
-              {vibe}
-            </div>
-          ) : null}
-
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-white/70">
-              <MapPin className="size-3 shrink-0" />
-              <span className="line-clamp-1">
-                {item.destination}
-                {item.destinationState ? `, ${item.destinationState}` : ""}
+            {/* Badges */}
+            <div className="absolute left-3 top-3 flex gap-2">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
+                  isPlan
+                    ? "bg-[var(--color-sea-500)] text-white"
+                    : "bg-[var(--color-sky-500)] text-white",
+                )}
+              >
+                {isPlan ? "User Plan" : "Agency Package"}
               </span>
+              {vibe && (
+                <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                  {vibe}
+                </span>
+              )}
             </div>
 
-            <h3 className="mb-3 line-clamp-2 font-display text-[1.2rem] font-black leading-tight text-white sm:text-[1.35rem]">
-              {item.title}
-            </h3>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-white/12 bg-black/45 px-2.5 py-2 text-center backdrop-blur-sm">
-                <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/55">Budget</p>
-                <p className="truncate text-[11px] font-bold text-white">{budgetLabel}</p>
+            {/* Floating Rating Badge */}
+            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg border border-white/25 bg-black/50 px-2.5 py-1.5 backdrop-blur-sm">
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={cn(
+                      "size-3",
+                      i < Math.floor(Number(rating))
+                        ? "fill-[#fbbf24] text-[#fbbf24]"
+                        : "text-white/30"
+                    )}
+                  />
+                ))}
               </div>
-              <div className="rounded-xl border border-white/12 bg-black/45 px-2.5 py-2 text-center backdrop-blur-sm">
-                <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/55">Duration</p>
-                <p className="truncate text-[11px] font-bold text-white">{durLabel}</p>
-              </div>
-              <div className="rounded-xl border border-white/12 bg-black/45 px-2.5 py-2 text-center backdrop-blur-sm">
-                <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/55">Members</p>
-                <p className="text-[11px] font-bold text-white">
-                  {item.joinedCount}/{item.groupSizeMax}
-                </p>
-              </div>
+              <span className="text-[10px] font-bold text-white">{rating}</span>
             </div>
           </div>
         </div>
+
+        {/* Content Container */}
+        <div className="p-4 sm:p-5">
+          {/* Location & Destination */}
+          <div className="mb-2 flex items-start gap-2">
+            <MapPin className="size-3.5 shrink-0 text-[var(--color-sea-600)] mt-0.5" />
+            <span className="text-xs font-semibold text-[var(--color-ink-600)]">
+              {item.destination}
+              {item.destinationState ? `, ${item.destinationState}` : ""}
+            </span>
+          </div>
+
+          {/* Title */}
+          <h3 className="mb-3 line-clamp-2 font-display text-sm font-black leading-snug text-[var(--color-ink-950)]">
+            {item.title}
+          </h3>
+
+          {/* Rating & Review Count */}
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={cn(
+                    "size-3",
+                    i < Math.floor(Number(rating))
+                      ? "fill-[var(--color-sea-500)] text-[var(--color-sea-500)]"
+                      : "text-[var(--color-border)]"
+                  )}
+                />
+              ))}
+            </div>
+            <span className="text-xs font-semibold text-[var(--color-ink-900)]">{rating}</span>
+            <span className="text-xs text-[var(--color-ink-500)]">({ratingCount})</span>
+          </div>
+
+          {/* Details Grid */}
+          <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-[var(--color-surface-1)] p-2.5">
+            <div className="text-center">
+              <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--color-ink-600)]">Duration</p>
+              <p className="mt-1 flex items-center justify-center gap-1 text-xs font-bold text-[var(--color-ink-950)]">
+                <Clock className="size-3" />
+                {durLabel}
+              </p>
+            </div>
+            <div className="text-center border-l border-r border-[var(--color-border)]">
+              <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--color-ink-600)]">Budget</p>
+              <p className="mt-1 text-xs font-bold text-[var(--color-sea-600)]">{budgetLabel}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--color-ink-600)]">Members</p>
+              <p className="mt-1 flex items-center justify-center gap-1 text-xs font-bold text-[var(--color-ink-950)]">
+                <Users className="size-3" />
+                {item.joinedCount}/{item.groupSizeMax}
+              </p>
+            </div>
+          </div>
+
+          {/* CTA Buttons */}
+          <div className="flex gap-2">
+            <Link href={href} className="flex-1">
+              <Button type="button" variant="soft" size="sm" className="w-full">
+                {isPlan ? "View Plan" : "View Package"}
+              </Button>
+            </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-fit"
+              onClick={() => {
+                // In real app, would open join modal
+                console.log("Join clicked");
+              }}
+            >
+              <Phone className="size-3" />
+              Join
+            </Button>
+          </div>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -115,14 +197,16 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
   const { Icon } = palette;
   const dateLabel = formatDateRange(item.startDate, item.endDate);
   const isPlan = item.originType === "plan";
+  const budgetLabel = formatCurrency(item.priceLow ?? item.priceHigh ?? null);
+  const rating = getRandomRating();
 
   return (
     <Link href={href} className="group block">
       <div
         className={cn(
-          "relative overflow-hidden rounded-xl border border-white/10 bg-[#0b1d33]",
-          "shadow-[0_10px_24px_rgba(0,0,0,0.2)] transition-all duration-300",
-          "group-hover:-translate-y-0.5 group-hover:shadow-[0_14px_30px_rgba(0,0,0,0.28)]",
+          "relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-white",
+          "shadow-[var(--shadow-sm)] transition-all duration-300",
+          "group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-md)]",
         )}
       >
         <div className="relative aspect-4/5">
@@ -130,7 +214,7 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
             <img
               src={item.coverImageUrl}
               alt={item.title}
-              className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-110"
               loading="lazy"
             />
           ) : (
@@ -138,18 +222,29 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
               <Icon className="absolute right-3 top-3 size-10 text-white/20" />
             </div>
           )}
-          <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
 
-          <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/85 backdrop-blur-sm">
+          {/* Tag */}
+          <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/25 bg-black/50 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur-sm">
             {isPlan ? <Users className="size-2.5" /> : <CalendarDays className="size-2.5" />}
             {isPlan ? "Plan" : "Package"}
           </div>
 
+          {/* Rating Badge */}
+          <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-full border border-white/25 bg-black/50 px-1.5 py-0.5 backdrop-blur-sm">
+            <Star className="size-2.5 fill-[#fbbf24] text-[#fbbf24]" />
+            <span className="text-[9px] font-bold text-white">{rating}</span>
+          </div>
+
+          {/* Content */}
           <div className="absolute bottom-0 left-0 right-0 p-3">
             <p className="line-clamp-2 font-display text-[0.85rem] font-bold leading-tight text-white">
               {item.title}
             </p>
-            <p className="mt-1 text-[10px] text-white/70">{dateLabel}</p>
+            <div className="mt-2 flex items-center justify-between gap-1.5">
+              <p className="text-[10px] text-white/80">{dateLabel}</p>
+              <span className="text-[10px] font-bold text-[var(--color-sea-300)]">{budgetLabel}</span>
+            </div>
           </div>
         </div>
       </div>
