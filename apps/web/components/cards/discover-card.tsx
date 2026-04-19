@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { CalendarDays, Compass, MapPin, Mountain, Palmtree, Sunrise, Users, Star, Phone, Clock } from "lucide-react";
 import { formatCurrency, formatDuration, formatDateRange } from "@/lib/format";
