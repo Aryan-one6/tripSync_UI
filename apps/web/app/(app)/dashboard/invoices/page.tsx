@@ -50,6 +50,7 @@ export default function InvoicesListPage() {
 
   return (
     <DashboardShell
+      variant="user"
       title="My Invoices"
       subtitle="Tax invoices for all your trip payments. Download as PDF anytime."
     >
