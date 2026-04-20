@@ -23,6 +23,8 @@ interface DiscoverItem {
   ownerId: string | null;
   agencyId: string | null;
   joinedCount: number;
+  /** Null for packages, 'STANDARD' or 'CORPORATE' for plans */
+  planType: string | null;
 }
 
 interface CursorRow {
@@ -137,6 +139,10 @@ function getDiscoverOrderBy(
 
 function getDiscoverFilters(query: DiscoverQuery): Prisma.Sql[] {
   const filters: Prisma.Sql[] = [];
+
+  // Corporate plans are restricted — only agencies browse them via /plans/corporate/open.
+  // Exclude CORPORATE planType from the public discover feed.
+  filters.push(Prisma.sql`("planType" IS NULL OR "planType" = 'STANDARD')`);
 
   if (query.destination) {
     filters.push(Prisma.sql`destination ILIKE ${`%${query.destination.trim()}%`}`);

@@ -9,6 +9,7 @@ import {
   Compass,
   Eye,
   FilePlus2,
+  FileText,
   Gift,
   Handshake,
   LayoutDashboard,
@@ -35,6 +36,7 @@ const userNavSecondary = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/storefront", label: "Public Profile", icon: Eye },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+  { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { href: "/dashboard/refer-and-earn", label: "Refer & Earn", icon: Gift },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
@@ -51,6 +53,7 @@ const agencyNavMain = [
 const agencyNavSecondary = [
   { href: "/agency/storefront", label: "Storefront", icon: Store },
   { href: "/agency/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/agency/invoices", label: "Invoices", icon: FileText },
   { href: "/agency/settings", label: "Verification", icon: Settings },
 ];
 

@@ -749,6 +749,147 @@ export async function getGroupPaymentState(groupId: string, userId: string) {
   };
 }
 
+/**
+ * GET /payments/groups/:groupId/checkout — read-only breakdown preview.
+ * Computes the full price breakdown including optional promo, points, and wallet deductions
+ * without creating any payment order. Safe to call multiple times.
+ */
+export async function getCheckoutBreakdownPreview(
+  groupId: string,
+  userId: string,
+  options?: { promoCode?: string; pointsToRedeem?: number; walletAmountToUse?: number },
+) {
+  const context = await getGroupPaymentContext(groupId, userId);
+
+  const requestedPoints = options?.pointsToRedeem ?? 0;
+  const requestedWallet = options?.walletAmountToUse ?? 0;
+  const promoCodeRaw = options?.promoCode?.trim().toUpperCase() ?? null;
+
+  // ── Wallet preview ──
+  let walletDiscount = 0;
+  let walletAmountUsed = 0;
+  let walletError: string | null = null;
+  if (requestedWallet > 0) {
+    const { getWalletBalance } = await import('../wallet/service.js');
+    const balance = await getWalletBalance(userId);
+    if (requestedWallet > balance) {
+      walletError = `Cannot use ₹${requestedWallet}. Available: ₹${balance}`;
+    } else {
+      walletAmountUsed = requestedWallet;
+      walletDiscount = requestedWallet * 100;
+    }
+  }
+
+  // ── Points preview ──
+  let pointsDiscount = 0;
+  let pointsRedeemed = 0;
+  let pointsError: string | null = null;
+  if (requestedPoints > 0) {
+    const { computeMaxRedeemablePoints, getLoyaltyBalance } = await import('../loyalty/service.js');
+    const balance = await getLoyaltyBalance(userId);
+    const maxRedeem = computeMaxRedeemablePoints(context.breakdown.tripAmount - walletDiscount);
+    const effectiveMax = Math.min(balance, maxRedeem);
+    if (requestedPoints > effectiveMax) {
+      pointsError = `Cannot redeem ${requestedPoints} points. Max: ${effectiveMax}`;
+    } else {
+      pointsRedeemed = requestedPoints;
+      pointsDiscount = requestedPoints * 100;
+    }
+  }
+
+  // ── Promo code preview ──
+  let promoDiscount = 0;
+  let promoError: string | null = null;
+  let promoDescription: string | null = null;
+  if (promoCodeRaw) {
+    const promo = await prisma.promotionalDiscount.findUnique({
+      where: { code: promoCodeRaw },
+      include: { usages: { where: { userId }, select: { id: true } } },
+    });
+    if (!promo || !promo.isActive) {
+      promoError = 'Promo code not found or inactive.';
+    } else if (promo.expiresAt && promo.expiresAt < new Date()) {
+      promoError = 'This promo code has expired.';
+    } else if (promo.maxUsageTotal !== null && promo.usageCount >= promo.maxUsageTotal) {
+      promoError = 'This promo code has reached its usage limit.';
+    } else if (promo.usages.length >= promo.maxUsagePerUser) {
+      promoError = 'You have already used this promo code.';
+    } else {
+      const basketPaise = context.breakdown.totalAmount - walletDiscount - pointsDiscount;
+      if (basketPaise < promo.minOrderAmount) {
+        promoError = `Minimum order of ₹${(promo.minOrderAmount / 100).toLocaleString('en-IN')} required.`;
+      } else {
+        const rawDiscount =
+          promo.discountType === 'percent'
+            ? Math.floor((basketPaise * promo.discountValue) / 10000)
+            : promo.discountValue;
+        promoDiscount = promo.maxDiscountAmount !== null
+          ? Math.min(rawDiscount, promo.maxDiscountAmount)
+          : rawDiscount;
+        promoDescription = promo.description ?? null;
+      }
+    }
+  }
+
+  const effectiveTotal = Math.max(
+    0,
+    context.breakdown.totalAmount - walletDiscount - pointsDiscount - promoDiscount,
+  );
+
+  // ── Loyalty / wallet balances for UI ──
+  const { getLoyaltyBalance, computeMaxRedeemablePoints } = await import('../loyalty/service.js');
+  const { getWalletBalance } = await import('../wallet/service.js');
+  const loyaltyBalance = await getLoyaltyBalance(userId);
+  const walletBalance = await getWalletBalance(userId);
+  const maxRedeemablePoints = computeMaxRedeemablePoints(context.breakdown.tripAmount);
+  const effectiveMaxRedeem = Math.min(loyaltyBalance, maxRedeemablePoints);
+
+  return {
+    groupId,
+    agencyName: context.agency.name,
+    paymentSource: context.paymentSource,
+    plan: context.plan
+      ? { id: context.plan.id, title: context.plan.title, slug: context.plan.slug }
+      : null,
+    package: context.package
+      ? { id: context.package.id, title: context.package.title, slug: context.package.slug }
+      : null,
+    currency: 'INR',
+    breakdown: {
+      tripAmount: context.breakdown.tripAmount,
+      platformFeeAmount: context.breakdown.platformFeeAmount,
+      feeGstAmount: context.breakdown.feeGstAmount,
+      subtotal: context.breakdown.totalAmount,
+      walletDiscount,
+      walletAmountUsed,
+      pointsDiscount,
+      pointsRedeemed,
+      promoDiscount,
+      promoCode: promoCodeRaw,
+      promoDescription,
+      effectiveTotal,
+    },
+    errors: {
+      wallet: walletError,
+      points: pointsError,
+      promo: promoError,
+    },
+    loyalty: {
+      availablePoints: loyaltyBalance,
+      maxRedeemablePoints: effectiveMaxRedeem,
+      maxDiscountPaise: effectiveMaxRedeem * 100,
+    },
+    wallet: {
+      availableBalanceRupees: walletBalance,
+      maxUsableRupees: Math.min(walletBalance, Math.floor(context.breakdown.tripAmount / 100)),
+    },
+    checkoutMode: env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET ? 'razorpay' : 'mock',
+    razorpayKeyId: env.RAZORPAY_KEY_ID || null,
+  };
+}
+
+
+
 export async function listMyPayments(userId: string) {
   return prisma.payment.findMany({
     where: { userId },
@@ -782,11 +923,12 @@ export async function listMyPayments(userId: string) {
 export async function createOrder(
   groupId: string,
   userId: string,
-  options?: { pointsToRedeem?: number; walletAmountToUse?: number },
+  options?: { pointsToRedeem?: number; walletAmountToUse?: number; promoCode?: string },
 ) {
   const context = await getGroupPaymentContext(groupId, userId);
   const requestedPoints = options?.pointsToRedeem ?? 0;
   const requestedWallet = options?.walletAmountToUse ?? 0;
+  const promoCodeRaw = options?.promoCode?.trim().toUpperCase();
 
   if (!Number.isInteger(requestedPoints) || requestedPoints < 0) {
     throw new BadRequestError('pointsToRedeem must be a non-negative integer');
@@ -874,7 +1016,25 @@ export async function createOrder(
     pointsDiscount = requested * 100; // 1 point = 1 INR = 100 paise
   }
 
-  const effectiveTotal = context.breakdown.totalAmount - walletDiscount - pointsDiscount;
+  // ─── Promotional Discount ──────────────────────────────────────────────────
+  let promoDiscount = 0; // in paise
+  let promoCodeApplied: string | null = null;
+  let promoId: string | null = null;
+
+  if (promoCodeRaw) {
+    const promoResult = await applyPromoCodeAtCheckout(
+      userId,
+      promoCodeRaw,
+      context.breakdown.totalAmount - walletDiscount - pointsDiscount,
+    );
+    if (promoResult) {
+      promoDiscount = promoResult.discountPaise;
+      promoCodeApplied = promoCodeRaw;
+      promoId = promoResult.promoId;
+    }
+  }
+
+  const effectiveTotal = context.breakdown.totalAmount - walletDiscount - pointsDiscount - promoDiscount;
   if (effectiveTotal < 0) {
     throw new BadRequestError('Discounts cannot exceed payable amount');
   }
@@ -995,6 +1155,29 @@ export async function createOrder(
     );
   }
 
+  // Record promo code usage (atomic with payment creation, idempotent)
+  if (promoId && promoCodeApplied && promoDiscount > 0) {
+    try {
+      await prisma.$transaction([
+        prisma.promoCodeUsage.create({
+          data: {
+            promoId,
+            userId,
+            paymentId: payment.id,
+            discountApplied: promoDiscount,
+          },
+        }),
+        prisma.promotionalDiscount.update({
+          where: { id: promoId },
+          data: { usageCount: { increment: 1 } },
+        }),
+      ]);
+    } catch (err) {
+      // Unique constraint violation = promo already used by this user
+      console.warn('[promo] duplicate usage attempt, discarding', { userId, promoCodeApplied });
+    }
+  }
+
   return {
     payment,
     amount: payment.amount,
@@ -1008,6 +1191,8 @@ export async function createOrder(
       pointsDiscount,
       walletAmountUsed,
       walletDiscount,
+      promoCode: promoCodeApplied,
+      promoDiscount,
     },
     paymentSource: payment.source,
     currency: payment.currency,
@@ -2291,4 +2476,114 @@ export async function getAgencyPayoutSummary(userId: string) {
   };
 
   return { summary, payments };
+}
+
+// ─── Promotional Discount Helpers ─────────────────────────────────────────────
+
+/**
+ * Validates a promo code and computes its discount against the current basket amount.
+ * Returns discount details or null if the code is invalid/expired/exhausted.
+ * Does NOT apply or record usage — use applyPromoCodeAtCheckout for that.
+ */
+export async function validatePromoCode(
+  userId: string,
+  code: string,
+  groupId: string,
+) {
+  const normalized = code.trim().toUpperCase();
+
+  const promo = await prisma.promotionalDiscount.findUnique({
+    where: { code: normalized },
+    include: {
+      usages: {
+        where: { userId },
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!promo || !promo.isActive) {
+    return { valid: false, error: 'INVALID_CODE', message: 'Promo code not found or inactive.' };
+  }
+
+  if (promo.expiresAt && promo.expiresAt < new Date()) {
+    return { valid: false, error: 'EXPIRED', message: 'This promo code has expired.' };
+  }
+
+  if (promo.maxUsageTotal !== null && promo.usageCount >= promo.maxUsageTotal) {
+    return { valid: false, error: 'EXHAUSTED', message: 'This promo code has reached its usage limit.' };
+  }
+
+  if (promo.usages.length >= promo.maxUsagePerUser) {
+    return { valid: false, error: 'ALREADY_USED', message: 'You have already used this promo code.' };
+  }
+
+  // Compute discount against the group's basket
+  const context = await getGroupPaymentContext(groupId, userId);
+  const basketPaise = context.breakdown.totalAmount;
+
+  if (basketPaise < promo.minOrderAmount) {
+    return {
+      valid: false,
+      error: 'MIN_ORDER',
+      message: `Minimum order amount of ₹${(promo.minOrderAmount / 100).toLocaleString('en-IN')} required.`,
+    };
+  }
+
+  const rawDiscount =
+    promo.discountType === 'percent'
+      ? Math.floor((basketPaise * promo.discountValue) / 10000) // basisPoints: 100 = 1%
+      : promo.discountValue;
+
+  const discountPaise = promo.maxDiscountAmount !== null
+    ? Math.min(rawDiscount, promo.maxDiscountAmount)
+    : rawDiscount;
+
+  return {
+    valid: true,
+    code: normalized,
+    discountType: promo.discountType,
+    discountPaise,
+    discountRupees: discountPaise / 100,
+    description: promo.description,
+    expiresAt: promo.expiresAt,
+    message: `₹${(discountPaise / 100).toLocaleString('en-IN')} discount applied!`,
+  };
+}
+
+/**
+ * Internal: applies promo code and returns the discount to deduct from the order.
+ * Returns null if the code is invalid — caller should proceed without discount.
+ */
+async function applyPromoCodeAtCheckout(
+  userId: string,
+  code: string,
+  basketPaise: number,
+): Promise<{ discountPaise: number; promoId: string } | null> {
+  const promo = await prisma.promotionalDiscount.findUnique({
+    where: { code },
+    include: {
+      usages: {
+        where: { userId },
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!promo || !promo.isActive) return null;
+  if (promo.expiresAt && promo.expiresAt < new Date()) return null;
+  if (promo.maxUsageTotal !== null && promo.usageCount >= promo.maxUsageTotal) return null;
+  if (promo.usages.length >= promo.maxUsagePerUser) return null;
+  if (basketPaise < promo.minOrderAmount) return null;
+
+  const rawDiscount =
+    promo.discountType === 'percent'
+      ? Math.floor((basketPaise * promo.discountValue) / 10000)
+      : promo.discountValue;
+
+  const discountPaise = promo.maxDiscountAmount !== null
+    ? Math.min(rawDiscount, promo.maxDiscountAmount)
+    : rawDiscount;
+
+  return { discountPaise, promoId: promo.id };
 }

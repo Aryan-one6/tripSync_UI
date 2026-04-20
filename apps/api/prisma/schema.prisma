@@ -102,48 +102,60 @@ model Agency {
   packages        Package[]
   profileViews    ProfileView[]       @relation("ProfileViewTargetAgencyRel")
   reviewsReceived Review[]            @relation("TargetAgencyRel")
+  bankAccount     AgencyBankAccount?
+  kycDocuments    KycDocument[]
 
   @@map("agencies")
 }
 
 model Plan {
-  id               String     @id @default(uuid())
-  creatorId        String
-  title            String
-  slug             String     @unique
-  destination      String
-  destinationState String?
-  startDate        DateTime?
-  endDate          DateTime?
-  isDateFlexible   Boolean    @default(false)
-  budgetMin        Int?
-  budgetMax        Int?
-  groupSizeMin     Int        @default(4)
-  groupSizeMax     Int        @default(15)
-  vibes            Json?
-  accommodation    String?
-  groupType        String?
-  genderPref       String?
-  ageRangeMin      Int?
-  ageRangeMax      Int?
-  activities       Json?
-  description      String?
-  coverImageUrl    String?
-  autoApprove      Boolean    @default(false)
-  status           PlanStatus @default(DRAFT)
-  expiresAt        DateTime?
-  confirmedAt      DateTime?
-  selectedOfferId  String?    @unique
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  itinerary        Json?
-  galleryUrls      Json?
-  group            Group?
-  offers           Offer[]
-  creator          User       @relation(fields: [creatorId], references: [id])
-  selectedOffer    Offer?     @relation("SelectedOfferRel", fields: [selectedOfferId], references: [id])
+  id                    String      @id @default(uuid())
+  creatorId             String
+  title                 String
+  slug                  String      @unique
+  destination           String
+  destinationState      String?
+  startDate             DateTime?
+  endDate               DateTime?
+  isDateFlexible        Boolean     @default(false)
+  budgetMin             Int?
+  budgetMax             Int?
+  groupSizeMin          Int         @default(4)
+  groupSizeMax          Int         @default(15)
+  vibes                 Json?
+  accommodation         String?
+  groupType             String?
+  genderPref            String?
+  ageRangeMin           Int?
+  ageRangeMax           Int?
+  activities            Json?
+  description           String?
+  coverImageUrl         String?
+  autoApprove           Boolean     @default(false)
+  status                PlanStatus  @default(DRAFT)
+  expiresAt             DateTime?
+  confirmedAt           DateTime?
+  selectedOfferId       String?     @unique
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  itinerary             Json?
+  galleryUrls           Json?
+  // ─── Corporate plan fields ──────────────────────────────────────
+  planType              PlanType    @default(STANDARD)
+  corporateTravelerCount  Int?
+  hasBoardroomReq       Boolean     @default(false)
+  hasConferenceReq      Boolean     @default(false)
+  hasMeetingReq         Boolean     @default(false)
+  corporateBudgetNotes  String?
+  companySector         String?
+  corporateRequirements Json?       // free-form extra requirements
+  group                 Group?
+  offers                Offer[]
+  creator               User        @relation(fields: [creatorId], references: [id])
+  selectedOffer         Offer?      @relation("SelectedOfferRel", fields: [selectedOfferId], references: [id])
 
   @@index([status])
+  @@index([planType, status])
   @@index([destination])
   @@index([startDate, endDate])
   @@map("plans")
@@ -682,6 +694,11 @@ enum PlanStatus {
   CANCELLED
 }
 
+enum PlanType {
+  STANDARD
+  CORPORATE
+}
+
 enum OfferStatus {
   PENDING
   COUNTERED
@@ -860,4 +877,122 @@ model ReferralWalletTransaction {
   @@index([referralId])
   @@index([paymentId])
   @@map("referral_wallet_transactions")
+}
+
+// ─── GST Verification Audit Log ───────────────────────────────────────────────
+
+model GstVerificationLog {
+  id          String   @id @default(uuid())
+  gstin       String
+  agencyId    String?
+  requestedBy String?  // userId or IP
+  verified    Boolean  @default(false)
+  legalName   String?
+  tradeName   String?
+  status      String?
+  errorMsg    String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([gstin, createdAt(sort: Desc)])
+  @@index([agencyId, createdAt(sort: Desc)])
+  @@map("gst_verification_logs")
+}
+
+// ─── Agency Bank Account (Secure) ───────────────────────────────────────────
+
+model AgencyBankAccount {
+  id                    String         @id @default(uuid())
+  agencyId              String         @unique
+  encryptedAccountNumber String        // AES-256-GCM encrypted
+  encryptedIfsc         String         // AES-256-GCM encrypted
+  accountHolderName     String
+  bankName              String?
+  branchName            String?
+  verificationStatus    BankVerificationStatus @default(PENDING)
+  pennyDropReference    String?
+  pennyDropAmount       Int?           // in paise
+  nameMatchScore        Float?
+  verifiedAt            DateTime?
+  retryCount            Int            @default(0)
+  lastAttemptAt         DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  agency                Agency         @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("agency_bank_accounts")
+}
+
+enum BankVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  NAME_MISMATCH
+  MAX_RETRIES_EXCEEDED
+}
+
+// ─── KYC Document Vault ───────────────────────────────────────────────────────
+
+model KycDocument {
+  id          String          @id @default(uuid())
+  agencyId    String
+  docType     KycDocumentType
+  s3Key       String          // private S3 key — never exposed directly
+  fileName    String
+  mimeType    String
+  status      String          @default("pending")  // pending | approved | rejected
+  reviewedBy  String?         // admin userId
+  reviewedAt  DateTime?
+  reviewNotes String?
+  uploadedAt  DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  agency      Agency          @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, docType])
+  @@map("kyc_documents")
+}
+
+enum KycDocumentType {
+  PAN_CARD
+  CANCELLED_CHEQUE
+  GST_CERTIFICATE
+  TOURISM_LICENSE
+  OTHER
+}
+
+// ─── Promotional Discounts ────────────────────────────────────────────────────
+
+model PromotionalDiscount {
+  id                String    @id @default(uuid())
+  code              String    @unique
+  description       String?
+  discountType      String    @default("flat")  // flat | percent
+  discountValue     Int       // paise for flat, basis-points for percent (100 = 1%)
+  maxUsageTotal     Int?
+  maxUsagePerUser   Int       @default(1)
+  usageCount        Int       @default(0)
+  minOrderAmount    Int       @default(0)   // paise
+  maxDiscountAmount Int?      // paise cap
+  isActive          Boolean   @default(true)
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  usages            PromoCodeUsage[]
+
+  @@index([code, isActive])
+  @@map("promotional_discounts")
+}
+
+model PromoCodeUsage {
+  id        String    @id @default(uuid())
+  promoId   String
+  userId    String
+  paymentId String?
+  discountApplied Int
+  usedAt    DateTime  @default(now())
+  promo     PromotionalDiscount @relation(fields: [promoId], references: [id])
+
+  @@unique([promoId, userId])  // max 1 usage per user (enforced at DB level)
+  @@index([userId])
+  @@map("promo_code_usages")
 }

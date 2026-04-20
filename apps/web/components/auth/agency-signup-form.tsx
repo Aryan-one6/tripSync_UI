@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
   ArrowLeft, ArrowRight, Building2, User, MapPin,
-  ShieldCheck, Check, Eye, EyeOff,
+  ShieldCheck, Check, Eye, EyeOff, Loader2, BadgeCheck,
+  AlertCircle, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth/auth-context";
+import { apiFetch } from "@/lib/api/client";
+import { API_BASE_URL } from "@/lib/config";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +53,17 @@ const agencyFormSchema = z
   });
 
 type AgencyFormValues = z.infer<typeof agencyFormSchema>;
+
+// ─── GST verification state ───────────────────────────────────────────────────
+
+type GstStatus =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "verified"; legalName: string; tradeName?: string | null }
+  | { state: "conflict"; message: string }
+  | { state: "inactive"; status: string }
+  | { state: "invalid" }
+  | { state: "unavailable" };
 
 // ─── Steps config ─────────────────────────────────────────────────────────────
 
@@ -148,6 +162,95 @@ function Field({ label, error, hint, className, children, optional }: {
   );
 }
 
+// ─── GSTIN Verification Badge ─────────────────────────────────────────────────
+
+function GstVerificationBadge({ status }: { status: GstStatus }) {
+  if (status.state === "idle") return null;
+
+  if (status.state === "checking") {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-600">
+        <Loader2 className="size-3.5 animate-spin" />
+        Verifying GSTIN…
+      </div>
+    );
+  }
+
+  if (status.state === "verified") {
+    return (
+      <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <BadgeCheck className="size-4 text-emerald-600" />
+          <span className="text-xs font-bold text-emerald-700">GSTIN Verified</span>
+          <Lock className="size-3 text-emerald-500 ml-auto" />
+        </div>
+        <p className="mt-0.5 text-[11px] text-emerald-800 font-medium">
+          {status.legalName}
+        </p>
+        {status.tradeName && status.tradeName !== status.legalName && (
+          <p className="text-[10px] text-emerald-600">Trade name: {status.tradeName}</p>
+        )}
+        <p className="mt-1 text-[10px] text-emerald-600">
+          Company name and address are now locked and read-only.
+        </p>
+      </div>
+    );
+  }
+
+  if (status.state === "conflict") {
+    return (
+      <div className="mt-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="size-3.5 text-red-500" />
+          <span className="text-xs font-bold text-red-700">Already Registered</span>
+        </div>
+        <p className="mt-0.5 text-[11px] text-red-700">{status.message}</p>
+        <Link href="/login?role=agency" className="mt-1 block text-[10px] font-semibold text-violet-600 hover:underline">
+          Sign in to your existing account →
+        </Link>
+      </div>
+    );
+  }
+
+  if (status.state === "inactive") {
+    return (
+      <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="size-3.5 text-amber-600" />
+          <span className="text-xs font-bold text-amber-700">Inactive GSTIN</span>
+        </div>
+        <p className="mt-0.5 text-[11px] text-amber-700">
+          Status: {status.status}. Only active GSTINs are accepted for escrow payouts.
+        </p>
+      </div>
+    );
+  }
+
+  if (status.state === "invalid") {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-red-500">
+        <AlertCircle className="size-3.5" />
+        Invalid GSTIN format. Expected 15-character code (e.g. 22AAAAA0000A1Z5).
+      </div>
+    );
+  }
+
+  if (status.state === "unavailable") {
+    return (
+      <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="size-3.5 text-gray-400" />
+          <span className="text-xs text-gray-500">
+            Verification service unavailable — your GSTIN will be reviewed manually.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // ─── Main Form ────────────────────────────────────────────────────────────────
 
 export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?: string }) {
@@ -158,6 +261,11 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
   const [isPending, startTransition] = useTransition();
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  // GST verification state
+  const [gstStatus, setGstStatus] = useState<GstStatus>({ state: "idle" });
+  const gstDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
   const form = useForm<AgencyFormValues>({
     resolver: zodResolver(agencyFormSchema),
@@ -176,6 +284,80 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
   const currentStep = STEPS[step];
   const isLastStep = step === STEPS.length - 1;
   const loginNextPath = nextPath.startsWith("/dashboard") ? "/agency/dashboard" : nextPath;
+  const isGstVerified = gstStatus.state === "verified";
+
+  // ─── GSTIN live verification ─────────────────────────────────────────────────
+
+  const handleGstinChange = useCallback(
+    (value: string) => {
+      const normalized = value.toUpperCase().trim();
+      form.setValue("gstin", normalized, { shouldValidate: false });
+
+      if (gstDebounceRef.current) clearTimeout(gstDebounceRef.current);
+
+      if (normalized.length < 15) {
+        setGstStatus({ state: "idle" });
+        return;
+      }
+
+      if (!GSTIN_REGEX.test(normalized)) {
+        setGstStatus({ state: "invalid" });
+        return;
+      }
+
+      setGstStatus({ state: "checking" });
+
+      gstDebounceRef.current = setTimeout(async () => {
+        try {
+          const data = await apiFetch<{
+            valid: boolean;
+            verified: boolean;
+            error: string | null;
+            message: string | null;
+            legalName: string | null;
+            tradeName: string | null;
+            status: string | null;
+            alreadyRegistered: boolean;
+          }>(`/api/v1/agencies/gst/verify?gstin=${encodeURIComponent(normalized)}`);
+
+          if (data.alreadyRegistered) {
+            setGstStatus({ state: "conflict", message: data.message || "This GSTIN is already registered." });
+            return;
+          }
+
+          if (data.error === "GST_INACTIVE") {
+            setGstStatus({ state: "inactive", status: data.status ?? "Inactive" });
+            return;
+          }
+
+          if (data.verified && data.legalName) {
+            setGstStatus({
+              state: "verified",
+              legalName: data.legalName,
+              tradeName: data.tradeName,
+            });
+            // Auto-populate legal name into agencyName if it's not yet set
+            const currentName = form.getValues("agencyName");
+            if (!currentName || currentName.trim() === "") {
+              form.setValue("agencyName", data.tradeName || data.legalName);
+            }
+            return;
+          }
+
+          if (data.error === "INVALID_FORMAT") {
+            setGstStatus({ state: "invalid" });
+            return;
+          }
+
+          // Verification API returned but couldn't verify
+          setGstStatus({ state: "unavailable" });
+        } catch {
+          setGstStatus({ state: "unavailable" });
+        }
+      }, 700);
+    },
+    [form],
+  );
 
   async function goNext() {
     const valid = await form.trigger(currentStep.fields);
@@ -293,7 +475,17 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
         {step === 2 && (
           <div className="grid gap-3.5 sm:grid-cols-2 animate-rise-in">
             <Field label="Agency name" error={form.formState.errors.agencyName?.message}>
-              <Input placeholder="TrailRoot Travels" className="h-10" {...form.register("agencyName")} />
+              <Input
+                placeholder="TrailRoot Travels"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyName")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Locked after GST verification
+                </p>
+              )}
             </Field>
             <Field label="Agency city" error={form.formState.errors.agencyCity?.message}>
               <Input placeholder="Delhi" className="h-10" {...form.register("agencyCity")} />
@@ -302,7 +494,17 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
               <Input placeholder="Delhi" className="h-10" {...form.register("agencyState")} />
             </Field>
             <Field label="Registered address" error={form.formState.errors.agencyAddress?.message}>
-              <Input placeholder="Office / registered address" className="h-10" {...form.register("agencyAddress")} />
+              <Input
+                placeholder="Office / registered address"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyAddress")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Locked after GST verification
+                </p>
+              )}
             </Field>
             <div className="sm:col-span-2">
               <Field label="Agency description" error={form.formState.errors.agencyDescription?.message} hint="What makes your agency unique?">
@@ -331,9 +533,29 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
             <Field label="Destinations" error={form.formState.errors.destinationsInput?.message} hint="Comma-separated: Manali, Spiti, Goa" className="sm:col-span-2">
               <Input placeholder="Bir, Manali, Spiti, Kasol" className="h-10" {...form.register("destinationsInput")} />
             </Field>
-            <Field label="GSTIN" error={form.formState.errors.gstin?.message}>
-              <Input placeholder="22AAAAA0000A1Z5" className="h-10 font-mono" {...form.register("gstin")} />
-            </Field>
+
+            {/* ── GSTIN with live verification ── */}
+            <div className="sm:col-span-2">
+              <Field label="GSTIN" error={form.formState.errors.gstin?.message}>
+                <div className="relative">
+                  <Input
+                    placeholder="22AAAAA0000A1Z5"
+                    className={`h-10 font-mono pr-10 ${isGstVerified ? "border-emerald-300 bg-emerald-50/50" : ""}`}
+                    readOnly={isGstVerified}
+                    value={form.watch("gstin")}
+                    onChange={(e) => handleGstinChange(e.target.value)}
+                  />
+                  {isGstVerified && (
+                    <BadgeCheck className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-emerald-500" />
+                  )}
+                  {gstStatus.state === "checking" && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-blue-500 animate-spin" />
+                  )}
+                </div>
+                <GstVerificationBadge status={gstStatus} />
+              </Field>
+            </div>
+
             <Field label="PAN" error={form.formState.errors.pan?.message} optional>
               <Input placeholder="ABCDE1234F" className="h-10 font-mono" {...form.register("pan")} />
             </Field>

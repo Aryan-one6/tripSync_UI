@@ -14,6 +14,12 @@ export const MockCapturePaymentSchema = z.object({
 export const CreateOrderSchema = z.object({
   pointsToRedeem: z.number().int().min(0).optional().default(0),
   walletAmountToUse: z.number().int().min(0).max(200000).optional().default(0),
+  promoCode: z.string().trim().max(30).optional(),
+});
+
+export const ValidatePromoCodeSchema = z.object({
+  code: z.string().trim().min(1).max(30),
+  groupId: z.string().uuid(),
 });
 
 export const ResolveConfirmingWindowSchema = z.object({
@@ -52,3 +58,4 @@ export type ReconcilePaymentsInput = z.infer<typeof ReconcilePaymentsSchema>;
 export type CreateDisputeInput = z.infer<typeof CreateDisputeSchema>;
 export type ResolveDisputeInput = z.infer<typeof ResolveDisputeSchema>;
 export type AdminPaymentMapInput = z.infer<typeof AdminPaymentMapSchema>;
+export type ValidatePromoCodeInput = z.infer<typeof ValidatePromoCodeSchema>;

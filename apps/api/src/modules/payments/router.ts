@@ -14,6 +14,7 @@ import {
   ResolveDisputeSchema,
   CreateOrderSchema,
   AdminPaymentMapSchema,
+  ValidatePromoCodeSchema,
 } from '@tripsync/shared';
 import * as paymentService from './service.js';
 
@@ -68,6 +69,28 @@ paymentsRouter.get(
   }),
 );
 
+// GET /payments/groups/:groupId/checkout — read-only breakdown preview
+// Accepts optional query params: promoCode, pointsToRedeem, walletAmountToUse
+// Safe to call multiple times before committing to an order.
+paymentsRouter.get(
+  '/groups/:groupId/checkout',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const promoCode = typeof req.query.promoCode === 'string' ? req.query.promoCode : undefined;
+    const pointsToRedeem = req.query.pointsToRedeem ? Number(req.query.pointsToRedeem) : undefined;
+    const walletAmountToUse = req.query.walletAmountToUse ? Number(req.query.walletAmountToUse) : undefined;
+
+    const preview = await paymentService.getCheckoutBreakdownPreview(
+      param(req.params.groupId),
+      req.userId!,
+      { promoCode, pointsToRedeem, walletAmountToUse },
+    );
+    res.json({ data: preview });
+  }),
+);
+
+
+
 paymentsRouter.post(
   '/groups/:groupId/order',
   authenticate,
@@ -79,9 +102,25 @@ paymentsRouter.post(
       {
         pointsToRedeem: req.body.pointsToRedeem,
         walletAmountToUse: req.body.walletAmountToUse,
+        promoCode: req.body.promoCode,
       },
     );
     res.json({ data: order });
+  }),
+);
+
+// Promo code validation — pre-flight check before checkout
+paymentsRouter.post(
+  '/promo/validate',
+  authenticate,
+  validate(ValidatePromoCodeSchema),
+  asyncHandler(async (req, res) => {
+    const result = await paymentService.validatePromoCode(
+      req.userId!,
+      req.body.code,
+      req.body.groupId,
+    );
+    res.json({ data: result });
   }),
 );
 

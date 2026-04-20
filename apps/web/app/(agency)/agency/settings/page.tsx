@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Building2, ShieldCheck, Save, FileCheck2, ExternalLink } from "lucide-react";
+import React, { useMemo, useState, useTransition } from "react";
+import {
+  Building2, ShieldCheck, Save, FileCheck2, ExternalLink,
+  Landmark, CheckCircle2, AlertTriangle, Loader2, Lock, RefreshCcw,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -13,11 +16,44 @@ import { AgencyVerificationBadge, UserVerificationBadge } from "@/components/ui/
 import { useAuth } from "@/lib/auth/auth-context";
 import type { AgencySummary, UserProfile } from "@/lib/api/types";
 
+type BankVerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'NAME_MISMATCH' | 'MAX_RETRIES_EXCEEDED';
+
+interface BankRecord {
+  id: string;
+  accountHolderName: string;
+  bankName?: string | null;
+  maskedAccountNumber: string;
+  ifscCode: string;
+  verificationStatus: BankVerificationStatus;
+  nameMatchScore?: number | null;
+  nameMatchPassed?: boolean;
+  verifiedAt?: string | null;
+  retryCount: number;
+  message?: string;
+}
+
 function arrayFromCsv(value: string) {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function BankStatusBadge({ status }: { status: BankVerificationStatus }) {
+  const map: Record<BankVerificationStatus, { label: string; color: string; icon: React.ReactElement }> = {
+    PENDING: { label: "Pending", color: "text-amber-600 bg-amber-50 border-amber-200", icon: <Loader2 className="size-3.5 animate-spin" /> },
+    VERIFIED: { label: "Verified", color: "text-emerald-700 bg-emerald-50 border-emerald-200", icon: <CheckCircle2 className="size-3.5" /> },
+    FAILED: { label: "Failed", color: "text-red-700 bg-red-50 border-red-200", icon: <AlertTriangle className="size-3.5" /> },
+    NAME_MISMATCH: { label: "Name mismatch", color: "text-orange-700 bg-orange-50 border-orange-200", icon: <AlertTriangle className="size-3.5" /> },
+    MAX_RETRIES_EXCEEDED: { label: "Max retries", color: "text-gray-700 bg-gray-100 border-gray-300", icon: <Lock className="size-3.5" /> },
+  };
+  const { label, color, icon } = map[status] ?? map.PENDING;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${color}`}>
+      {icon}
+      {label}
+    </span>
+  );
 }
 
 export default function AgencySettingsPage() {
@@ -41,6 +77,18 @@ export default function AgencySettingsPage() {
     destinations: (agency?.destinations ?? []).join(", "),
     logoUrl: agency?.logoUrl ?? "",
   });
+
+  // ── Bank Verification State ────────────────────────────────────────
+  const [bankForm, setBankForm] = useState({
+    accountNumber: "",
+    ifscCode: "",
+    accountHolderName: "",
+    bankName: "",
+    branchName: "",
+  });
+  const [bankRecord, setBankRecord] = useState<BankRecord | null>(null);
+  const [bankFeedback, setBankFeedback] = useState<string | null>(null);
+  const [isBankLoading, startBankVerify] = useTransition();
 
   const ownerTier = session?.user.verification ?? "BASIC";
   const canReachVerified = ownerTier !== "BASIC";
@@ -336,6 +384,191 @@ export default function AgencySettingsPage() {
           </div>
         </div>
       </Card>
+      {/* Bank Verification card */}
+      {agency && (
+        <Card className="relative overflow-hidden p-5 sm:p-6">
+          <div className="relative space-y-5">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-gradient-to-b from-blue-50 to-blue-100 text-blue-700 shadow-[var(--shadow-clay-sm)]">
+                <Landmark className="size-5" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg text-[var(--color-ink-950)]">Bank account verification</h2>
+                <p className="text-sm text-[var(--color-ink-500)]">
+                  Required for escrow payouts. Encrypted with AES-256-GCM and matched against your GST-verified name.
+                </p>
+              </div>
+            </div>
+
+            {/* Existing record */}
+            {bankRecord && (
+              <div className={`rounded-xl border p-4 ${
+                bankRecord.verificationStatus === 'VERIFIED'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-amber-200 bg-amber-50'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-ink-900)]">
+                      {bankRecord.maskedAccountNumber}
+                    </p>
+                    <p className="text-xs text-[var(--color-ink-500)]">
+                      {bankRecord.accountHolderName} · {bankRecord.ifscCode}
+                    </p>
+                    {bankRecord.nameMatchScore !== null && bankRecord.nameMatchScore !== undefined && (
+                      <p className="mt-1 text-xs text-[var(--color-ink-400)]">
+                        Name match: {(bankRecord.nameMatchScore * 100).toFixed(0)}%
+                        {bankRecord.nameMatchPassed ? ' ✓' : ' — below threshold'}
+                      </p>
+                    )}
+                    {bankRecord.message && (
+                      <p className="mt-1 text-xs text-[var(--color-ink-600)]">{bankRecord.message}</p>
+                    )}
+                  </div>
+                  <BankStatusBadge status={bankRecord.verificationStatus} />
+                </div>
+                {bankRecord.retryCount > 0 && bankRecord.verificationStatus !== 'VERIFIED' && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Attempt {bankRecord.retryCount} / 3 — re-submit with correct details to retry.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Form */}
+            {(!bankRecord || bankRecord.verificationStatus !== 'VERIFIED') &&
+              bankRecord?.verificationStatus !== 'MAX_RETRIES_EXCEEDED' && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                    Account number <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Account number"
+                    value={bankForm.accountNumber}
+                    onChange={(e) => setBankForm((c) => ({ ...c, accountNumber: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                    IFSC code <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. HDFC0001234"
+                    value={bankForm.ifscCode}
+                    onChange={(e) => setBankForm((c) => ({ ...c, ifscCode: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                    Account holder name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="As registered with your bank"
+                    value={bankForm.accountHolderName}
+                    onChange={(e) => setBankForm((c) => ({ ...c, accountHolderName: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Bank name</label>
+                  <Input
+                    placeholder="HDFC Bank"
+                    value={bankForm.bankName}
+                    onChange={(e) => setBankForm((c) => ({ ...c, bankName: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">Branch</label>
+                  <Input
+                    placeholder="Branch name"
+                    value={bankForm.branchName}
+                    onChange={(e) => setBankForm((c) => ({ ...c, branchName: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
+            {bankFeedback && (
+              <div className={`rounded-[var(--radius-md)] p-3 text-sm shadow-[var(--shadow-clay-inset)] ${
+                bankRecord?.verificationStatus === 'VERIFIED'
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : 'bg-[var(--color-sunset-50)] text-[var(--color-sunset-700)]'
+              }`}>
+                {bankFeedback}
+              </div>
+            )}
+
+            {(!bankRecord || bankRecord.verificationStatus !== 'VERIFIED') &&
+              bankRecord?.verificationStatus !== 'MAX_RETRIES_EXCEEDED' && (
+              <div className="flex gap-3">
+                {bankRecord && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        const data = await apiFetchWithAuth<BankRecord>(`/agencies/${agency.id}/bank`);
+                        setBankRecord(data);
+                      } catch {
+                        // noop
+                      }
+                    }}
+                  >
+                    <RefreshCcw className="size-4" />
+                    Refresh status
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  onClick={() =>
+                    startBankVerify(async () => {
+                      setBankFeedback(null);
+                      try {
+                        if (!bankForm.accountNumber || !bankForm.ifscCode || !bankForm.accountHolderName) {
+                          setBankFeedback("Account number, IFSC code, and account holder name are required.");
+                          return;
+                        }
+                        const result = await apiFetchWithAuth<BankRecord>(
+                          `/agencies/${agency.id}/bank/verify`,
+                          {
+                            method: "POST",
+                            body: JSON.stringify(bankForm),
+                          },
+                        );
+                        setBankRecord(result);
+                        setBankFeedback(
+                          result.verificationStatus === 'VERIFIED'
+                            ? '✅ Bank account verified successfully!'
+                            : result.message ?? 'Verification pending — check the status above.',
+                        );
+                        setBankForm({ accountNumber: "", ifscCode: "", accountHolderName: "", bankName: "", branchName: "" });
+                      } catch (error) {
+                        setBankFeedback(error instanceof Error ? error.message : "Unable to verify bank account.");
+                      }
+                    })
+                  }
+                  disabled={isBankLoading}
+                >
+                  {isBankLoading ? (
+                    <><Loader2 className="size-4 animate-spin" /> Verifying…</>
+                  ) : (
+                    <><Landmark className="size-4" /> Verify bank account</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {bankRecord?.verificationStatus === 'MAX_RETRIES_EXCEEDED' && (
+              <p className="text-sm text-red-600">
+                Maximum verification attempts exceeded. Please contact support to reset your bank verification.
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
     </DashboardShell>
   );
 }

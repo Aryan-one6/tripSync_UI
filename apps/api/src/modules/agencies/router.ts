@@ -11,6 +11,9 @@ import {
   SubmitAgencyVerificationSchema,
   UpdateAgencyMemberSchema,
   UpdateAgencySchema,
+  VerifyGstinQuerySchema,
+  BankVerificationSchema,
+  KycDocumentUploadSchema,
 } from '@tripsync/shared';
 import * as agencyService from './service.js';
 
@@ -221,5 +224,97 @@ agenciesRouter.post(
   asyncHandler(async (_req, res) => {
     const results = await agencyService.evaluateAgencyTrustProfiles();
     res.json({ data: results });
+  }),
+);
+
+// ─── Real-time GST Verification ─────────────────────────────────────────────
+
+agenciesRouter.get(
+  '/gst/verify',
+  validateQuery(VerifyGstinQuerySchema),
+  asyncHandler(async (req, res) => {
+    const gstin = (req.validatedQuery as z.infer<typeof VerifyGstinQuerySchema>).gstin;
+    const result = await agencyService.verifyGstinRealtime(gstin, req.ip);
+    res.json({ data: result });
+  }),
+);
+
+// ─── Bank Account Verification ────────────────────────────────────────────────
+
+agenciesRouter.post(
+  '/:id/bank/verify',
+  authenticate,
+  validate(BankVerificationSchema),
+  asyncHandler(async (req, res) => {
+    const result = await agencyService.submitBankVerification(
+      param(req.params.id),
+      req.userId!,
+      req.body,
+    );
+    res.json({ data: result });
+  }),
+);
+
+agenciesRouter.get(
+  '/:id/bank',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await agencyService.getBankVerification(param(req.params.id), req.userId!);
+    res.json({ data: result });
+  }),
+);
+
+// ─── KYC Document Vault ───────────────────────────────────────────────────────
+
+agenciesRouter.post(
+  '/:id/kyc/documents',
+  authenticate,
+  validate(KycDocumentUploadSchema),
+  asyncHandler(async (req, res) => {
+    const doc = await agencyService.uploadKycDocument(
+      param(req.params.id),
+      req.userId!,
+      req.body,
+    );
+    res.status(201).json({ data: doc });
+  }),
+);
+
+agenciesRouter.get(
+  '/:id/kyc/documents',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const docs = await agencyService.listKycDocuments(param(req.params.id), req.userId!);
+    res.json({ data: docs });
+  }),
+);
+
+// Admin: get signed URL for a KYC document
+agenciesRouter.get(
+  '/:id/kyc/documents/:docId/download',
+  authenticate,
+  authorize('platform_admin'),
+  asyncHandler(async (req, res) => {
+    const url = await agencyService.getKycDocumentDownloadUrl(
+      param(req.params.id),
+      param(req.params.docId),
+    );
+    res.json({ data: { url } });
+  }),
+);
+
+// Get a presigned upload URL for direct-to-S3 upload of a KYC document
+agenciesRouter.post(
+  '/:id/kyc/upload-url',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { mimeType, fileName } = req.body as { mimeType: string; fileName: string };
+    if (!mimeType || !fileName) throw new Error('mimeType and fileName are required');
+
+    const { generatePresignedUploadUrl } = await import('../../lib/s3.js');
+    const agencyId = param(req.params.id);
+    const s3Key = `kyc/${agencyId}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const uploadUrl = await generatePresignedUploadUrl(s3Key, mimeType);
+    res.json({ data: { uploadUrl, s3Key } });
   }),
 );

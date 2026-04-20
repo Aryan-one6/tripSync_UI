@@ -62,6 +62,15 @@ export async function create(creatorId: string, data: CreatePlanInput) {
         coverImageUrl: data.galleryUrls?.[0] ?? data.coverImageUrl,
         autoApprove: data.autoApprove,
         status: PlanStatus.DRAFT,
+        // Corporate fields
+        planType: (data.planType as any) ?? 'STANDARD',
+        corporateTravelerCount: data.corporateTravelerCount,
+        hasBoardroomReq: data.hasBoardroomReq ?? false,
+        hasConferenceReq: data.hasConferenceReq ?? false,
+        hasMeetingReq: data.hasMeetingReq ?? false,
+        corporateBudgetNotes: data.corporateBudgetNotes,
+        companySector: data.companySector,
+        corporateRequirements: data.corporateRequirements as any,
       },
     });
 
@@ -234,6 +243,15 @@ export async function update(planId: string, userId: string, data: UpdatePlanInp
         data.galleryUrls !== undefined
           ? data.galleryUrls[0] ?? null
           : data.coverImageUrl,
+      // Corporate fields
+      planType: data.planType as any,
+      corporateTravelerCount: data.corporateTravelerCount,
+      hasBoardroomReq: data.hasBoardroomReq,
+      hasConferenceReq: data.hasConferenceReq,
+      hasMeetingReq: data.hasMeetingReq,
+      corporateBudgetNotes: data.corporateBudgetNotes,
+      companySector: data.companySector,
+      corporateRequirements: data.corporateRequirements as any,
     },
   });
 }
@@ -423,6 +441,48 @@ export async function listUserPlans(userId: string) {
     orderBy: { createdAt: 'desc' },
     include: {
       group: { select: { currentSize: true, maleCount: true, femaleCount: true, otherCount: true } },
+      _count: { select: { offers: true } },
+    },
+  });
+}
+
+/**
+ * List all OPEN corporate plans — only for authenticated agencies.
+ * Corporate plans are hidden from public discovery to protect business data.
+ */
+export async function listOpenCorporatePlans(
+  agencyUserId: string,
+  options: { cursor?: string; limit?: number } = {},
+) {
+  // Only agencies can browse corporate plans
+  const agency = await prisma.agency.findFirst({
+    where: {
+      OR: [
+        { ownerId: agencyUserId },
+        { members: { some: { userId: agencyUserId, isActive: true } } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (!agency) throw new Error('Agency access required to view corporate plans');
+
+  const limit = options.limit ?? 20;
+  return prisma.plan.findMany({
+    where: {
+      planType: 'CORPORATE',
+      status: 'OPEN',
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+    include: {
+      creator: {
+        select: {
+          id: true, fullName: true, username: true, avatarUrl: true, city: true,
+        },
+      },
+      group: { select: { currentSize: true } },
       _count: { select: { offers: true } },
     },
   });
