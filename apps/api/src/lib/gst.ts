@@ -2,13 +2,19 @@
  * GST Verification Service — TripSync
  *
  * Validates Indian GSTIN format, checks uniqueness across the platform,
- * and fetches the company/trade name from a public GST verification API.
+ * and fetches the company/trade name using a provider waterfall:
+ *
+ *   1. Razorpay Verification API  — free with every Razorpay account, uses
+ *      existing RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET, no extra signup needed.
+ *   2. gstincheck.co.in public API — free, no auth, best-effort backup.
+ *   3. Graceful unverified fallback — never blocks registration.
  *
  * GSTIN Format: 2-digit state + 10-digit PAN + 1 entity + 1 digit + 1 checksum = 15 chars
  * Example: 27AADCB2230M1ZT
  */
 
 import { prisma } from './prisma.js';
+import { env } from './env.js';
 import { BadRequestError, ConflictError } from './errors.js';
 
 // ─── GSTIN regex ─────────────────────────────────────────────────────────────
@@ -41,90 +47,116 @@ export async function assertGstinUnique(gstin: string, excludeAgencyId?: string)
 }
 
 /**
- * GST verification response shape from public API
+ * GST verification response shape
  */
 export interface GstVerificationResult {
   gstin: string;
-  legalName: string;       // registered legal name from GST records
-  tradeName: string | null; // trade/brand name (may differ from legal)
+  legalName: string;
+  tradeName: string | null;
   status: 'Active' | 'Inactive' | 'Cancelled' | 'Suspended' | string;
   stateCode: string;
   registrationDate: string | null;
   verified: boolean;
 }
 
-/**
- * Verify a GSTIN against the public GST verification API.
- *
- * Uses the free Appyflow/MasterIndia GST Search API endpoint.
- * In production, swap this with a paid provider (ClearTax, Suvit, MasterGST, etc.)
- * that gives higher rate limits and SLAs.
- *
- * Falls back gracefully if the API is unavailable — returns unverified result
- * so registration isn't blocked, but marks it as unverified for manual review.
- */
-export async function verifyGstinFromApi(gstin: string): Promise<GstVerificationResult> {
-  const normalized = gstin.toUpperCase().trim();
-
-  if (!isValidGSTIN(normalized)) {
-    throw new BadRequestError(
-      `Invalid GSTIN format: ${normalized}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
-    );
-  }
+// ─── Provider 1: Razorpay beta business-entities API ─────────────────────────
+// Included free with every Razorpay account.
+// Uses existing RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET (Basic Auth).
+async function verifyViaRazorpay(gstin: string): Promise<GstVerificationResult | null> {
+  const keyId = env.RAZORPAY_KEY_ID;
+  const keySecret = env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return null;
 
   try {
-    // Use the free public GST search API (rate-limited, best-effort)
-    // In production, replace with a paid provider like ClearTax or MasterGST
+    const credentials = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
     const response = await fetch(
-      `https://sheet.gstincheck.co.in/check/${normalized}`,
+      `https://api.razorpay.com/v1/beta/business-entities/${encodeURIComponent(gstin)}`,
       {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(10_000), // 10s timeout
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(8_000),
       },
     );
 
     if (!response.ok) {
-      console.warn(`[gst:verify] API returned ${response.status} for ${normalized}`);
-      return fallbackResult(normalized);
+      console.warn(`[gst:razorpay] HTTP ${response.status} for ${gstin}`);
+      return null;
     }
+
+    const data = await response.json() as {
+      gstin?: string;
+      legal_name?: string;
+      trade_name?: string;
+      status?: string;
+      registration_date?: string;
+      error?: string;
+    };
+
+    if (data.error || !data.legal_name) return null;
+
+    return {
+      gstin,
+      legalName: data.legal_name,
+      tradeName: data.trade_name || null,
+      status: data.status ?? 'Unknown',
+      stateCode: gstin.slice(0, 2),
+      registrationDate: data.registration_date || null,
+      verified: true,
+    };
+  } catch (err) {
+    console.warn(`[gst:razorpay] Error for ${gstin}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// ─── Provider 2: Free public gstincheck.co.in API ────────────────────────────
+async function verifyViaPublicApi(gstin: string): Promise<GstVerificationResult | null> {
+  try {
+    const response = await fetch(
+      `https://sheet.gstincheck.co.in/check/${gstin}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(8_000),
+      },
+    );
+
+    if (!response.ok) return null;
 
     const data = await response.json() as {
       flag?: boolean;
       data?: {
-        lgnm?: string;  // legal name
+        lgnm?: string;
         tradeNam?: string;
         sts?: string;
         stcd?: string;
         rgdt?: string;
-        gstin?: string;
       };
       error?: boolean;
-      message?: string;
     };
 
-    if (data.flag === false || data.error || !data.data) {
-      console.warn(`[gst:verify] API error for ${normalized}:`, data.message);
-      return fallbackResult(normalized);
-    }
+    if (data.flag === false || data.error || !data.data) return null;
 
-    const gstData = data.data;
-
+    const g = data.data;
     return {
-      gstin: normalized,
-      legalName: gstData.lgnm ?? 'Unknown',
-      tradeName: gstData.tradeNam || null,
-      status: gstData.sts ?? 'Unknown',
-      stateCode: gstData.stcd ?? normalized.slice(0, 2),
-      registrationDate: gstData.rgdt || null,
+      gstin,
+      legalName: g.lgnm ?? 'Unknown',
+      tradeName: g.tradeNam || null,
+      status: g.sts ?? 'Unknown',
+      stateCode: g.stcd ?? gstin.slice(0, 2),
+      registrationDate: g.rgdt || null,
       verified: true,
     };
   } catch (err) {
-    console.warn(`[gst:verify] Failed to verify ${normalized}:`, err instanceof Error ? err.message : err);
-    return fallbackResult(normalized);
+    console.warn(`[gst:public] Error for ${gstin}:`, err instanceof Error ? err.message : err);
+    return null;
   }
 }
 
+// ─── Provider 3: Graceful unverified fallback ─────────────────────────────────
 function fallbackResult(gstin: string): GstVerificationResult {
   return {
     gstin,
@@ -135,4 +167,38 @@ function fallbackResult(gstin: string): GstVerificationResult {
     registrationDate: null,
     verified: false,
   };
+}
+
+/**
+ * Verify a GSTIN using a provider waterfall:
+ *   1. Razorpay (free, using existing credentials)
+ *   2. Public gstincheck.co.in API
+ *   3. Unverified fallback — never blocks registration
+ */
+export async function verifyGstinFromApi(gstin: string): Promise<GstVerificationResult> {
+  const normalized = gstin.toUpperCase().trim();
+
+  if (!isValidGSTIN(normalized)) {
+    throw new BadRequestError(
+      `Invalid GSTIN format: ${normalized}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
+    );
+  }
+
+  // 1. Try Razorpay (free with existing account credentials)
+  const razorResult = await verifyViaRazorpay(normalized);
+  if (razorResult) {
+    console.info(`[gst:verify] ✅ Razorpay verified ${normalized} → ${razorResult.legalName}`);
+    return razorResult;
+  }
+
+  // 2. Try free public API
+  const publicResult = await verifyViaPublicApi(normalized);
+  if (publicResult) {
+    console.info(`[gst:verify] ✅ Public API verified ${normalized} → ${publicResult.legalName}`);
+    return publicResult;
+  }
+
+  // 3. Graceful fallback — flag for manual review, don't block
+  console.warn(`[gst:verify] ⚠️ All providers failed for ${normalized} — queued for manual review`);
+  return fallbackResult(normalized);
 }
