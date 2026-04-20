@@ -318,7 +318,7 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
             tradeName: string | null;
             status: string | null;
             alreadyRegistered: boolean;
-          }>(`/api/v1/agencies/gst/verify?gstin=${encodeURIComponent(normalized)}`);
+          }>(`/agencies/gst/verify?gstin=${encodeURIComponent(normalized)}`);
 
           if (data.alreadyRegistered) {
             setGstStatus({ state: "conflict", message: data.message || "This GSTIN is already registered." });
