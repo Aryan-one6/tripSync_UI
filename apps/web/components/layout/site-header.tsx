@@ -35,6 +35,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { initials } from "@/lib/format";
 import { useLiveNotifications } from "@/lib/realtime/use-live-notifications";
 import { useUnreadDirectCount } from "@/lib/realtime/use-unread-direct-count";
+import { WalletMenu } from "@/components/wallet/wallet-menu";
 
 // ─── Shared nav config (mirrors app-sidebar) ─────────────────────────────────
 
@@ -142,8 +143,12 @@ export function SiteHeader() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const isHomepage = pathname === "/";
+  const isTransparent = isHomepage && !scrolled;
 
   const isAgency = session?.role === "agency_admin";
   const discoverHref = `/discover?audience=${isAgency ? "agency" : "traveler"}`;
@@ -173,6 +178,12 @@ export function SiteHeader() {
   const sidebarIcon = isAgency ? Building2 : Compass;
   const sidebarTitle = isAgency ? "Agency Console" : "My Space";
   const SidebarIcon = sidebarIcon;
+
+  useEffect(() => {
+    function onScroll() { setScrolled(window.scrollY > 20); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -213,7 +224,10 @@ export function SiteHeader() {
       {/* ── Sticky header bar ─────────────────────────────────────── */}
       <header
         className={cn(
-          "sticky top-0 z-40 border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
+          "sticky top-0 z-40 transition-all duration-300",
+          isTransparent
+            ? "border-b border-transparent bg-transparent shadow-none"
+            : "border-b border-[var(--color-border)] bg-white/95 backdrop-blur-xl shadow-[var(--shadow-sm)]",
           isMobileMessengerRoute && "hidden md:block",
         )}
       >
@@ -222,7 +236,7 @@ export function SiteHeader() {
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center">
             <Image
-              src="/brand/travellersin.png"
+              src={isTransparent ? "/brand/travellersin-light.png" : "/brand/travellersin.png"}
               alt="TravellersIn"
               width={312}
               height={92}
@@ -242,11 +256,16 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  style={isTransparent ? { color: "#ffffff" } : undefined}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
-                      : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
+                    isTransparent
+                      ? active
+                        ? "bg-white/20 !text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
+                        : "!text-white hover:bg-white/15 drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)]"
+                      : active
+                        ? "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]"
+                        : "text-[var(--color-ink-600)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
                   )}
                 >
                   {link.label}
@@ -261,10 +280,15 @@ export function SiteHeader() {
                 <button
                   type="button"
                   onClick={() => setNotificationMenuOpen((v) => !v)}
-                  className="relative flex size-9 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]"
+                  className={cn(
+                    "relative flex size-9 items-center justify-center rounded-full transition",
+                    isTransparent
+                      ? "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] hover:bg-white/15 hover:text-white"
+                      : "text-[var(--color-ink-500)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink-900)]",
+                  )}
                   aria-label="Notifications"
                 >
-                  <Bell className="size-4.5" />
+                  <Bell className="size-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-[var(--color-sunset-600)] px-1 text-[10px] font-semibold text-white">
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -318,9 +342,19 @@ export function SiteHeader() {
             {/* Desktop right actions */}
             <div className="hidden items-center gap-2 md:flex">
               {status === "authenticated" && session ? (
-                <div ref={avatarRef} className="flex items-center gap-2">
+                <>
+                  <WalletMenu />
+                  <div ref={avatarRef} className="flex items-center gap-2">
                 <Link href={inboxHref}>
-                  <Button type="button" variant="ghost" size="sm">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      isTransparent &&
+                        "text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] hover:bg-white/15 hover:text-white",
+                    )}
+                  >
                     <span className="relative">
                       <Inbox className="size-4" />
                       {unreadDirectCount > 0 && (
@@ -377,13 +411,20 @@ export function SiteHeader() {
                     </div>
                   )}
                 </div>
-              </div>
+                  </div>
+                </>
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">Log In</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={isTransparent ? "text-white hover:bg-white/15" : ""}
+                  >
+                    Log In
+                  </Button>
                 </Link>
-                <Link href="/signup/traveler">
+                <Link href="/signup">
                   <Button size="sm">
                     <UserRoundPlus className="size-4" />
                     Sign Up
@@ -396,7 +437,12 @@ export function SiteHeader() {
             {/* Mobile: hamburger */}
             <button
               type="button"
-              className="flex size-10 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-surface-2)] md:hidden"
+              className={cn(
+                "flex size-10 items-center justify-center  md:hidden",
+                isTransparent
+                  ? " text-white "
+                  : " text-[var(--color-ink-700)] "
+              )}
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
             >

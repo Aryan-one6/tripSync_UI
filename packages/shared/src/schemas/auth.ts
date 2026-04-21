@@ -16,10 +16,31 @@ const dateOfBirthSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must be in YYYY-MM-DD format');
 
-export const LoginSchema = z.object({
-  email: z.string().trim().email('Valid email is required'),
-  password: passwordSchema,
-});
+const loginIdentifierSchema = z
+  .string()
+  .trim()
+  .min(3, 'Email or username is required')
+  .max(120, 'Email or username is too long');
+
+export const LoginSchema = z
+  .object({
+    identifier: loginIdentifierSchema.optional(),
+    email: z.string().trim().email('Valid email is required').optional(),
+    password: passwordSchema,
+  })
+  .superRefine((value, ctx) => {
+    if (!value.identifier && !value.email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['identifier'],
+        message: 'Email or username is required',
+      });
+    }
+  })
+  .transform((value) => ({
+    identifier: value.identifier ?? value.email ?? '',
+    password: value.password,
+  }));
 
 const baseSignupSchema = z.object({
   fullName: z.string().trim().min(2).max(100),
@@ -35,7 +56,14 @@ const baseSignupSchema = z.object({
   avatarUrl: z.string().url().optional(),
 });
 
-export const TravelerSignupSchema = baseSignupSchema;
+export const TravelerSignupSchema = baseSignupSchema.extend({
+  referralCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{6,8}$/, 'Referral code must be 6-8 alphanumeric characters')
+    .optional(),
+});
 
 export const AgencySignupSchema = baseSignupSchema.extend({
   agencyName: z.string().trim().min(2).max(120),

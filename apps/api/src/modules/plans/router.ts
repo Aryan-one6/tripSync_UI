@@ -105,3 +105,15 @@ plansRouter.get(
     res.json({ data: offers });
   }),
 );
+
+// Corporate plans listing — agencies only
+plansRouter.get(
+  '/corporate/open',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const plans = await planService.listOpenCorporatePlans(req.userId!, { cursor, limit });
+    res.json({ data: plans });
+  }),
+);

@@ -39,7 +39,7 @@ export function SiteFooter() {
   ];
 
   return (
-    <footer className="relative mt-16 overflow-hidden border-t border-[var(--color-border)]">
+    <footer className="relative overflow-hidden border-t border-[var(--color-border)]">
       {/* Main footer body */}
       <div className="bg-[var(--color-ink-950)]">
         <div className="page-shell py-14">
@@ -47,13 +47,16 @@ export function SiteFooter() {
 
             {/* Brand column */}
             <div className="space-y-6">
-              <Image
-                src="/brand/travellersin.png"
-                alt="TravellersIn"
-                width={312}
-                height={92}
-                className="h-10 w-auto brightness-0 invert"
-              />
+             <Link href="/" className="flex shrink-0 items-center">
+            <Image
+              src= "/brand/travellersin-light.png" 
+              alt="TravellersIn"
+              width={312}
+              height={92}
+              priority
+              className="h-8 w-auto sm:h-9"
+            />
+          </Link>
               <p className="max-w-xs text-sm leading-relaxed text-white/90">
                 India&apos;s group travel marketplace — connecting adventurers with
                 verified agencies. Escrow-protected payments. Real negotiations.

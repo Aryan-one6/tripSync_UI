@@ -36,7 +36,18 @@ const BasePlanSchema = z.object({
     .max(8),
   coverImageUrl: z.string().url().optional(),
   autoApprove: z.boolean().default(false),
+  // ─── Plan type ──────────────────────────────────────────────────────────
+  planType: z.enum(['STANDARD', 'CORPORATE']).default('STANDARD'),
+  // ─── Corporate-specific fields ───────────────────────────────────────────
+  corporateTravelerCount: z.number().int().min(1).max(10000).optional(),
+  hasBoardroomReq: z.boolean().default(false),
+  hasConferenceReq: z.boolean().default(false),
+  hasMeetingReq: z.boolean().default(false),
+  corporateBudgetNotes: z.string().max(1000).optional(),
+  companySector: z.string().max(100).optional(),
+  corporateRequirements: z.record(z.unknown()).optional(),
 });
+
 
 function validatePlanRanges(
   data: {
@@ -48,6 +59,8 @@ function validatePlanRanges(
     groupSizeMax?: number;
     ageRangeMin?: number;
     ageRangeMax?: number;
+    planType?: string;
+    corporateTravelerCount?: number;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -92,6 +105,15 @@ function validatePlanRanges(
       code: z.ZodIssueCode.custom,
       message: 'Minimum age cannot exceed maximum age',
       path: ['ageRangeMin'],
+    });
+  }
+
+  // Corporate-specific: traveler count required for corporate plans
+  if (data.planType === 'CORPORATE' && !data.corporateTravelerCount) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Employee/traveler count is required for corporate trip requests',
+      path: ['corporateTravelerCount'],
     });
   }
 }

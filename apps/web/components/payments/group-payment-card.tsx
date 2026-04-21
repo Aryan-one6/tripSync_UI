@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { CreditCard, ShieldCheck, Sparkles, MessageSquareMore, ArrowRight, Wallet, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,8 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [useWallet, setUseWallet] = useState(true);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
 
   const loadState = useCallback(async () => {
     const data = await apiFetchWithAuth<GroupPaymentState>(`/payments/groups/${groupId}`);
@@ -73,11 +75,57 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
     })();
   }, [loadState]);
 
+  useEffect(() => {
+    if (!state) return;
+    const existingWalletUsed = Number(state.payment?.walletAmountUsed ?? 0);
+    const existingPointsUsed = Number(state.payment?.pointsRedeemed ?? 0);
+    const shouldAutoApplyWallet = state.wallet?.autoApply ?? false;
+    setUseWallet(existingWalletUsed > 0 ? true : shouldAutoApplyWallet);
+    setPointsToRedeem(existingPointsUsed);
+  }, [state]);
+
+  const walletAppliedRupees = useMemo(() => {
+    if (!state || !useWallet) return 0;
+    const maxUsable = state.wallet?.maxUsableRupees ?? 0;
+    const available = state.wallet?.availableBalanceRupees ?? 0;
+    return Math.max(0, Math.floor(Math.min(maxUsable, available)));
+  }, [state, useWallet]);
+
+  const walletAppliedPaise = walletAppliedRupees * 100;
+
+  const maxRedeemablePoints = useMemo(() => {
+    if (!state?.loyalty) return 0;
+    const capByWalletAdjustedAmount = Math.max(
+      0,
+      Math.floor(((state.breakdown.tripAmount - walletAppliedPaise) * 0.2) / 100),
+    );
+    return Math.max(
+      0,
+      Math.min(
+        state.loyalty.availablePoints,
+        state.loyalty.maxRedeemablePoints,
+        capByWalletAdjustedAmount,
+      ),
+    );
+  }, [state, walletAppliedPaise]);
+
+  const appliedPoints = Math.max(0, Math.min(pointsToRedeem, maxRedeemablePoints));
+  const pointsDiscountPaise = appliedPoints * 100;
+
+  const previewTotalAmount = useMemo(() => {
+    if (!state) return 0;
+    return Math.max(0, state.breakdown.totalAmount - walletAppliedPaise - pointsDiscountPaise);
+  }, [pointsDiscountPaise, state, walletAppliedPaise]);
+
   function openCheckout() {
     startTransition(async () => {
       try {
         const order = await apiFetchWithAuth<GroupPaymentOrder>(`/payments/groups/${groupId}/order`, {
           method: "POST",
+          body: JSON.stringify({
+            pointsToRedeem: appliedPoints,
+            walletAmountToUse: walletAppliedRupees,
+          }),
         });
 
         if (order.checkoutMode === "captured") {
@@ -212,10 +260,62 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
                 <span>GST on fee (18%)</span>
                 <span>{formatCurrency(state.breakdown.feeGstAmount / 100)}</span>
               </div>
+              {walletAppliedPaise > 0 && (
+                <div className="flex items-center justify-between text-[var(--color-success-700)]">
+                  <span>Wallet applied</span>
+                  <span>-{formatCurrency(walletAppliedPaise / 100)}</span>
+                </div>
+              )}
+              {pointsDiscountPaise > 0 && (
+                <div className="flex items-center justify-between text-[var(--color-success-700)]">
+                  <span>Points redeemed ({appliedPoints})</span>
+                  <span>-{formatCurrency(pointsDiscountPaise / 100)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between font-semibold text-[var(--color-ink-900)]">
                 <span>Total payable</span>
-                <span>{formatCurrency(state.breakdown.totalAmount / 100)}</span>
+                <span>{formatCurrency(previewTotalAmount / 100)}</span>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white/70 p-3 text-sm">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+              Apply savings
+            </p>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-[var(--color-ink-800)]">Use wallet balance</p>
+                  <p className="text-xs text-[var(--color-ink-500)]">
+                    Available: ₹{(state.wallet?.availableBalanceRupees ?? 0).toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={useWallet}
+                  onChange={(event) => setUseWallet(event.target.checked)}
+                  className="size-4 accent-[var(--color-sea-600)]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-[var(--color-ink-800)]">Redeem points</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={maxRedeemablePoints}
+                  value={appliedPoints}
+                  onChange={(event) => {
+                    const next = Number(event.target.value || 0);
+                    setPointsToRedeem(Number.isFinite(next) ? Math.max(0, Math.floor(next)) : 0);
+                  }}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-ink-800)]"
+                />
+                <p className="mt-1 text-xs text-[var(--color-ink-500)]">
+                  Max redeemable now: {maxRedeemablePoints.toLocaleString("en-IN")} points
+                </p>
+              </label>
             </div>
           </div>
 

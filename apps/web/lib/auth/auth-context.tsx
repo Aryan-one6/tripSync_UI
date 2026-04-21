@@ -30,6 +30,7 @@ type SignupTravelerInput = {
   travelPreferences: string;
   bio?: string;
   avatarUrl?: string;
+  referralCode?: string;
 };
 
 type SignupAgencyInput = SignupTravelerInput & {
@@ -51,7 +52,7 @@ interface AuthContextValue {
   session: AuthSession | null;
   status: "loading" | "guest" | "authenticated";
   isPending: boolean;
-  login: (email: string, password: string) => Promise<AuthSession>;
+  login: (identifier: string, password: string) => Promise<AuthSession>;
   signupTraveler: (input: SignupTravelerInput) => Promise<void>;
   signupAgency: (input: SignupAgencyInput) => Promise<void>;
   refreshAuthSession: () => Promise<AuthSession | null>;
@@ -162,10 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? "authenticated"
       : "guest";
 
-  async function login(email: string, password: string) {
+  async function login(identifier: string, password: string) {
     const nextSession = await apiFetch<AuthSession>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
 
     startTransition(() => {
