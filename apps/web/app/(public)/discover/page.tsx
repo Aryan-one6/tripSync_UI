@@ -52,7 +52,6 @@ export default async function DiscoverPage({
   ]);
 
   const items = rail === "trending" ? trending : forYouItems;
-
   const majorFilters = [
     {
       id: "for-you",
@@ -73,6 +72,24 @@ export default async function DiscoverPage({
       icon: TrendingUp,
     },
   ] as const;
+
+  const railContent = {
+    "for-you": {
+      overline: "Personalized feed",
+      title: "Popular Plans",
+      description: "Balanced results from travelers and agencies across the platform.",
+    },
+    following: {
+      overline: "Your network",
+      title: "Following Feed",
+      description: "Fresh listings from creators and agencies you already follow.",
+    },
+    trending: {
+      overline: "Momentum picks",
+      title: "Trending Listings",
+      description: "Plans and packages getting the most traction right now.",
+    },
+  } as const;
 
   function buildDiscoverHref(overrides: Record<string, string | undefined>) {
     const nextParams = new URLSearchParams();
@@ -108,39 +125,28 @@ export default async function DiscoverPage({
 
   return (
     <div className="page-shell pb-mobile-nav">
-
-      {/* ── Hero Header ── */}
-      <section className="relative mb-6 mt-3 overflow-hidden rounded-[var(--radius-xl)] bg-gradient-to-br from-[var(--color-sea-700)] via-[var(--color-sea-600)] to-[var(--color-sea-500)] p-5 text-white shadow-[var(--shadow-lg)] sm:mb-8 sm:mt-4 sm:rounded-[var(--radius-2xl)] sm:p-8 lg:p-10">
-        {/* Decorative blobs */}
-        <div className="pointer-events-none absolute -right-10 -top-10 size-36 rounded-full bg-white/10 blur-2xl sm:-right-12 sm:-top-12 sm:size-48" />
-        <div className="pointer-events-none absolute -bottom-10 left-1/3 size-24 rounded-full bg-white/5 blur-xl sm:size-32" />
-
-        <div className="relative">
-          <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.24em] text-white/70 sm:text-[10px] sm:tracking-[0.26em]">
-            TravellersIn
-          </p>
-          <h1 className="font-display text-[2rem] font-black leading-[1.02] tracking-tight sm:text-5xl lg:text-6xl">
-            Discover
-            <br />
-            <em className="not-italic text-[var(--color-sea-200)]">Adventure</em>
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-4 sm:text-base">
-            Browse live community plans and agency packages. Filter by destination, budget, dates, or vibe.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2.5 sm:mt-6 sm:gap-3">
-            {["Escrow protected", "Verified agencies", "Live group chat"].map((pill) => (
-              <span
-                key={pill}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur-sm sm:px-4 sm:py-1.5 sm:text-sm"
-              >
-                ✓ {pill}
-              </span>
-            ))}
+      <section className="mb-5 mt-3 rounded-[var(--radius-xl)] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-4 shadow-[var(--shadow-sm)] sm:p-5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Live Trip Marketplace</p>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="font-display text-[clamp(1.6rem,3.8vw,2.35rem)] font-black leading-[1.05] text-[var(--color-ink-950)]">
+              Discover Better Trips.
+            </h1>
+            <p className="mt-1.5 max-w-2xl text-sm text-[var(--color-ink-600)]">
+              Compare live plans and packages by destination, budget, and vibe.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[11px]">
+            <span className="rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 font-semibold text-emerald-700">
+              {items.length.toLocaleString("en-IN")} live results
+            </span>
+            <span className="rounded-full border border-cyan-200 bg-cyan-100 px-3 py-1 font-semibold text-cyan-800">
+              {trending.length.toLocaleString("en-IN")} trending
+            </span>
           </div>
         </div>
       </section>
 
-      {/* ── Search bar ── */}
       <DiscoverSearchFilters
         q={q}
         destination={destination}
@@ -151,8 +157,7 @@ export default async function DiscoverPage({
         rail={rail}
       />
 
-      {/* ── Quick filter pills ── */}
-      <div className="mb-8 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+      <div className="mb-8 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         {QUICK_FILTERS.map((filter) => {
           const active = isQuickFilterActive(filter);
           return (
@@ -160,8 +165,8 @@ export default async function DiscoverPage({
               <span
                 className={
                   active
-                    ? "inline-flex items-center rounded-(--radius-full) px-4 py-2 text-sm font-semibold text-white shadow-(--shadow-sm) transition-all bg-(--color-sea-700)"
-                    : "inline-flex items-center rounded-(--radius-full) border border-(--color-border-strong) bg-(--color-surface-raised) px-4 py-2 text-sm font-medium text-(--color-ink-700) shadow-(--shadow-sm) transition-all hover:border-(--color-sea-200) hover:bg-(--color-sea-50) hover:text-(--color-sea-700)"
+                    ? "inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(16,185,129,0.3)]"
+                    : "inline-flex items-center rounded-full border border-[var(--color-border-strong)] bg-white px-4 py-2 text-sm font-medium text-[var(--color-ink-700)] shadow-[var(--shadow-sm)] transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
                 }
               >
                 {filter.label}
@@ -171,23 +176,24 @@ export default async function DiscoverPage({
         })}
       </div>
 
-      {/* ── Main layout: content + desktop sidebar ── */}
-      <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
-
-        {/* ── Left: Popular Plans + Trending Near You ── */}
-        <div className="space-y-12">
-
-          {/* Popular Plans */}
-          <section>
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="font-display text-xl font-bold text-(--color-ink-950) sm:text-2xl">
-                Popular Plans
-              </h2>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-10">
+          <section className="  p-4 sm:p-6">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">
+                  {railContent[rail].overline}
+                </p>
+                <h2 className="mt-1 font-display text-2xl font-black text-[var(--color-ink-950)] sm:text-3xl">
+                  {railContent[rail].title}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--color-ink-600)]">{railContent[rail].description}</p>
+              </div>
               <Link
                 href={buildDiscoverHref({ rail: "for-you", q: undefined })}
-                className="text-[11px] font-bold uppercase tracking-[0.18em] text-(--color-sea-600) transition hover:text-(--color-sea-500)"
+                className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-600 transition hover:text-emerald-500"
               >
-                See All
+                See all
               </Link>
             </div>
 
@@ -205,7 +211,7 @@ export default async function DiscoverPage({
             ) : items.length === 0 ? (
               <EmptyState
                 title="No results found"
-                description="Try a broader destination or switch between plans and packages."
+                description="Try broader filters or switch between plans and packages."
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -216,13 +222,15 @@ export default async function DiscoverPage({
             )}
           </section>
 
-          {/* Trending Near You */}
           {trending.length > 0 && (
-            <section>
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="font-display text-xl font-bold text-(--color-ink-950) sm:text-2xl">
-                  Trending Near You
-                </h2>
+            <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-[var(--shadow-sm)] sm:p-6">
+              <div className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Hot right now</p>
+                  <h2 className="mt-1 font-display text-xl font-black text-[var(--color-ink-950)] sm:text-2xl">
+                    Trending Near You
+                  </h2>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {trending.slice(0, 4).map((item) => (
@@ -232,18 +240,17 @@ export default async function DiscoverPage({
             </section>
           )}
 
-          {/* Feed filters — mobile only (desktop uses sidebar) */}
           <section className="xl:hidden">
-            <Card className="h-fit p-5">
+            <Card className="h-fit border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white p-5">
               <div className="mb-4 flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-sm bg-(--color-sea-50) text-(--color-sea-700) shadow-(--shadow-sm)">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-[var(--shadow-sm)]">
                   <Compass className="size-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-(--color-ink-500)">
-                    Major filters
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                    Feed mode
                   </p>
-                  <p className="font-display text-base text-(--color-ink-950)">Shape the feed</p>
+                  <p className="font-display text-base text-[var(--color-ink-950)]">Choose your lane</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -254,16 +261,16 @@ export default async function DiscoverPage({
                     <Link
                       key={filter.id}
                       href={buildDiscoverHref({ rail: filter.id })}
-                      className={`flex items-center gap-3 rounded-md border p-3 transition ${
+                      className={`flex items-center gap-3 rounded-xl border p-3 transition ${
                         isActive
-                          ? "border-(--color-sea-200) bg-(--color-sea-50)"
-                          : "border-(--color-border) bg-(--color-surface-raised) hover:border-(--color-sea-100)"
+                          ? "border-emerald-300 bg-emerald-100/70"
+                          : "border-[var(--color-border)] bg-white hover:border-emerald-200"
                       }`}
                     >
-                      <div className="flex size-8 items-center justify-center rounded-full bg-white text-(--color-sea-700) shadow-(--shadow-sm)">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-white text-emerald-700 shadow-[var(--shadow-sm)]">
                         <Icon className="size-4" />
                       </div>
-                      <span className="text-sm font-semibold text-(--color-ink-950)">{filter.label}</span>
+                      <span className="text-sm font-semibold text-[var(--color-ink-950)]">{filter.label}</span>
                     </Link>
                   );
                 })}
@@ -272,19 +279,17 @@ export default async function DiscoverPage({
           </section>
         </div>
 
-        {/* ── Desktop sidebar ── */}
-        <div className="hidden xl:block xl:sticky xl:top-24 self-start xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto hide-scrollbar space-y-5">
-          {/* Feed type selector */}
-          <Card className="h-fit p-5">
+        <aside className="hidden space-y-5 self-start xl:sticky xl:top-24 xl:block xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
+          <Card className="h-fit border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white p-5">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-sm bg-(--color-sea-50) text-(--color-sea-700) shadow-(--shadow-sm)">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-[var(--shadow-sm)]">
                 <Compass className="size-5" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-(--color-ink-500)">
-                  Major filters
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+                  Feed mode
                 </p>
-                <p className="font-display text-lg text-(--color-ink-950)">Shape the feed first</p>
+                <p className="font-display text-lg text-[var(--color-ink-950)]">Shape the feed first</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -295,19 +300,19 @@ export default async function DiscoverPage({
                   <Link
                     key={filter.id}
                     href={buildDiscoverHref({ rail: filter.id })}
-                    className={`block rounded-lg border p-4 transition ${
+                    className={`block rounded-xl border p-4 transition ${
                       isActive
-                        ? "border-(--color-sea-200) bg-(--color-sea-50) shadow-(--shadow-md)"
-                        : "border-(--color-border) bg-(--color-surface-raised) hover:border-(--color-sea-100) hover:shadow-(--shadow-sm)"
+                        ? "border-emerald-300 bg-emerald-100/80 shadow-[var(--shadow-sm)]"
+                        : "border-[var(--color-border)] bg-white hover:border-emerald-200"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex size-9 items-center justify-center rounded-full bg-white text-(--color-sea-700) shadow-(--shadow-sm)">
+                      <div className="mt-0.5 flex size-9 items-center justify-center rounded-full bg-white text-emerald-700 shadow-[var(--shadow-sm)]">
                         <Icon className="size-4" />
                       </div>
                       <div>
-                        <p className="font-semibold text-(--color-ink-950)">{filter.label}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-(--color-ink-600)">
+                        <p className="font-semibold text-[var(--color-ink-950)]">{filter.label}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-[var(--color-ink-600)]">
                           {filter.description}
                         </p>
                       </div>
@@ -318,9 +323,28 @@ export default async function DiscoverPage({
             </div>
           </Card>
 
-          {/* Trending sidebar */}
-      
-        </div>
+          {trending.length > 0 && (
+            <Card className="border border-[var(--color-border)] bg-white p-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600">Momentum board</p>
+              <h3 className="mt-1 font-display text-lg font-black text-[var(--color-ink-950)]">Top trending picks</h3>
+              <div className="mt-4 space-y-3">
+                {trending.slice(0, 3).map((item) => (
+                  <Link
+                    key={`${item.originType}-${item.id}-sidebar`}
+                    href={item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`}
+                    className="block rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-emerald-200 hover:bg-emerald-50"
+                  >
+                    <p className="line-clamp-2 text-sm font-semibold text-[var(--color-ink-900)]">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-[var(--color-ink-600)]">
+                      {item.destination}
+                      {item.destinationState ? `, ${item.destinationState}` : ""}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          )}
+        </aside>
       </div>
     </div>
   );

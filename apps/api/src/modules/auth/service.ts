@@ -10,7 +10,6 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken, type TokenPayloa
 import {
   BadRequestError,
   ConflictError,
-  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
 } from '../../lib/errors.js';
@@ -21,6 +20,7 @@ import { syncUserVerificationTier } from '../../lib/verification.js';
 import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
 import { randomUUID } from 'crypto';
+import { isValidGSTIN, assertGstinUnique, verifyGstinFromApi } from '../../lib/gst.js';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 type SafeAgency = {
@@ -256,19 +256,27 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   // Validate referral code if provided (before creating the user)
   let inviterUserId: string | null = null;
-  const referralCode = (data as any).referralCode as string | undefined;
+  let referralLinkId: string | null = null;
+  const referralCode = data.referralCode?.trim();
   if (referralCode) {
-    const inviter = await prisma.user.findUnique({
-      where: { referralCode },
+    const { assertValidReferralCodeFormat, validateReferralCode } = await import('../referrals/service.js');
+    const normalizedCode = assertValidReferralCodeFormat(referralCode);
+    const validatedReferral = await validateReferralCode(normalizedCode);
+
+    if (!validatedReferral) {
+      throw new BadRequestError('Referral code is invalid or expired');
+    }
+
+    inviterUserId = validatedReferral.referrerId;
+
+    const existingLink = await prisma.referralLink.findUnique({
+      where: { code: normalizedCode },
       select: { id: true },
     });
-    // Silently ignore invalid referral codes — don't fail signup
-    inviterUserId = inviter?.id ?? null;
+    referralLinkId = existingLink?.id ?? null;
   }
 
   const passwordHash = await hashPassword(data.password);
-  // Generate a unique referral code for the new user
-  const newUserReferralCode = `TS${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
 
   const user = existingUser
     ? await prisma.user.update({
@@ -285,7 +293,6 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
-          referralCode: newUserReferralCode,
           referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
@@ -303,19 +310,25 @@ export async function signupTraveler(data: TravelerSignupInput) {
           travelPreferences: data.travelPreferences.trim(),
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
-          referralCode: newUserReferralCode,
           referredByUserId: inviterUserId ?? undefined,
         },
         select: { id: true },
       });
 
-  // Fire referral bonuses asynchronously (don't block signup)
   if (inviterUserId) {
-    // Dynamically import loyalty service to avoid circular deps
-    import('../loyalty/service.js')
-      .then(({ grantReferralBonuses }) => grantReferralBonuses(inviterUserId!, user.id))
-      .catch((err) => console.error('[referral-bonus] failed to grant referral bonuses', err));
+    const { registerReferralInvite } = await import('../referrals/service.js');
+    await registerReferralInvite({
+      referrerId: inviterUserId,
+      referredUserId: user.id,
+      referredEmail: email,
+      referralLinkId: referralLinkId ?? undefined,
+    });
   }
+
+  const { getOrCreateReferralLink } = await import('../referrals/service.js');
+  await getOrCreateReferralLink(user.id);
+
+  // Referral bonus credits are granted in updateProfile() after profile completion.
 
   return {
     message: 'Traveler account created successfully. Please log in.',
@@ -332,7 +345,36 @@ export async function signupAgency(data: AgencySignupInput) {
 
   const passwordHash = await hashPassword(data.password);
 
-  const created = await prisma.$transaction(async (tx) => {
+  // ─── GST Verification for agency signup ─────────────────────────────────
+  let gstVerifiedName: string | null = null;
+  let gstVerifiedAt: Date | null = null;
+  const normalizedGstin = data.gstin?.toUpperCase().trim() || null;
+
+  if (normalizedGstin) {
+    if (!isValidGSTIN(normalizedGstin)) {
+      throw new BadRequestError(
+        `Invalid GSTIN format: ${normalizedGstin}. Expected 15-character Indian GSTIN (e.g. 27AADCB2230M1ZT).`,
+      );
+    }
+
+    // Check uniqueness — throws ConflictError if already registered
+    await assertGstinUnique(normalizedGstin);
+
+    // Verify via public GST API
+    const gstResult = await verifyGstinFromApi(normalizedGstin);
+    if (gstResult.verified) {
+      gstVerifiedName = gstResult.tradeName || gstResult.legalName;
+      gstVerifiedAt = new Date();
+    }
+
+    if (gstResult.status === 'Cancelled' || gstResult.status === 'Suspended') {
+      throw new BadRequestError(
+        `GSTIN ${normalizedGstin} has status "${gstResult.status}". Only active GSTINs are accepted.`,
+      );
+    }
+  }
+
+  const user = await prisma.$transaction(async (tx) => {
     const user = existingUser
       ? await tx.user.update({
           where: { id: existingUser.id },
@@ -399,7 +441,9 @@ export async function signupAgency(data: AgencySignupInput) {
           address: data.agencyAddress.trim(),
           city: data.agencyCity.trim(),
           state: data.agencyState.trim(),
-          gstin: data.gstin?.trim() || undefined,
+          gstin: normalizedGstin || undefined,
+          gstVerifiedName: gstVerifiedName || undefined,
+          gstVerifiedAt: gstVerifiedAt || undefined,
           pan: data.pan?.trim() || undefined,
           tourismLicense: data.tourismLicense?.trim() || undefined,
           specializations: data.specializations,
@@ -412,29 +456,49 @@ export async function signupAgency(data: AgencySignupInput) {
     return user;
   });
 
+  const { getOrCreateReferralLink } = await import('../referrals/service.js');
+  await getOrCreateReferralLink(user.id);
+
   return {
     message: 'Agency account created successfully. Please log in.',
   };
 }
 
 export async function login(
-  email: LoginInput['email'],
+  identifier: LoginInput['identifier'],
   password: LoginInput['password'],
 ) {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedIdentifier = identifier.trim();
+  if (!normalizedIdentifier) {
+    throw new UnauthorizedError('Email or username is required');
+  }
+
+  const looksLikePhone = /^[6-9]\d{9}$/.test(normalizedIdentifier);
+
   const user = await prisma.user.findFirst({
     where: {
-      email: normalizedEmail,
+      OR: [
+        { email: { equals: normalizedIdentifier.toLowerCase(), mode: 'insensitive' } },
+        { username: { equals: normalizedIdentifier.toLowerCase(), mode: 'insensitive' } },
+        ...(looksLikePhone ? [{ phone: normalizedIdentifier }] : []),
+      ],
     },
     select: {
       id: true,
       passwordHash: true,
       isActive: true,
+      email: true,
+      username: true,
+      phone: true,
     },
   });
 
-  if (!user || !user.passwordHash) {
-    throw new UnauthorizedError('Invalid email or password');
+  if (!user) {
+    throw new UnauthorizedError('No account found for this email/username');
+  }
+
+  if (!user.passwordHash) {
+    throw new UnauthorizedError('This account has no password set. Please reset password.');
   }
 
   if (!user.isActive) {
@@ -443,7 +507,7 @@ export async function login(
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
-    throw new UnauthorizedError('Invalid email or password');
+    throw new UnauthorizedError('Incorrect password');
   }
 
   return createSession(user.id);
@@ -482,6 +546,34 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     },
     select: safeUserSelect,
   });
+
+  // After profile update, if user has a referrer and hasn't been credited yet, complete the referral
+  const updatedUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      referredByUserId: true,
+      referralBonusPaid: true,
+    },
+  });
+
+  if (updatedUser?.referredByUserId && !updatedUser.referralBonusPaid) {
+    try {
+      // Dynamically import to avoid circular dependencies
+      const { completeReferral } = await import('../referrals/service.js');
+      await completeReferral(updatedUser.referredByUserId, userId);
+
+      // Mark bonus as paid
+      await prisma.user.update({
+        where: { id: userId },
+        data: { referralBonusPaid: true },
+      });
+    } catch (err) {
+      console.error('[auth] Failed to complete referral on profile update', err);
+      // Don't fail the profile update if referral completion fails
+    }
+  }
+
   return user;
 }
 

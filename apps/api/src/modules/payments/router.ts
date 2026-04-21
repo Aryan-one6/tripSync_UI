@@ -12,6 +12,9 @@ import {
   ReconcilePaymentsSchema,
   CreateDisputeSchema,
   ResolveDisputeSchema,
+  CreateOrderSchema,
+  AdminPaymentMapSchema,
+  ValidatePromoCodeSchema,
 } from '@tripsync/shared';
 import * as paymentService from './service.js';
 
@@ -66,12 +69,58 @@ paymentsRouter.get(
   }),
 );
 
+// GET /payments/groups/:groupId/checkout — read-only breakdown preview
+// Accepts optional query params: promoCode, pointsToRedeem, walletAmountToUse
+// Safe to call multiple times before committing to an order.
+paymentsRouter.get(
+  '/groups/:groupId/checkout',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const promoCode = typeof req.query.promoCode === 'string' ? req.query.promoCode : undefined;
+    const pointsToRedeem = req.query.pointsToRedeem ? Number(req.query.pointsToRedeem) : undefined;
+    const walletAmountToUse = req.query.walletAmountToUse ? Number(req.query.walletAmountToUse) : undefined;
+
+    const preview = await paymentService.getCheckoutBreakdownPreview(
+      param(req.params.groupId),
+      req.userId!,
+      { promoCode, pointsToRedeem, walletAmountToUse },
+    );
+    res.json({ data: preview });
+  }),
+);
+
+
+
 paymentsRouter.post(
   '/groups/:groupId/order',
   authenticate,
+  validate(CreateOrderSchema),
   asyncHandler(async (req, res) => {
-    const order = await paymentService.createOrder(param(req.params.groupId), req.userId!);
+    const order = await paymentService.createOrder(
+      param(req.params.groupId),
+      req.userId!,
+      {
+        pointsToRedeem: req.body.pointsToRedeem,
+        walletAmountToUse: req.body.walletAmountToUse,
+        promoCode: req.body.promoCode,
+      },
+    );
     res.json({ data: order });
+  }),
+);
+
+// Promo code validation — pre-flight check before checkout
+paymentsRouter.post(
+  '/promo/validate',
+  authenticate,
+  validate(ValidatePromoCodeSchema),
+  asyncHandler(async (req, res) => {
+    const result = await paymentService.validatePromoCode(
+      req.userId!,
+      req.body.code,
+      req.body.groupId,
+    );
+    res.json({ data: result });
   }),
 );
 
@@ -158,6 +207,58 @@ paymentsRouter.post(
     const result = await paymentService.completeTrip(
       param(req.params.groupId),
       req.userId!,
+    );
+    res.json({ data: result });
+  }),
+);
+
+// ─── Payment Tracking ────────────────────────────────────────────────────────
+
+// GET /payments/tracking — full payment map for the current user
+paymentsRouter.get(
+  '/tracking',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const map = await paymentService.getPaymentTrackingMap(req.userId!);
+    res.json({ data: map });
+  }),
+);
+
+// GET /payments/admin/map — platform-level payment tracking (admin only)
+paymentsRouter.get(
+  '/admin/map',
+  authenticate,
+  authorize('platform_admin'),
+  validateQuery(AdminPaymentMapSchema),
+  asyncHandler(async (req, res) => {
+    const query = req.validatedQuery as z.infer<typeof AdminPaymentMapSchema>;
+    const map = await paymentService.getAdminPaymentMap(query);
+    res.json({ data: map.payments, meta: { cursor: map.cursor } });
+  }),
+);
+
+// ─── Agency Payout ───────────────────────────────────────────────────────────
+
+// GET /payments/agency/payouts — agency payout summary & escrow lifecycle
+paymentsRouter.get(
+  '/agency/payouts',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await paymentService.getAgencyPayoutSummary(req.userId!);
+    res.json({ data: result });
+  }),
+);
+
+// POST /payments/agency/payout/:paymentId — trigger automated payout for a specific payment
+paymentsRouter.post(
+  '/agency/payout/:paymentId',
+  authenticate,
+  authorize('platform_admin'),
+  asyncHandler(async (req, res) => {
+    const tranche = (req.body.tranche === 'tranche2' ? 'tranche2' : 'tranche1') as 'tranche1' | 'tranche2';
+    const result = await paymentService.executeAgencyPayout(
+      param(req.params.paymentId),
+      tranche,
     );
     res.json({ data: result });
   }),

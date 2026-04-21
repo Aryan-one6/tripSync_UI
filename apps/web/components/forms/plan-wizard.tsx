@@ -51,6 +51,13 @@ interface PlanWizardValues {
   galleryUrls: string[];
   autoApprove: boolean;
   publishNow: boolean;
+  // ─── Corporate trip fields ────────────────────────────────────────
+  isCorporate: boolean;
+  corporateTravelerCount: string;
+  hasBoardroomReq: boolean;
+  hasConferenceReq: boolean;
+  corporateBudgetNotes: string;
+  companySector: string;
 }
 
 const steps = [
@@ -93,6 +100,13 @@ export function PlanWizard() {
     galleryUrls: [],
     autoApprove: false,
     publishNow: true,
+    // Corporate defaults
+    isCorporate: false,
+    corporateTravelerCount: "",
+    hasBoardroomReq: false,
+    hasConferenceReq: false,
+    corporateBudgetNotes: "",
+    companySector: "",
   });
 
   const itineraryPreview = useMemo<DayPlan[]>(() => {
@@ -224,6 +238,19 @@ export function PlanWizard() {
           galleryUrls: values.galleryUrls.length > 0 ? values.galleryUrls : undefined,
           coverImageUrl: values.galleryUrls[0] || undefined,
           autoApprove: values.autoApprove,
+          // Corporate fields
+          planType: values.isCorporate ? 'CORPORATE' : 'STANDARD',
+          corporateTravelerCount: values.isCorporate && values.corporateTravelerCount
+            ? Number(values.corporateTravelerCount)
+            : undefined,
+          hasBoardroomReq: values.isCorporate ? values.hasBoardroomReq : false,
+          hasConferenceReq: values.isCorporate ? values.hasConferenceReq : false,
+          corporateBudgetNotes: values.isCorporate && values.corporateBudgetNotes
+            ? values.corporateBudgetNotes
+            : undefined,
+          companySector: values.isCorporate && values.companySector
+            ? values.companySector
+            : undefined,
         });
 
         const created = await apiFetchWithAuth<{ id: string }>("/plans", {
@@ -315,6 +342,71 @@ export function PlanWizard() {
                     onChange={(e) => setValues((c) => ({ ...c, endDate: e.target.value }))}
                   />
                 </div>
+
+                {/* ── Corporate Trip Toggle ── */}
+                <div className="sm:col-span-2">
+                  <Toggle
+                    checked={values.isCorporate}
+                    onChange={(checked) => setValues((c) => ({ ...c, isCorporate: checked }))}
+                    label="Corporate trip request"
+                    description="Restrict visibility to verified agencies only — your business data stays private"
+                  />
+                </div>
+
+                {/* ── Corporate-specific fields ── */}
+                {values.isCorporate && (
+                  <>
+                    <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                      🏢 Corporate trips are hidden from the public discover feed. Only verified agencies will be able to see and bid on this request.
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                        Number of travelers <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 25"
+                        value={values.corporateTravelerCount}
+                        onChange={(e) => setValues((c) => ({ ...c, corporateTravelerCount: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                        Company / industry sector
+                      </label>
+                      <Input
+                        placeholder="e.g. Financial Services, IT, Healthcare"
+                        value={values.companySector}
+                        onChange={(e) => setValues((c) => ({ ...c, companySector: e.target.value }))}
+                      />
+                    </div>
+                    <div className="sm:col-span-2 grid grid-cols-2 gap-4">
+                      <Toggle
+                        checked={values.hasBoardroomReq}
+                        onChange={(checked) => setValues((c) => ({ ...c, hasBoardroomReq: checked }))}
+                        label="Boardroom required"
+                        description="Need a private board meeting room"
+                      />
+                      <Toggle
+                        checked={values.hasConferenceReq}
+                        onChange={(checked) => setValues((c) => ({ ...c, hasConferenceReq: checked }))}
+                        label="Conference hall required"
+                        description="Need full conference facilities"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-2 block text-sm font-medium text-[var(--color-ink-700)]">
+                        Corporate budget notes
+                      </label>
+                      <Input
+                        placeholder="e.g. All-inclusive budget of ₹5L, no alcohol, dietary restrictions..."
+                        value={values.corporateBudgetNotes}
+                        onChange={(e) => setValues((c) => ({ ...c, corporateBudgetNotes: e.target.value }))}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

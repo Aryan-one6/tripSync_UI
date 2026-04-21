@@ -444,7 +444,7 @@ a {
 
 /* ─── Focus ring improvements ─── */
 
-:focus-visible {
+:focus-visible:not([data-no-focus-ring="true"]) {
   outline: 2px solid var(--color-sea-400);
   outline-offset: 2px;
   border-radius: 4px;

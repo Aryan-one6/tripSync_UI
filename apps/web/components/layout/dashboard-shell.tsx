@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { WalletCard } from "@/components/wallet/wallet-card";
 import { cn } from "@/lib/utils";
 
 export function DashboardShell({
@@ -23,8 +24,9 @@ export function DashboardShell({
 
         {/* Desktop sidebar only — mobile nav is in the header sidebar */}
         <div className="hidden md:block">
-          <div className="sticky top-20">
+          <div className="sticky top-20 space-y-3">
             <AppSidebar variant={variant} />
+            {variant === "user" ? <WalletCard /> : null}
           </div>
         </div>
 

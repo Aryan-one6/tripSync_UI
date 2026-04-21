@@ -23,6 +23,8 @@ interface DiscoverItem {
   ownerId: string | null;
   agencyId: string | null;
   joinedCount: number;
+  /** Null for packages, 'STANDARD' or 'CORPORATE' for plans */
+  planType: string | null;
 }
 
 interface CursorRow {
@@ -137,6 +139,10 @@ function getDiscoverOrderBy(
 
 function getDiscoverFilters(query: DiscoverQuery): Prisma.Sql[] {
   const filters: Prisma.Sql[] = [];
+
+  // Corporate plans are restricted — only agencies browse them via /plans/corporate/open.
+  // Exclude CORPORATE planType from the public discover feed.
+  filters.push(Prisma.sql`("planType" IS NULL OR "planType" = 'STANDARD')`);
 
   if (query.destination) {
     filters.push(Prisma.sql`destination ILIKE ${`%${query.destination.trim()}%`}`);
@@ -275,23 +281,35 @@ async function getDiscoverCursorRow(
 }
 
 function getSearchRankExpression(term: string): Prisma.Sql {
+  const likeTerm = `%${term}%`;
   return Prisma.sql`
-    ts_rank_cd(
-      to_tsvector(
-        'simple',
-        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-      ),
-      websearch_to_tsquery('simple', ${term})
+    (
+      ts_rank_cd(
+        to_tsvector(
+          'simple',
+          concat_ws(' ', title, destination, COALESCE("destinationState", ''))
+        ),
+        websearch_to_tsquery('simple', ${term})
+      )
+      + CASE WHEN title ILIKE ${likeTerm} THEN 0.8 ELSE 0 END
+      + CASE WHEN destination ILIKE ${likeTerm} THEN 0.5 ELSE 0 END
+      + CASE WHEN COALESCE("destinationState", '') ILIKE ${likeTerm} THEN 0.3 ELSE 0 END
     )
   `;
 }
 
 function getSearchFilter(term: string): Prisma.Sql {
+  const likeTerm = `%${term}%`;
   return Prisma.sql`
-    to_tsvector(
-      'simple',
-      concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-    ) @@ websearch_to_tsquery('simple', ${term})
+    (
+      to_tsvector(
+        'simple',
+        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
+      ) @@ websearch_to_tsquery('simple', ${term})
+      OR title ILIKE ${likeTerm}
+      OR destination ILIKE ${likeTerm}
+      OR COALESCE("destinationState", '') ILIKE ${likeTerm}
+    )
   `;
 }
 
@@ -305,10 +323,7 @@ async function getSearchCursorRow(cursorId: string, term: string): Promise<Curso
       ${rankExpr} AS "sortValue"
     FROM discover_feed
     WHERE id = ${cursorId}
-      AND to_tsvector(
-        'simple',
-        concat_ws(' ', title, destination, COALESCE("destinationState", ''))
-      ) @@ websearch_to_tsquery('simple', ${term})
+      AND ${getSearchFilter(term)}
     LIMIT 1
   `);
 
