@@ -12,7 +12,9 @@ class MainWebView extends StatefulWidget {
 class _MainWebViewState extends State<MainWebView> {
   InAppWebViewController?
   _webViewController; // Handles navigation inside the webview
-  bool isLoading = true;
+  //bool isLoading = true;
+
+  ValueNotifier<bool> isLoading = ValueNotifier(true);
 
   @override
   void initState() {
@@ -49,22 +51,34 @@ class _MainWebViewState extends State<MainWebView> {
                 initialUrlRequest: URLRequest(
                   url: WebUri('https://travellersin.com'),
                 ),
+                initialSettings: InAppWebViewSettings(
+                  mediaPlaybackRequiresUserGesture: false,
+                  allowsInlineMediaPlayback: true,
+                  useHybridComposition: true, // Android: better perf
+                  allowFileAccessFromFileURLs: true,
+                  allowUniversalAccessFromFileURLs: true,
+                ),
+                
                 onLoadStart: (controller, url) {
-                  setState(() {
-                    isLoading = true;
-                  });
+                  isLoading.value = true;
                 },
                 onLoadStop: (controller, url) {
-                  setState(() {
-                    isLoading = false;
-                  });
+                  isLoading.value = false;
                 },
+
+              
               ),
 
-              if (isLoading)
-                const Center(
-                  child: CircularProgressIndicator(color: Color(0XFF30c99d)),
-                ),
+              ValueListenableBuilder(
+                valueListenable: isLoading,
+                builder: (context, value, child) {
+                  if (!value) return SizedBox();
+
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0XFF30c99d)),
+                  );
+                },
+              ),
             ],
           ),
         ),
