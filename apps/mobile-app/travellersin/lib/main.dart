@@ -1,9 +1,36 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:travellersin/firebase_options.dart';
 import 'package:travellersin/screens/web_view_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await getFcmToken();
+
   runApp(const MyApp());
+}
+
+Future<void> getFcmToken() async {
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  // Android 13+ / iOS
+  NotificationSettings settings =
+      await messaging.requestPermission();
+
+  debugPrint("Permission: ${settings.authorizationStatus}");
+
+  String? token = await messaging.getToken();
+
+  debugPrint("FCM TOKEN => $token");
+
+  messaging.onTokenRefresh.listen((newToken) {
+    debugPrint("REFRESH TOKEN => $newToken");
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -20,7 +47,7 @@ class MyApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           systemOverlayStyle: SystemUiOverlayStyle(
             statusBarColor: Colors.white,
-            statusBarIconBrightness: Brightness.dark
+            statusBarIconBrightness: Brightness.dark,
           ),
         ),
       ),
@@ -28,7 +55,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-
-
-

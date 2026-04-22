@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "712700521698",
+    "project_id": "travellersin-56644",
+    "storage_bucket": "travellersin-56644.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:712700521698:android:fb45c622e4cd309a71c2bb",
+        "android_client_info": {
+          "package_name": "com.example.travellersin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW1t8sNKzZ2uQnme3EhJCq2uv7J_6g0Gg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

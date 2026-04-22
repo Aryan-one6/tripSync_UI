@@ -65,7 +65,6 @@ class _MainWebViewState extends State<MainWebView> {
                 onLoadStop: (controller, url) {
                   isLoading.value = false;
                 },
-
               
               ),
 
@@ -73,7 +72,6 @@ class _MainWebViewState extends State<MainWebView> {
                 valueListenable: isLoading,
                 builder: (context, value, child) {
                   if (!value) return SizedBox();
-
                   return const Center(
                     child: CircularProgressIndicator(color: Color(0XFF30c99d)),
                   );
