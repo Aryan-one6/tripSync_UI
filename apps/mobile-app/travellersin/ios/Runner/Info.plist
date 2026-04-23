@@ -45,5 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Required for photo uploads</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Required to select photos for upload</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Required for video recording</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Required to save downloaded files</string>
 </dict>
 </plist>

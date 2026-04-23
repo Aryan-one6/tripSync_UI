@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:travellersin/core/notification_service.dart';
 import 'package:travellersin/firebase_options.dart';
 import 'package:travellersin/screens/web_view_screen.dart';
 
@@ -10,7 +11,7 @@ void main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  await getFcmToken();
+  await NotificationService.init();
 
   runApp(const MyApp());
 }

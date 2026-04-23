@@ -1,6 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show isSkiaWeb, kIsWeb;
 
 class MainWebView extends StatefulWidget {
   const MainWebView({super.key});
@@ -58,14 +62,16 @@ class _MainWebViewState extends State<MainWebView> {
                   allowFileAccessFromFileURLs: true,
                   allowUniversalAccessFromFileURLs: true,
                 ),
-                
+                onDownloadStartRequest:
+                    (controller, downloadStartRequest) async {
+                      await _downloadFile(downloadStartRequest.url.toString());
+                    },
                 onLoadStart: (controller, url) {
                   isLoading.value = true;
                 },
                 onLoadStop: (controller, url) {
                   isLoading.value = false;
                 },
-              
               ),
 
               ValueListenableBuilder(
@@ -82,5 +88,27 @@ class _MainWebViewState extends State<MainWebView> {
         ),
       ),
     );
+  }
+
+  Future<void> _downloadFile(String url) async {
+    var dir = await getExternalStorageDirectory(); // Android
+
+    // iOS: use getApplicationDocumentsDirectory()
+    if (!kIsWeb && Platform.isIOS) {
+      dir = await getApplicationDocumentsDirectory(); // IOS
+    }
+
+    final filename = url.split('/').last;
+    final savePath = '${dir!.path}/$filename';
+
+    try {
+      await Dio().download(url, savePath);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved: $filename')));
+    } catch (e) {
+      debugPrint('Download error: $e');
+    }
   }
 }
