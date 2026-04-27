@@ -1183,8 +1183,11 @@ export function GroupChat({
                 })}
                 {typingUsers.length > 0 && (
                   <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 px-3 py-2 shadow-sm">
-                      <span className="flex gap-1">
+                    <div className="rounded-2xl rounded-tl-[6px] border border-white/90 bg-white/95 px-3 py-2 shadow-sm max-w-[70%]">
+                      <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--color-sea-700)]">
+                        {typingUsers.map((u) => u.fullName).join(", ")}
+                      </p>
+                      <span className="flex gap-1 items-center">
                         <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
                         <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
                         <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:300ms]" />
@@ -1559,10 +1562,19 @@ export function GroupChat({
 
               {/* Typing indicator */}
               {typingUsers.length > 0 && (
-                <p className="text-xs text-[var(--color-ink-500)]">
-                  {typingUsers.map((e) => e.fullName).join(", ")}{" "}
-                  {typingUsers.length === 1 ? "is" : "are"} typing…
-                </p>
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-tl-[6px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-2 shadow-sm max-w-[70%]">
+                    <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--color-sea-700)]">
+                      {typingUsers.map((u) => u.fullName).join(", ")}{" "}
+                      {typingUsers.length === 1 ? "is typing…" : "are typing…"}
+                    </p>
+                    <span className="flex gap-1 items-center">
+                      <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:0ms]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:150ms]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-[var(--color-ink-400)] [animation-delay:300ms]" />
+                    </span>
+                  </div>
+                </div>
               )}
 
               {/* @mention dropdown */}
