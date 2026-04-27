@@ -340,6 +340,7 @@ export default async function PackageDetailPage({
                           groupSizeMin={pkg.groupSizeMin}
                           groupSizeMax={pkg.groupSizeMax}
                           currentSize={currentSize}
+                          groupId={pkg.group?.id}
                         />
                       ),
                     },

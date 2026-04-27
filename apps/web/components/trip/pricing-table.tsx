@@ -1,4 +1,9 @@
-import { Users, TrendingDown } from "lucide-react";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Users, TrendingDown, CreditCard, MessageCircle, LogIn } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth/auth-context";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +18,7 @@ interface PricingTableProps {
   groupSizeMin: number;
   groupSizeMax: number;
   currentSize?: number;
+  groupId?: string;
 }
 
 export function PricingTable({
@@ -21,101 +27,144 @@ export function PricingTable({
   groupSizeMin,
   groupSizeMax,
   currentSize = 0,
+  groupId,
 }: PricingTableProps) {
+  const { session, status } = useAuth();
+  const router = useRouter();
+
   const sortedTiers = [...(tiers ?? [])].sort((a, b) => a.minPax - b.minPax);
   const hasTiers = sortedTiers.length > 0;
 
-  // Find which tier the current group size falls into
   const currentTier = hasTiers
-    ? sortedTiers
-        .filter((t) => currentSize >= t.minPax)
-        .at(-1)
+    ? sortedTiers.filter((t) => currentSize >= t.minPax).at(-1)
     : null;
 
+  const activePrice = currentTier?.price ?? basePrice;
+  const isFull = currentSize >= groupSizeMax;
+  const isLoggedIn = !!session && status === "authenticated";
+  const checkoutHref = groupId ? `/dashboard/groups/${groupId}/checkout` : "/dashboard";
+
+  function handleEnroll() {
+    if (!isLoggedIn) {
+      router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    if (groupId) {
+      router.push(checkoutHref);
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Base price hero - more prominent */}
-      <div className="rounded-2xl border-2 border-[var(--color-sea-200)] bg-gradient-to-br from-[var(--color-sea-50)] via-white to-[var(--color-sea-50)] p-8 shadow-lg">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-ink-600)]">
-          Price per person
-        </p>
-        <div className="mt-3 flex items-baseline gap-2">
-          <p className="font-display text-4xl font-bold text-[var(--color-sea-700)]">
-            {formatCurrency(currentTier?.price ?? basePrice)}
+    <div className="space-y-5">
+      {/* ── Price hero ── */}
+      <div className="rounded-xl border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] p-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-500)]">Price per person</p>
+        <div className="mt-1.5 flex items-baseline gap-1.5">
+          <p className="font-display text-3xl font-bold text-[var(--color-sea-700)]">
+            {formatCurrency(activePrice)}
           </p>
-          <p className="text-sm text-[var(--color-ink-500)]">+ taxes</p>
+          <p className="text-sm text-[var(--color-ink-400)]">+ taxes</p>
         </div>
         {currentTier && currentTier.price < basePrice && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--color-sea-600)] px-3 py-2 text-sm font-semibold text-white shadow-md">
-            <TrendingDown className="size-4" />
-            Save {formatCurrency(basePrice - currentTier.price)} per person
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-sea-600)] px-2.5 py-1 text-xs font-semibold text-white">
+            <TrendingDown className="size-3" />
+            Save {formatCurrency(basePrice - currentTier.price)}/person
           </div>
+        )}
+
+        {/* ── CTA Buttons ── */}
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            className="flex-1 gap-2 h-11 text-sm font-bold"
+            disabled={isFull || !groupId}
+            onClick={handleEnroll}
+          >
+            {!isLoggedIn ? (
+              <>
+                <LogIn className="size-4" />
+                Login to Enroll
+              </>
+            ) : isFull ? (
+              <>Group Full</>
+            ) : (
+              <>
+                <CreditCard className="size-4" />
+                Enroll Now — Pay ₹{(activePrice).toLocaleString("en-IN")}
+              </>
+            )}
+          </Button>
+          {isLoggedIn && groupId && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="gap-2 h-11 text-sm sm:w-auto w-full"
+              onClick={() => router.push(`/dashboard/messages?groupId=${encodeURIComponent(groupId)}`)}
+            >
+              <MessageCircle className="size-4" />
+              Chat
+            </Button>
+          )}
+        </div>
+
+        {!isLoggedIn && (
+          <p className="mt-2 text-center text-xs text-[var(--color-ink-400)]">
+            You&apos;ll be redirected to login, then back here automatically.
+          </p>
         )}
       </div>
 
-      {/* Group discount tiers - professional table layout */}
+      {/* ── Group discount tiers ── */}
       {hasTiers && (
         <div>
-          <div className="mb-4 flex items-center gap-2">
-            <Users className="size-5 text-[var(--color-sea-600)]" />
-            <p className="font-semibold text-[var(--color-ink-800)]">
-              Group Discounts
-            </p>
-            <p className="text-sm text-[var(--color-ink-600)]">
-              More travelers = Lower price
-            </p>
+          <div className="mb-3 flex items-center gap-2">
+            <Users className="size-4 text-[var(--color-sea-600)]" />
+            <p className="text-sm font-semibold text-[var(--color-ink-800)]">Group Discounts</p>
+            <p className="text-xs text-[var(--color-ink-500)]">· More travelers = lower price</p>
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {sortedTiers.map((tier, i) => {
               const isActive = currentTier?.minPax === tier.minPax;
               const savings = basePrice - tier.price;
               const nextTier = sortedTiers[i + 1];
-              const maxForTier = nextTier
-                ? nextTier.minPax - 1
-                : groupSizeMax;
+              const maxForTier = nextTier ? nextTier.minPax - 1 : groupSizeMax;
 
               return (
                 <div
                   key={tier.minPax}
                   className={cn(
-                    "flex items-center justify-between rounded-xl border-2 px-4 py-4 transition-all duration-300",
+                    "flex items-center justify-between rounded-xl border px-4 py-3 transition-all",
                     isActive
-                      ? "border-[var(--color-sea-500)] bg-gradient-to-r from-[var(--color-sea-50)] to-white shadow-md"
-                      : "border-[var(--color-ink-100)] bg-white hover:border-[var(--color-sea-200)]",
+                      ? "border-[var(--color-sea-400)] bg-[var(--color-sea-50)] shadow-sm"
+                      : "border-[var(--color-border)] bg-white hover:border-[var(--color-sea-200)]",
                   )}
                 >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={cn(
-                        "flex size-10 items-center justify-center rounded-lg font-bold text-sm",
-                        isActive
-                          ? "bg-gradient-to-br from-[var(--color-sea-500)] to-[var(--color-sea-600)] text-white shadow-md"
-                          : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]",
-                      )}
-                    >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex size-8 items-center justify-center rounded-lg text-xs font-bold",
+                      isActive
+                        ? "bg-[var(--color-sea-600)] text-white"
+                        : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]",
+                    )}>
                       {tier.minPax}+
                     </div>
                     <div>
-                      <p className="font-semibold text-[var(--color-ink-800)]">
+                      <p className="text-sm font-semibold text-[var(--color-ink-800)]">
                         {tier.minPax}–{maxForTier} travelers
                       </p>
                       {savings > 0 && (
-                        <p className="text-xs text-[var(--color-sea-600)] mt-0.5">
+                        <p className="text-xs text-[var(--color-sea-600)]">
                           Save {formatCurrency(savings)}/person
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p
-                      className={cn(
-                        "font-display text-xl font-bold",
-                        isActive ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-700)]",
-                      )}
-                    >
-                      {formatCurrency(tier.price)}
-                    </p>
-                  </div>
+                  <p className={cn(
+                    "font-display text-lg font-bold",
+                    isActive ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-700)]",
+                  )}>
+                    {formatCurrency(tier.price)}
+                  </p>
                 </div>
               );
             })}
@@ -123,15 +172,15 @@ export function PricingTable({
         </div>
       )}
 
-      {/* Group size range info - subtle info box */}
-      <div className="rounded-lg bg-[var(--color-sea-50)] border border-[var(--color-sea-200)] px-4 py-3">
-        <p className="text-sm text-[var(--color-ink-700)]">
-          <span className="font-semibold">Group size:</span> {groupSizeMin}–{groupSizeMax} travelers
-          {currentSize > 0 && (
-            <> • <span className="text-[var(--color-sea-700)] font-semibold">{currentSize} enrolled</span></>
-          )}
-        </p>
-      </div>
+      {/* ── Group size note ── */}
+      <p className="text-xs text-[var(--color-ink-500)] rounded-lg bg-[var(--color-surface-2)] px-3 py-2.5">
+        <span className="font-semibold text-[var(--color-ink-700)]">Group size:</span>{" "}
+        {groupSizeMin}–{groupSizeMax} travelers
+        {currentSize > 0 && (
+          <> · <span className="font-semibold text-[var(--color-sea-700)]">{currentSize} enrolled</span></>
+        )}
+        {isFull && <span className="ml-2 font-semibold text-red-600">· Group Full</span>}
+      </p>
     </div>
   );
 }
