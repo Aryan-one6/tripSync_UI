@@ -383,6 +383,90 @@ export default async function PackageDetailPage({
               </div>
             </Card>
 
+            {/* ── MOBILE ONLY: Organized By + Join + Who's Going ── */}
+            <div className="lg:hidden space-y-4" id="mobile-join-card">
+              {/* Join card */}
+              <Card className="overflow-hidden border border-[var(--color-sea-200)] shadow-lg p-0">
+                <div className="bg-white p-5 pb-4">
+                  {pkg.agency.avgRating > 0 && (
+                    <div className="mb-3 flex items-center gap-1.5">
+                      <Star className="size-4 fill-amber-400 text-amber-400" />
+                      <span className="font-bold text-[var(--color-ink-900)]">{pkg.agency.avgRating.toFixed(1)}</span>
+                      <span className="text-sm text-[var(--color-ink-500)]">({pkg.agency.totalReviews} reviews)</span>
+                    </div>
+                  )}
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display text-3xl font-bold text-[var(--color-ink-950)]">
+                      {formatCurrency(pkg.basePrice)}
+                    </span>
+                    <span className="text-sm text-[var(--color-ink-500)]">Per Adult</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--color-ink-400)]">+ taxes as applicable</p>
+                </div>
+                <div className="border-t border-[var(--color-sea-100)] p-5 pt-4">
+                  <BookingSidebar
+                    groupId={pkg.group?.id}
+                    price={pkg.basePrice}
+                    startDate={pkg.startDate}
+                    endDate={pkg.endDate}
+                    groupSizeMax={pkg.groupSizeMax}
+                    currentSize={currentSize}
+                    spotsLeft={spotsLeft}
+                    shareUrl={shareUrl}
+                    departureDates={pkg.departureDates}
+                    label="Join Group"
+                  />
+                </div>
+              </Card>
+
+              {/* Agency card */}
+              <Card className="p-5 border-0 shadow-md">
+                <span className="inline-flex items-center rounded-full bg-[var(--color-sea-100)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--color-sea-700)] border border-[var(--color-sea-200)]">
+                  Organized by
+                </span>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex size-14 items-center justify-center rounded-xl bg-[var(--color-sea-50)] font-display text-base text-[var(--color-sea-800)] border border-[var(--color-sea-200)]">
+                    {pkg.agency.logoUrl ? (
+                      <img src={pkg.agency.logoUrl} alt={pkg.agency.name} className="size-full rounded-xl object-cover" />
+                    ) : (
+                      initials(pkg.agency.name)
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/profile/${pkg.agency.slug}`} className="font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] truncate block">
+                      {pkg.agency.name}
+                    </Link>
+                    {pkg.agency.avgRating > 0 && (
+                      <div className="mt-1 flex items-center gap-1.5 text-sm text-[var(--color-ink-600)]">
+                        <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                        <span className="font-semibold">{pkg.agency.avgRating.toFixed(1)}</span>
+                        <span>· {pkg.agency.totalReviews ?? 0} reviews</span>
+                      </div>
+                    )}
+                    <div className="mt-1.5">
+                      <AgencyVerificationBadge status={pkg.agency.verification} />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Who's Going */}
+              <Card className="p-5 border-0 shadow-md">
+                <div className="mb-4 flex items-center gap-2">
+                  <Users className="size-4 text-[var(--color-sea-600)]" />
+                  <p className="font-semibold text-[var(--color-ink-950)]">Who&apos;s Going</p>
+                </div>
+                <EnrolledMembers
+                  members={pkg.group?.members ?? []}
+                  maxSize={pkg.groupSizeMax}
+                  currentSize={currentSize}
+                  maleCount={pkg.group?.maleCount}
+                  femaleCount={pkg.group?.femaleCount}
+                  otherCount={pkg.group?.otherCount}
+                />
+              </Card>
+            </div>
+
             {/* Reviews */}
             {agencyReviews.length > 0 && (
               <Card className="p-5 sm:p-6 border-0 shadow-md">
@@ -445,9 +529,8 @@ export default async function PackageDetailPage({
                     spotsLeft={spotsLeft}
                     shareUrl={shareUrl}
                     departureDates={pkg.departureDates}
-                    label="Send Enquiry"
+                    label="Join Group"
                     compact
-                    showQuickActions={false}
                   />
                 </div>
               </Card>
@@ -542,16 +625,16 @@ export default async function PackageDetailPage({
         </div>
       </div>
 
-      {/* ═══ Mobile sticky bottom CTA (Thrillophilia style) ═══ */}
-      <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-[var(--color-sea-200)] bg-white px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.10)] safe-bottom">
-        <div className="flex items-center justify-between gap-4">
+      {/* ═══ Mobile sticky bottom bar — price only, scroll to join card ═══ */}
+      <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-[var(--color-border)] bg-white/95 backdrop-blur-md px-4 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.10)]">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-[var(--color-ink-500)]">Starting from</p>
+            <p className="text-[11px] font-medium text-[var(--color-ink-500)]">Starting from</p>
             <div className="flex items-baseline gap-1">
               <p className="font-display text-xl font-bold text-[var(--color-ink-950)]">
                 {formatCurrency(pkg.basePrice)}
               </p>
-              <p className="text-xs text-[var(--color-ink-500)]">/person</p>
+              <p className="text-xs text-[var(--color-ink-400)]">/person</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -559,15 +642,15 @@ export default async function PackageDetailPage({
               href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 items-center gap-2 rounded-xl border border-[var(--color-sea-300)] bg-white px-4 text-sm font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-50)]"
+              className="flex h-10 items-center gap-1.5 rounded-xl border border-[var(--color-sea-300)] bg-white px-3.5 text-sm font-semibold text-[var(--color-sea-700)] transition hover:bg-[var(--color-sea-50)]"
             >
               Share
             </a>
             <a
-              href="#enquiry-section"
-              className="flex h-11 items-center rounded-xl bg-gradient-to-r from-[var(--color-sea-500)] to-[var(--color-sea-700)] px-5 text-sm font-bold text-white shadow-md transition hover:brightness-110"
+              href="#mobile-join-card"
+              className="flex h-10 items-center rounded-xl bg-gradient-to-r from-[var(--color-sea-500)] to-[var(--color-sea-700)] px-5 text-sm font-bold text-white shadow-md transition hover:brightness-110"
             >
-              Send Enquiry
+              Join Group
             </a>
           </div>
         </div>
