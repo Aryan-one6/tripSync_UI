@@ -27,6 +27,8 @@ interface BookingSidebarProps {
   departureDates?: string[] | null;
   label?: string;
   members?: GroupMember[];
+  compact?: boolean;
+  showQuickActions?: boolean;
 }
 
 export function BookingSidebar({
@@ -49,50 +51,85 @@ export function BookingSidebar({
   departureDates,
   label = "Join this trip",
   members = [],
+  compact = false,
+  showQuickActions = !compact,
 }: BookingSidebarProps) {
   return (
-    <div className="space-y-2.5 sm:space-y-3">
-      {/* Price card */}
-      <div className="rounded-[var(--radius-lg)] border border-white/70 bg-[var(--color-surface-raised)] p-4 shadow-[var(--shadow-clay)] sm:p-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+    <div className={compact ? "space-y-2.5" : "space-y-4"}>
+      {/* Price card - premium design */}
+      <div className={compact
+        ? "rounded-xl border border-[var(--color-sea-200)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-4 shadow-md"
+        : "rounded-2xl border-2 border-[var(--color-sea-200)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-6 shadow-lg"}
+      >
+        <p className={compact
+          ? "text-[10px] font-bold uppercase tracking-wider text-[var(--color-ink-600)]"
+          : "text-xs font-bold uppercase tracking-wider text-[var(--color-ink-600)]"}
+        >
           Starting from
         </p>
-        <p className="mt-1 font-display text-2xl text-[var(--color-sea-700)] sm:text-3xl">
-          {formatCurrency(price)}
-          <span className="text-sm font-normal text-[var(--color-ink-500)] sm:text-base"> /person</span>
+        <div className={compact ? "mt-1.5 flex items-baseline gap-1" : "mt-2 flex items-baseline gap-1.5"}>
+          <p className={compact
+            ? "font-display text-3xl font-bold text-[var(--color-sea-700)]"
+            : "font-display text-4xl font-bold text-[var(--color-sea-700)]"}
+          >
+            {formatCurrency(price)}
+          </p>
+          <p className={compact ? "text-xs text-[var(--color-ink-500)]" : "text-sm text-[var(--color-ink-500)]"}>/person</p>
+        </div>
+        <p className={compact ? "mt-0.5 text-[11px] text-[var(--color-ink-500)]" : "mt-1 text-xs text-[var(--color-ink-500)]"}>
+          + taxes as applicable
         </p>
-        <p className="mt-0.5 text-xs text-[var(--color-ink-500)]">+ taxes as applicable</p>
 
-        {/* Quick info */}
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center gap-2.5 text-xs text-[var(--color-ink-600)] sm:text-sm">
-            <Calendar className="size-4 text-[var(--color-sea-600)]" />
-            <span>{formatDateRange(startDate, endDate)}</span>
+        {/* Quick info - better layout */}
+        <div className={compact ? "mt-3 space-y-2.5" : "mt-5 space-y-3"}>
+          <div className={compact ? "flex items-center gap-2.5" : "flex items-center gap-3"}>
+            <Calendar className={compact ? "size-4 text-[var(--color-sea-600)]" : "size-5 text-[var(--color-sea-600)]"} />
+            <div className="min-w-0">
+              <p className={compact ? "text-[11px] font-semibold text-[var(--color-ink-600)]" : "text-xs font-semibold text-[var(--color-ink-600)]"}>
+                Dates
+              </p>
+              <p className={compact ? "text-xs text-[var(--color-ink-800)]" : "text-sm text-[var(--color-ink-800)]"}>
+                {formatDateRange(startDate, endDate)}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 text-xs text-[var(--color-ink-600)] sm:text-sm">
-            <Users className="size-4 text-[var(--color-sea-600)]" />
-            <span>
-              {currentSize}/{groupSizeMax} joined
-              {spotsLeft > 0 && spotsLeft <= 5 && (
-                <span className="ml-1 font-semibold text-[var(--color-sunset-600)]">
-                  · {spotsLeft} left!
-                </span>
-              )}
-            </span>
+          <div className={compact ? "flex items-center gap-2.5" : "flex items-center gap-3"}>
+            <Users className={compact ? "size-4 text-[var(--color-sea-600)]" : "size-5 text-[var(--color-sea-600)]"} />
+            <div className="min-w-0">
+              <p className={compact ? "text-[11px] font-semibold text-[var(--color-ink-600)]" : "text-xs font-semibold text-[var(--color-ink-600)]"}>
+                Group Status
+              </p>
+              <p className={compact ? "text-xs text-[var(--color-ink-800)]" : "text-sm text-[var(--color-ink-800)]"}>
+                {currentSize}/{groupSizeMax} enrolled
+                {spotsLeft > 0 && spotsLeft <= 5 && (
+                  <span className="ml-2 font-semibold text-[var(--color-sunset-600)]">
+                    {spotsLeft} spots left
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Departure dates */}
+        {/* Departure dates - upgraded design */}
         {departureDates && departureDates.length > 1 && (
-          <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] p-3 shadow-[var(--shadow-clay-inset)]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
-              Available batches
+          <div className={compact
+            ? "mt-3 rounded-lg bg-[var(--color-sea-50)] p-2.5 border border-[var(--color-sea-200)]"
+            : "mt-5 rounded-lg bg-[var(--color-sea-50)] p-3 border border-[var(--color-sea-200)]"}
+          >
+            <p className={compact
+              ? "mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-sea-700)]"
+              : "text-xs font-bold uppercase tracking-wider text-[var(--color-sea-700)] mb-2"}
+            >
+              Available Batches
             </p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className={compact ? "flex flex-wrap gap-1.5" : "flex flex-wrap gap-2"}>
               {departureDates.slice(0, 4).map((date) => (
                 <span
                   key={date}
-                  className="rounded-full bg-[var(--color-sea-50)] px-2.5 py-1 text-[10px] font-semibold text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]"
+                  className={compact
+                    ? "rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-[var(--color-sea-700)] shadow-sm border border-[var(--color-sea-200)]"
+                    : "rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-sea-700)] shadow-sm border border-[var(--color-sea-200)]"}
                 >
                   {new Date(date).toLocaleDateString("en-IN", {
                     day: "numeric",
@@ -100,12 +137,17 @@ export function BookingSidebar({
                   })}
                 </span>
               ))}
+              {departureDates.length > 4 && (
+                <span className="px-3 py-1.5 text-xs font-semibold text-[var(--color-ink-600)]">
+                  +{departureDates.length - 4} more
+                </span>
+              )}
             </div>
           </div>
         )}
 
-        {/* CTA */}
-        <div className="mt-5 space-y-2.5">
+        {/* CTA - more prominent */}
+        <div className={compact ? "mt-4 space-y-2" : "mt-6 space-y-3"}>
           <PlanPrimaryAction
             groupId={groupId}
             joinLabel={label}
@@ -124,38 +166,40 @@ export function BookingSidebar({
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="flex-1 gap-1.5"
-          onClick={() => {
-            if (navigator.share) {
-              navigator.share({
-                title: "Check out this trip on TravellersIn",
-                url: window.location.href,
-              });
-            } else {
-              navigator.clipboard.writeText(window.location.href);
-            }
-          }}
-        >
-          <Share2 className="size-3.5" />
-          Share
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="flex-1 gap-1.5"
-          onClick={() => {
-            const el = document.getElementById("enquiry-section");
-            el?.scrollIntoView({ behavior: "smooth" });
-          }}
-        >
-          <MessageCircle className="size-3.5" />
-          Enquiry
-        </Button>
-      </div>
+      {showQuickActions && (
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 gap-2 border-2"
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({
+                  title: "Check out this trip on TravellersIn",
+                  url: window.location.href,
+                });
+              } else {
+                navigator.clipboard.writeText(window.location.href);
+              }
+            }}
+          >
+            <Share2 className="size-4" />
+            Share
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1 gap-2 border-2"
+            onClick={() => {
+              const el = document.getElementById("enquiry-section");
+              el?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            <MessageCircle className="size-4" />
+            Ask
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

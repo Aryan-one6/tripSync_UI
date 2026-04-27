@@ -59,7 +59,14 @@ type AgencyFormValues = z.infer<typeof agencyFormSchema>;
 type GstStatus =
   | { state: "idle" }
   | { state: "checking" }
-  | { state: "verified"; legalName: string; tradeName?: string | null }
+  | {
+      state: "verified";
+      legalName: string;
+      tradeName?: string | null;
+      registeredAddress?: string | null;
+      registeredCity?: string | null;
+      registeredState?: string | null;
+    }
   | { state: "conflict"; message: string }
   | { state: "inactive"; status: string }
   | { state: "invalid" }
@@ -83,18 +90,18 @@ const STEPS = [
     fields: ["gender", "dateOfBirth", "city", "travelPreferences", "bio"] as Array<keyof AgencyFormValues>,
   },
   {
-    key: "agency",
-    title: "Agency Details",
-    subtitle: "Your business information",
-    icon: Building2,
-    fields: ["agencyName", "agencyDescription", "agencyAddress", "agencyCity", "agencyState"] as Array<keyof AgencyFormValues>,
+    key: "verification",
+    title: "Verification",
+    subtitle: "Verify GST before agency details",
+    icon: ShieldCheck,
+    fields: ["gstin", "pan", "tourismLicense"] as Array<keyof AgencyFormValues>,
   },
   {
     key: "operations",
-    title: "Verification",
-    subtitle: "Compliance & operational info",
-    icon: ShieldCheck,
-    fields: ["agencyPhone", "agencyEmail", "specializationsInput", "destinationsInput", "gstin", "pan", "tourismLicense"] as Array<keyof AgencyFormValues>,
+    title: "Agency Details",
+    subtitle: "Business profile & operations",
+    icon: Building2,
+    fields: ["agencyName", "agencyDescription", "agencyAddress", "agencyCity", "agencyState", "agencyPhone", "agencyEmail", "specializationsInput", "destinationsInput"] as Array<keyof AgencyFormValues>,
   },
 ];
 
@@ -190,8 +197,13 @@ function GstVerificationBadge({ status }: { status: GstStatus }) {
         {status.tradeName && status.tradeName !== status.legalName && (
           <p className="text-[10px] text-emerald-600">Trade name: {status.tradeName}</p>
         )}
+        {(status.registeredCity || status.registeredState) && (
+          <p className="text-[10px] text-emerald-600">
+            Registered location: {[status.registeredCity, status.registeredState].filter(Boolean).join(", ")}
+          </p>
+        )}
         <p className="mt-1 text-[10px] text-emerald-600">
-          Company name and address are now locked and read-only.
+          Company, address, city and state are now auto-filled from GST and locked.
         </p>
       </div>
     );
@@ -317,6 +329,9 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
             legalName: string | null;
             tradeName: string | null;
             status: string | null;
+            registeredAddress: string | null;
+            registeredCity: string | null;
+            registeredState: string | null;
             alreadyRegistered: boolean;
           }>(`/agencies/gst/verify?gstin=${encodeURIComponent(normalized)}`);
 
@@ -335,11 +350,20 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
               state: "verified",
               legalName: data.legalName,
               tradeName: data.tradeName,
+              registeredAddress: data.registeredAddress,
+              registeredCity: data.registeredCity,
+              registeredState: data.registeredState,
             });
-            // Auto-populate legal name into agencyName if it's not yet set
-            const currentName = form.getValues("agencyName");
-            if (!currentName || currentName.trim() === "") {
-              form.setValue("agencyName", data.tradeName || data.legalName);
+            // Auto-fill agency profile from GST verification result.
+            form.setValue("agencyName", data.tradeName || data.legalName, { shouldValidate: true });
+            if (data.registeredAddress?.trim()) {
+              form.setValue("agencyAddress", data.registeredAddress.trim(), { shouldValidate: true });
+            }
+            if (data.registeredCity?.trim()) {
+              form.setValue("agencyCity", data.registeredCity.trim(), { shouldValidate: true });
+            }
+            if (data.registeredState?.trim()) {
+              form.setValue("agencyState", data.registeredState.trim(), { shouldValidate: true });
             }
             return;
           }
@@ -471,68 +495,13 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
           </div>
         )}
 
-        {/* ── Step 2: Agency details ── */}
+        {/* ── Step 2: GST verification ── */}
         {step === 2 && (
-          <div className="grid gap-3.5 sm:grid-cols-2 animate-rise-in">
-            <Field label="Agency name" error={form.formState.errors.agencyName?.message}>
-              <Input
-                placeholder="TrailRoot Travels"
-                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
-                readOnly={isGstVerified}
-                {...form.register("agencyName")}
-              />
-              {isGstVerified && (
-                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
-                  <Lock className="size-2.5" /> Locked after GST verification
-                </p>
-              )}
-            </Field>
-            <Field label="Agency city" error={form.formState.errors.agencyCity?.message}>
-              <Input placeholder="Delhi" className="h-10" {...form.register("agencyCity")} />
-            </Field>
-            <Field label="State" error={form.formState.errors.agencyState?.message}>
-              <Input placeholder="Delhi" className="h-10" {...form.register("agencyState")} />
-            </Field>
-            <Field label="Registered address" error={form.formState.errors.agencyAddress?.message}>
-              <Input
-                placeholder="Office / registered address"
-                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
-                readOnly={isGstVerified}
-                {...form.register("agencyAddress")}
-              />
-              {isGstVerified && (
-                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
-                  <Lock className="size-2.5" /> Locked after GST verification
-                </p>
-              )}
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label="Agency description" error={form.formState.errors.agencyDescription?.message} hint="What makes your agency unique?">
-                <Textarea placeholder="Destinations, trip formats, and service style…" className="resize-none min-h-[80px]" {...form.register("agencyDescription")} />
-              </Field>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 3: Operations & docs ── */}
-        {step === 3 && (
           <div className="grid gap-3.5 sm:grid-cols-2 animate-rise-in">
             {/* Compliance info box */}
             <div className="sm:col-span-2 rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
-              🔒 GSTIN is required for escrow payouts. PAN & Tourism license help boost your credibility score.
+              🔒 GSTIN is required for escrow payouts. We use this to auto-fill your registered agency details.
             </div>
-            <Field label="Agency phone" error={form.formState.errors.agencyPhone?.message} optional>
-              <Input placeholder="9876543210" className="h-10" {...form.register("agencyPhone")} />
-            </Field>
-            <Field label="Agency email" error={form.formState.errors.agencyEmail?.message} optional>
-              <Input type="email" placeholder="ops@agency.com" className="h-10" {...form.register("agencyEmail")} />
-            </Field>
-            <Field label="Specializations" error={form.formState.errors.specializationsInput?.message} hint="Comma-separated: Adventure, Trekking, Beach" className="sm:col-span-2">
-              <Input placeholder="Adventure, Trekking, Weekend getaways" className="h-10" {...form.register("specializationsInput")} />
-            </Field>
-            <Field label="Destinations" error={form.formState.errors.destinationsInput?.message} hint="Comma-separated: Manali, Spiti, Goa" className="sm:col-span-2">
-              <Input placeholder="Bir, Manali, Spiti, Kasol" className="h-10" {...form.register("destinationsInput")} />
-            </Field>
 
             {/* ── GSTIN with live verification ── */}
             <div className="sm:col-span-2">
@@ -559,9 +528,82 @@ export function AgencySignupForm({ nextPath = "/agency/dashboard" }: { nextPath?
             <Field label="PAN" error={form.formState.errors.pan?.message} optional>
               <Input placeholder="ABCDE1234F" className="h-10 font-mono" {...form.register("pan")} />
             </Field>
+            <Field label="Tourism license no." error={form.formState.errors.tourismLicense?.message} optional>
+              <Input placeholder="License number if available" className="h-10" {...form.register("tourismLicense")} />
+            </Field>
+          </div>
+        )}
+
+        {/* ── Step 3: Agency details & operations ── */}
+        {step === 3 && (
+          <div className="grid gap-3.5 sm:grid-cols-2 animate-rise-in">
+            <Field label="Agency name" error={form.formState.errors.agencyName?.message}>
+              <Input
+                placeholder="TrailRoot Travels"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyName")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Auto-filled from GST verification
+                </p>
+              )}
+            </Field>
+            <Field label="Agency city" error={form.formState.errors.agencyCity?.message}>
+              <Input
+                placeholder="Delhi"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyCity")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Auto-filled from GST verification
+                </p>
+              )}
+            </Field>
+            <Field label="State" error={form.formState.errors.agencyState?.message}>
+              <Input
+                placeholder="Delhi"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyState")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Auto-filled from GST verification
+                </p>
+              )}
+            </Field>
+            <Field label="Registered address" error={form.formState.errors.agencyAddress?.message}>
+              <Input
+                placeholder="Office / registered address"
+                className={`h-10 ${isGstVerified ? "bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                readOnly={isGstVerified}
+                {...form.register("agencyAddress")}
+              />
+              {isGstVerified && (
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600">
+                  <Lock className="size-2.5" /> Auto-filled from GST verification
+                </p>
+              )}
+            </Field>
+            <Field label="Agency phone" error={form.formState.errors.agencyPhone?.message} optional>
+              <Input placeholder="9876543210" className="h-10" {...form.register("agencyPhone")} />
+            </Field>
+            <Field label="Agency email" error={form.formState.errors.agencyEmail?.message} optional>
+              <Input type="email" placeholder="ops@agency.com" className="h-10" {...form.register("agencyEmail")} />
+            </Field>
+            <Field label="Specializations" error={form.formState.errors.specializationsInput?.message} hint="Comma-separated: Adventure, Trekking, Beach" className="sm:col-span-2">
+              <Input placeholder="Adventure, Trekking, Weekend getaways" className="h-10" {...form.register("specializationsInput")} />
+            </Field>
+            <Field label="Destinations" error={form.formState.errors.destinationsInput?.message} hint="Comma-separated: Manali, Spiti, Goa" className="sm:col-span-2">
+              <Input placeholder="Bir, Manali, Spiti, Kasol" className="h-10" {...form.register("destinationsInput")} />
+            </Field>
             <div className="sm:col-span-2">
-              <Field label="Tourism license no." error={form.formState.errors.tourismLicense?.message} optional>
-                <Input placeholder="License number if available" className="h-10" {...form.register("tourismLicense")} />
+              <Field label="Agency description" error={form.formState.errors.agencyDescription?.message} hint="What makes your agency unique?">
+                <Textarea placeholder="Destinations, trip formats, and service style…" className="resize-none min-h-[80px]" {...form.register("agencyDescription")} />
               </Field>
             </div>
           </div>

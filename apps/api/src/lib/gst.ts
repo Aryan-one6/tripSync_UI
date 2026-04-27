@@ -6,7 +6,7 @@
  *
  *   1. Razorpay Verification API  — free with every Razorpay account, uses
  *      existing RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET, no extra signup needed.
- *   2. gstincheck.co.in public API — free, no auth, best-effort backup.
+ *   2. gstincheck.co.in API — best-effort backup via API key.
  *   3. Graceful unverified fallback — never blocks registration.
  *
  * GSTIN Format: 2-digit state + 10-digit PAN + 1 entity + 1 digit + 1 checksum = 15 chars
@@ -56,6 +56,9 @@ export interface GstVerificationResult {
   status: 'Active' | 'Inactive' | 'Cancelled' | 'Suspended' | string;
   stateCode: string;
   registrationDate: string | null;
+  registeredAddress: string | null;
+  registeredCity: string | null;
+  registeredState: string | null;
   verified: boolean;
 }
 
@@ -104,6 +107,9 @@ async function verifyViaRazorpay(gstin: string): Promise<GstVerificationResult |
       status: data.status ?? 'Unknown',
       stateCode: gstin.slice(0, 2),
       registrationDate: data.registration_date || null,
+      registeredAddress: null,
+      registeredCity: null,
+      registeredState: null,
       verified: true,
     };
   } catch (err) {
@@ -112,11 +118,14 @@ async function verifyViaRazorpay(gstin: string): Promise<GstVerificationResult |
   }
 }
 
-// ─── Provider 2: Free public gstincheck.co.in API ────────────────────────────
+// ─── Provider 2: gstincheck.co.in API ─────────────────────────────────────────
 async function verifyViaPublicApi(gstin: string): Promise<GstVerificationResult | null> {
+  const apiKey = env.GSTINCHECK_API_KEY?.trim();
+  if (!apiKey) return null;
+
   try {
     const response = await fetch(
-      `https://sheet.gstincheck.co.in/check/${gstin}`,
+      `https://sheet.gstincheck.co.in/check/${encodeURIComponent(apiKey)}/${encodeURIComponent(gstin)}`,
       {
         method: 'GET',
         headers: { Accept: 'application/json' },
@@ -134,6 +143,13 @@ async function verifyViaPublicApi(gstin: string): Promise<GstVerificationResult 
         sts?: string;
         stcd?: string;
         rgdt?: string;
+        pradr?: {
+          adr?: string;
+          addr?: {
+            loc?: string;
+            stcd?: string;
+          };
+        };
       };
       error?: boolean;
     };
@@ -148,6 +164,9 @@ async function verifyViaPublicApi(gstin: string): Promise<GstVerificationResult 
       status: g.sts ?? 'Unknown',
       stateCode: g.stcd ?? gstin.slice(0, 2),
       registrationDate: g.rgdt || null,
+      registeredAddress: g.pradr?.adr?.trim() || null,
+      registeredCity: g.pradr?.addr?.loc?.trim() || null,
+      registeredState: g.pradr?.addr?.stcd?.trim() || null,
       verified: true,
     };
   } catch (err) {
@@ -165,6 +184,9 @@ function fallbackResult(gstin: string): GstVerificationResult {
     status: 'Unknown',
     stateCode: gstin.slice(0, 2),
     registrationDate: null,
+    registeredAddress: null,
+    registeredCity: null,
+    registeredState: null,
     verified: false,
   };
 }
@@ -172,7 +194,7 @@ function fallbackResult(gstin: string): GstVerificationResult {
 /**
  * Verify a GSTIN using a provider waterfall:
  *   1. Razorpay (free, using existing credentials)
- *   2. Public gstincheck.co.in API
+ *   2. gstincheck.co.in API (requires GSTINCHECK_API_KEY)
  *   3. Unverified fallback — never blocks registration
  */
 export async function verifyGstinFromApi(gstin: string): Promise<GstVerificationResult> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, X, Images } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Images as ImagesIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ImageGalleryProps {
@@ -15,10 +15,10 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
 
   if (images.length === 0) {
     return (
-      <div className="flex aspect-[2.2/1] items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-sea-50)] to-[var(--color-sea-100)] shadow-[var(--shadow-clay-inset)]">
+      <div className="flex aspect-video items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--color-sea-50)] to-[var(--color-sea-100)] shadow-lg">
         <div className="text-center">
-          <Images className="mx-auto size-10 text-[var(--color-sea-300)]" />
-          <p className="mt-2 text-sm text-[var(--color-ink-500)]">No photos yet</p>
+          <ImagesIcon className="mx-auto size-12 text-[var(--color-sea-300)]" />
+          <p className="mt-3 text-sm font-medium text-[var(--color-ink-500)]">No photos yet</p>
         </div>
       </div>
     );
@@ -32,122 +32,168 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
     );
   };
 
+  const openLightbox = (index: number) => {
+    setSelectedIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const sideImages = images.slice(1, 5);
+
+  const tileSpanClass = (count: number, index: number) => {
+    if (count === 1) return "col-span-2 row-span-2";
+    if (count === 2) return "row-span-2";
+    if (count === 3 && index === 0) return "row-span-2";
+    return "";
+  };
+
   return (
     <>
-      {/* Main gallery grid */}
-      <div className="grid gap-2 sm:grid-cols-[1fr_0.4fr] sm:grid-rows-2">
-        {/* Primary image */}
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedIndex(0);
-            setLightboxOpen(true);
-          }}
-          className="group relative overflow-hidden rounded-[var(--radius-lg)] shadow-[var(--shadow-clay)] sm:row-span-2 sm:rounded-r-none"
-        >
-          <img
-            src={images[0]}
-            alt={`${title} - 1`}
-            className="aspect-[16/9] size-full object-cover transition-transform duration-500 group-hover:scale-105 sm:aspect-auto sm:h-full"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-        </button>
-
-        {/* Side thumbnails — hidden on mobile, shown on sm+ */}
-        {images.slice(1, 3).map((url, i) => (
+      <div className="overflow-hidden rounded-2xl border border-white/40 bg-[var(--color-surface-raised)] shadow-[var(--shadow-clay-sm)]">
+        <div className="grid gap-2 p-2 md:grid-cols-[1.6fr_1fr] md:p-2.5">
           <button
-            key={url}
             type="button"
-            onClick={() => {
-              setSelectedIndex(i + 1);
-              setLightboxOpen(true);
-            }}
-            className={cn(
-              "group relative hidden overflow-hidden shadow-[var(--shadow-clay-sm)] sm:block",
-              i === 0 && "sm:rounded-tr-[var(--radius-lg)]",
-              i === 1 && "sm:rounded-br-[var(--radius-lg)]",
-              images.length <= 1 && "sm:hidden",
-            )}
+            onClick={() => openLightbox(0)}
+            className="group relative block overflow-hidden rounded-xl md:h-[420px]"
           >
             <img
-              src={url}
-              alt={`${title} - ${i + 2}`}
-              className="aspect-[1.4/1] size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              src={images[0]}
+              alt={`${title} - 1`}
+              className="aspect-[16/10] size-full object-cover transition-transform duration-500 group-hover:scale-105 md:aspect-auto"
             />
-            {/* "+N more" overlay on last visible thumb */}
-            {i === 1 && images.length > 3 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white backdrop-blur-[2px]">
-                <span className="font-display text-lg">+{images.length - 3} more</span>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-70" />
+            {images.length > 1 && (
+              <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1.5 text-[11px] font-semibold text-white backdrop-blur">
+                <ImagesIcon className="size-3.5" />
+                <span>{images.length} photos</span>
               </div>
             )}
           </button>
-        ))}
+
+          {sideImages.length > 0 && (
+            <div className="hidden h-[420px] grid-cols-2 grid-rows-2 gap-2 md:grid">
+              {sideImages.map((url, i) => {
+                const imageIndex = i + 1;
+                const isLastVisible = i === sideImages.length - 1;
+                const extraCount = Math.max(0, images.length - 5);
+
+                return (
+                  <button
+                    key={`${url}-${imageIndex}`}
+                    type="button"
+                    onClick={() => openLightbox(imageIndex)}
+                    className={cn(
+                      "group relative overflow-hidden rounded-lg",
+                      tileSpanClass(sideImages.length, i),
+                    )}
+                  >
+                    <img
+                      src={url}
+                      alt={`${title} - ${imageIndex + 1}`}
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-75" />
+                    {isLastVisible && (
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between rounded-md bg-black/45 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                        <span>View all photos</span>
+                        {extraCount > 0 && <span>+{extraCount}</span>}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {images.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto px-2 pb-2 md:hidden">
+            {images.slice(1, Math.min(images.length, 6)).map((url, i) => (
+              <button
+                key={`${url}-${i + 1}`}
+                type="button"
+                onClick={() => openLightbox(i + 1)}
+                className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md"
+              >
+                <img
+                  src={url}
+                  alt={`${title} - ${i + 2}`}
+                  className="size-full object-cover"
+                />
+              </button>
+            ))}
+            {images.length > 6 && (
+              <button
+                type="button"
+                onClick={() => openLightbox(0)}
+                className="flex h-16 w-24 shrink-0 items-center justify-center rounded-md border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-xs font-semibold text-[var(--color-sea-700)]"
+              >
+                +{images.length - 6} more
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Photo count badge */}
-      {images.length > 1 && (
-        <button
-          type="button"
-          onClick={() => setLightboxOpen(true)}
-          className="mt-2 inline-flex items-center gap-2 rounded-full bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink-700)] shadow-[var(--shadow-clay-sm)] transition hover:shadow-[var(--shadow-clay)]"
-        >
-          <Images className="size-3.5" />
-          {images.length} photos
-        </button>
-      )}
-
-      {/* Lightbox */}
+      {/* Lightbox Modal */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
           onClick={() => setLightboxOpen(false)}
           role="dialog"
-          aria-label="Image gallery"
+          aria-label="Image gallery lightbox"
         >
           <div
-            className="relative max-h-[90vh] max-w-[90vw]"
+            className="relative w-full max-h-[90vh] flex items-center justify-center px-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <img
-              src={images[selectedIndex]}
-              alt={`${title} - ${selectedIndex + 1}`}
-              className="max-h-[85vh] rounded-[var(--radius-lg)] object-contain shadow-2xl"
-            />
+            {/* Main image */}
+            <div className="relative max-w-4xl">
+              <img
+                src={images[selectedIndex]}
+                alt={`${title} - ${selectedIndex + 1}`}
+                className="max-h-[80vh] rounded-xl object-contain shadow-2xl"
+              />
 
-            {/* Navigation */}
-            {images.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => navigate("prev")}
-                  className="absolute left-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 sm:-left-14 sm:size-10"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("next")}
-                  className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 sm:-right-14 sm:size-10"
-                >
-                  <ChevronRight className="size-5" />
-                </button>
-              </>
-            )}
+              {/* Navigation Arrows */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate("prev")}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 flex size-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="size-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("next")}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 flex size-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="size-6" />
+                  </button>
+                </>
+              )}
+            </div>
 
-            {/* Counter */}
-            <p className="mt-3 text-center text-sm text-white/70">
-              {selectedIndex + 1} / {images.length}
-            </p>
+            {/* Counter and info */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center">
+              <p className="text-sm font-medium text-white">
+                {selectedIndex + 1} <span className="text-white/60">/ {images.length}</span>
+              </p>
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-6 right-6 flex size-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
+              aria-label="Close gallery"
+            >
+              <X className="size-5" />
+            </button>
           </div>
-
-          {/* Close */}
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-6 right-6 flex size-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20"
-          >
-            <X className="size-5" />
-          </button>
         </div>
       )}
     </>

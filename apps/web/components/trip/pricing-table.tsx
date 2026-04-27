@@ -33,36 +33,39 @@ export function PricingTable({
     : null;
 
   return (
-    <div className="space-y-4">
-      {/* Base price hero */}
-      <div className="rounded-[var(--radius-md)] border border-[var(--color-sea-100)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-5 shadow-[var(--shadow-clay)]">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
+    <div className="space-y-6">
+      {/* Base price hero - more prominent */}
+      <div className="rounded-2xl border-2 border-[var(--color-sea-200)] bg-gradient-to-br from-[var(--color-sea-50)] via-white to-[var(--color-sea-50)] p-8 shadow-lg">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-ink-600)]">
           Price per person
         </p>
-        <p className="mt-1 font-display text-3xl text-[var(--color-sea-700)]">
-          {formatCurrency(currentTier?.price ?? basePrice)}
-        </p>
-        <p className="mt-1 text-xs text-[var(--color-ink-500)]">
-          + taxes as applicable
-        </p>
+        <div className="mt-3 flex items-baseline gap-2">
+          <p className="font-display text-4xl font-bold text-[var(--color-sea-700)]">
+            {formatCurrency(currentTier?.price ?? basePrice)}
+          </p>
+          <p className="text-sm text-[var(--color-ink-500)]">+ taxes</p>
+        </div>
         {currentTier && currentTier.price < basePrice && (
-          <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--color-sea-600)] px-2.5 py-1 text-[10px] font-bold text-white">
-            <TrendingDown className="size-3" />
-            You save {formatCurrency(basePrice - currentTier.price)} per person
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--color-sea-600)] px-3 py-2 text-sm font-semibold text-white shadow-md">
+            <TrendingDown className="size-4" />
+            Save {formatCurrency(basePrice - currentTier.price)} per person
           </div>
         )}
       </div>
 
-      {/* Group discount tiers */}
+      {/* Group discount tiers - professional table layout */}
       {hasTiers && (
         <div>
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="size-4 text-[var(--color-sea-600)]" />
-            <p className="text-xs font-semibold text-[var(--color-ink-700)]">
-              Group discount — more people, lower price
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="size-5 text-[var(--color-sea-600)]" />
+            <p className="font-semibold text-[var(--color-ink-800)]">
+              Group Discounts
+            </p>
+            <p className="text-sm text-[var(--color-ink-600)]">
+              More travelers = Lower price
             </p>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2.5">
             {sortedTiers.map((tier, i) => {
               const isActive = currentTier?.minPax === tier.minPax;
               const savings = basePrice - tier.price;
@@ -75,42 +78,44 @@ export function PricingTable({
                 <div
                   key={tier.minPax}
                   className={cn(
-                    "flex items-center justify-between rounded-[var(--radius-sm)] border px-4 py-3 transition-all",
+                    "flex items-center justify-between rounded-xl border-2 px-4 py-4 transition-all duration-300",
                     isActive
-                      ? "border-[var(--color-sea-200)] bg-[var(--color-sea-50)] shadow-[var(--shadow-clay-sm)]"
-                      : "border-white/40 bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)]",
+                      ? "border-[var(--color-sea-500)] bg-gradient-to-r from-[var(--color-sea-50)] to-white shadow-md"
+                      : "border-[var(--color-ink-100)] bg-white hover:border-[var(--color-sea-200)]",
                   )}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     <div
                       className={cn(
-                        "flex size-8 items-center justify-center rounded-full text-xs font-bold",
+                        "flex size-10 items-center justify-center rounded-lg font-bold text-sm",
                         isActive
-                          ? "bg-[var(--color-sea-600)] text-white shadow-[var(--shadow-clay-sea)]"
-                          : "bg-[var(--color-surface-raised)] text-[var(--color-ink-500)] shadow-[var(--shadow-clay-sm)]",
+                          ? "bg-gradient-to-br from-[var(--color-sea-500)] to-[var(--color-sea-600)] text-white shadow-md"
+                          : "bg-[var(--color-sea-50)] text-[var(--color-sea-700)]",
                       )}
                     >
                       {tier.minPax}+
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--color-ink-800)]">
+                      <p className="font-semibold text-[var(--color-ink-800)]">
                         {tier.minPax}–{maxForTier} travelers
                       </p>
                       {savings > 0 && (
-                        <p className="text-[10px] text-[var(--color-sea-600)]">
+                        <p className="text-xs text-[var(--color-sea-600)] mt-0.5">
                           Save {formatCurrency(savings)}/person
                         </p>
                       )}
                     </div>
                   </div>
-                  <p
-                    className={cn(
-                      "font-display text-lg",
-                      isActive ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-700)]",
-                    )}
-                  >
-                    {formatCurrency(tier.price)}
-                  </p>
+                  <div className="text-right">
+                    <p
+                      className={cn(
+                        "font-display text-xl font-bold",
+                        isActive ? "text-[var(--color-sea-700)]" : "text-[var(--color-ink-700)]",
+                      )}
+                    >
+                      {formatCurrency(tier.price)}
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -118,12 +123,12 @@ export function PricingTable({
         </div>
       )}
 
-      {/* Group size range info */}
-      <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] px-4 py-3 shadow-[var(--shadow-clay-inset)]">
-        <p className="text-xs text-[var(--color-ink-600)]">
-          Group size: <span className="font-semibold">{groupSizeMin}–{groupSizeMax}</span> travelers.
+      {/* Group size range info - subtle info box */}
+      <div className="rounded-lg bg-[var(--color-sea-50)] border border-[var(--color-sea-200)] px-4 py-3">
+        <p className="text-sm text-[var(--color-ink-700)]">
+          <span className="font-semibold">Group size:</span> {groupSizeMin}–{groupSizeMax} travelers
           {currentSize > 0 && (
-            <> Currently <span className="font-semibold text-[var(--color-sea-700)]">{currentSize}</span> enrolled.</>
+            <> • <span className="text-[var(--color-sea-700)] font-semibold">{currentSize} enrolled</span></>
           )}
         </p>
       </div>

@@ -745,6 +745,9 @@ export async function verifyGstinRealtime(gstin: string, ipAddress?: string) {
       legalName: null,
       tradeName: null,
       status: null,
+      registeredAddress: null,
+      registeredCity: null,
+      registeredState: null,
       alreadyRegistered: false,
     };
   }
@@ -766,6 +769,9 @@ export async function verifyGstinRealtime(gstin: string, ipAddress?: string) {
       legalName: null,
       tradeName: null,
       status: null,
+      registeredAddress: null,
+      registeredCity: null,
+      registeredState: null,
       alreadyRegistered: true,
     };
   }
@@ -793,6 +799,9 @@ export async function verifyGstinRealtime(gstin: string, ipAddress?: string) {
       legalName: result.legalName || null,
       tradeName: result.tradeName || null,
       status: result.status,
+      registeredAddress: result.registeredAddress || null,
+      registeredCity: result.registeredCity || null,
+      registeredState: result.registeredState || null,
       alreadyRegistered: false,
     };
   }
@@ -808,6 +817,9 @@ export async function verifyGstinRealtime(gstin: string, ipAddress?: string) {
     legalName: result.legalName || null,
     tradeName: result.tradeName || null,
     status: result.status || null,
+    registeredAddress: result.registeredAddress || null,
+    registeredCity: result.registeredCity || null,
+    registeredState: result.registeredState || null,
     alreadyRegistered: false,
   };
 }

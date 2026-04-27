@@ -11,6 +11,7 @@ const envSchema = z.object({
   DIGILOCKER_VERIFY_URL: z.union([z.string().url(), z.literal('')]).default(''),
   DIGILOCKER_CLIENT_ID: z.string().default(''),
   DIGILOCKER_CLIENT_SECRET: z.string().default(''),
+  GSTINCHECK_API_KEY: z.string().default(''),
   RAZORPAY_KEY_ID: z.string().default(''),
   RAZORPAY_KEY_SECRET: z.string().default(''),
   RAZORPAY_WEBHOOK_SECRET: z.string().default(''),

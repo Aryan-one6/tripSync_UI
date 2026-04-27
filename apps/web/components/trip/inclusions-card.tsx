@@ -58,23 +58,23 @@ export function InclusionsCard({ inclusions, exclusions }: InclusionsCardProps) 
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-6 sm:grid-cols-2">
       {/* Inclusions */}
       {inclusionItems.length > 0 && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-sea-100)] bg-gradient-to-br from-[var(--color-sea-50)]/50 to-white p-5 shadow-[var(--shadow-clay-sm)]">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-full bg-[var(--color-sea-600)] shadow-[var(--shadow-clay-sm)]">
-              <Check className="size-3.5 text-white" />
+        <div className="rounded-2xl border border-[var(--color-sea-200)] bg-gradient-to-br from-[var(--color-sea-50)] to-white p-6 shadow-lg">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-sea-500)] to-[var(--color-sea-600)] shadow-md">
+              <Check className="size-5 text-white" />
             </div>
-            <p className="font-display text-base text-[var(--color-ink-950)]">
-              What&apos;s included
+            <p className="font-display text-lg font-semibold text-[var(--color-ink-950)]">
+              What&apos;s Included
             </p>
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {inclusionItems.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm text-[var(--color-ink-700)]">
-                <Check className="mt-0.5 size-3.5 shrink-0 text-[var(--color-sea-500)]" />
-                {item}
+              <li key={item} className="flex items-start gap-3">
+                <Check className="mt-1 size-4 shrink-0 text-[var(--color-sea-600)]" />
+                <span className="text-sm leading-relaxed text-[var(--color-ink-700)]">{item}</span>
               </li>
             ))}
           </ul>
@@ -83,20 +83,20 @@ export function InclusionsCard({ inclusions, exclusions }: InclusionsCardProps) 
 
       {/* Exclusions */}
       {exclusionItems.length > 0 && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--color-sunset-100)] bg-gradient-to-br from-[var(--color-sunset-50)]/50 to-white p-5 shadow-[var(--shadow-clay-sm)]">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-full bg-[var(--color-sunset-600)] shadow-[var(--shadow-clay-sm)]">
-              <X className="size-3.5 text-white" />
+        <div className="rounded-2xl border border-[var(--color-sunset-200)] bg-gradient-to-br from-[var(--color-sunset-50)] to-white p-6 shadow-lg">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-sunset-500)] to-[var(--color-sunset-600)] shadow-md">
+              <X className="size-5 text-white" />
             </div>
-            <p className="font-display text-base text-[var(--color-ink-950)]">
-              Not included
+            <p className="font-display text-lg font-semibold text-[var(--color-ink-950)]">
+              Not Included
             </p>
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {exclusionItems.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm text-[var(--color-ink-700)]">
-                <X className="mt-0.5 size-3.5 shrink-0 text-[var(--color-sunset-500)]" />
-                {item}
+              <li key={item} className="flex items-start gap-3">
+                <X className="mt-1 size-4 shrink-0 text-[var(--color-sunset-600)]" />
+                <span className="text-sm leading-relaxed text-[var(--color-ink-700)]">{item}</span>
               </li>
             ))}
           </ul>

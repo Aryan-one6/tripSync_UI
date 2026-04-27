@@ -121,35 +121,35 @@ export function DayStepper({ days, totalDays }: DayStepperProps) {
                   )
                 }
                 className={cn(
-                  "min-w-0 w-full rounded-[var(--radius-md)] border text-left transition-all duration-300",
+                  "min-w-0 w-full rounded-xl border-2 text-left transition-all duration-300",
                   isExpanded
-                    ? "border-[var(--color-sea-100)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-clay)]"
-                    : "border-white/40 bg-[var(--color-surface-2)] shadow-[var(--shadow-clay-inset)] hover:shadow-[var(--shadow-clay-sm)]",
+                    ? "border-[var(--color-sea-300)] bg-white shadow-md"
+                    : "border-[var(--color-ink-100)] bg-[var(--color-surface-2)] shadow-sm hover:shadow-md hover:border-[var(--color-sea-200)]",
                 )}
               >
-                <div className="flex items-center justify-between gap-2 p-2.5 sm:p-4">
-                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4">
+                  <div className="flex min-w-0 items-center gap-3">
                     <DayIcon
                       className={cn(
-                        "size-3.5 shrink-0 sm:size-4",
+                        "size-5 shrink-0 sm:size-5",
                         isExpanded
                           ? "text-[var(--color-sea-600)]"
-                          : "text-[var(--color-ink-400)]",
+                          : "text-[var(--color-sea-400)]",
                       )}
                     />
                     <div className="min-w-0">
                       <p
                         className={cn(
-                          "truncate font-display text-[12px] leading-5 transition-colors sm:text-base sm:leading-6",
+                          "truncate font-display text-sm font-semibold leading-5 transition-colors sm:text-base sm:leading-6",
                           isExpanded
                             ? "text-[var(--color-ink-950)]"
-                            : "text-[var(--color-ink-700)]",
+                            : "text-[var(--color-ink-800)]",
                         )}
                       >
                         Day {day.day}: {day.title}
                       </p>
                       {!isExpanded && day.description && (
-                        <p className="mt-0.5 truncate text-[10px] text-[var(--color-ink-500)] sm:text-xs">
+                        <p className="mt-1 truncate text-xs text-[var(--color-ink-500)] sm:text-sm">
                           {day.description}
                         </p>
                       )}
@@ -157,7 +157,7 @@ export function DayStepper({ days, totalDays }: DayStepperProps) {
                   </div>
                   <ChevronDown
                     className={cn(
-                      "size-4 shrink-0 text-[var(--color-ink-400)] transition-transform duration-300",
+                      "size-5 shrink-0 text-[var(--color-ink-400)] transition-transform duration-300",
                       isExpanded && "rotate-180 text-[var(--color-sea-600)]",
                     )}
                   />
@@ -170,49 +170,53 @@ export function DayStepper({ days, totalDays }: DayStepperProps) {
                     isExpanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
                   )}
                 >
-                  <div className="space-y-2.5 border-t border-[var(--color-line)] px-2.5 pb-2.5 pt-2 sm:space-y-3 sm:px-4 sm:pb-4 sm:pt-3">
+                  <div className="space-y-4 border-t border-[var(--color-ink-100)] px-3 pb-4 pt-4 sm:px-5 sm:pb-5 sm:space-y-5">
+                    {/* Day description - large and prominent */}
                     {day.description && (
-                      <p className="text-[12px] leading-5 text-[var(--color-ink-600)] sm:text-sm sm:leading-relaxed">
+                      <p className="text-sm leading-relaxed text-[var(--color-ink-700)] sm:text-base">
                         {day.description}
                       </p>
                     )}
 
-                    {/* Highlights */}
+                    {/* Highlights Section - better design */}
                     {day.highlights && day.highlights.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-ink-500)]">
+                      <div className="space-y-2.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-600)]">
                           Highlights
-                        </p>
-                        <ul className="space-y-1">
+                        </h4>
+                        <ul className="space-y-2">
                           {day.highlights.map((h) => (
                             <li
                               key={h}
-                              className="flex items-start gap-2 text-[12px] leading-5 text-[var(--color-ink-700)] sm:text-sm sm:leading-6"
+                              className="flex items-start gap-3 text-sm text-[var(--color-ink-700)]"
                             >
-                              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-sea-400)]" />
-                              {h}
+                              <span className="mt-2 size-2 shrink-0 rounded-full bg-[var(--color-sea-500)]" />
+                              <span>{h}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
 
-                    {/* Day meta chips */}
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                    {/* Day Details Grid */}
+                    <div className="grid gap-2.5 sm:grid-cols-3">
                       {day.meals && day.meals.length > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-sunset-50)] px-2 py-0.5 text-[8px] font-semibold text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)] sm:px-2.5 sm:py-1 sm:text-[10px]">
-                          Meals: {day.meals.join(", ")}
-                        </span>
+                        <div className="rounded-lg bg-[var(--color-sunset-50)] p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sunset-700)]">Meals</p>
+                          <p className="mt-1.5 text-sm text-[var(--color-sunset-900)]">{day.meals.join(" • ")}</p>
+                        </div>
                       )}
                       {day.accommodation && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-lavender-50)] px-2 py-0.5 text-[8px] font-semibold text-[var(--color-lavender-500)] shadow-[var(--shadow-clay-sm)] sm:px-2.5 sm:py-1 sm:text-[10px]">
-                          Stay: {day.accommodation}
-                        </span>
+                        <div className="rounded-lg bg-[var(--color-lavender-50)] p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-lavender-600)]">Stay</p>
+                          <p className="mt-1.5 text-sm text-[var(--color-lavender-900)]">{day.accommodation}</p>
+                        </div>
                       )}
                       {day.transport && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[8px] font-semibold text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)] sm:px-2.5 sm:py-1 sm:text-[10px]">
-                          {day.transport}
-                        </span>
+                        <div className="rounded-lg bg-[var(--color-sea-50)] p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sea-700)]">Transfer</p>
+                          <p className="mt-1.5 text-sm text-[var(--color-sea-900)]">{day.transport}</p>
+                        </div>
                       )}
                     </div>
                   </div>

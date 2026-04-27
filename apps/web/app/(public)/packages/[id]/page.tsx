@@ -161,85 +161,97 @@ export default async function PackageDetailPage({
   const activities = (pkg.activities ?? []) as string[];
 
   return (
-    <div className="page-shell space-y-8 py-10">
+    <div className="page-shell space-y-8 py-10 sm:py-12">
       {/* ═══ Hero Section ═══ */}
       <div className="space-y-4">
         {/* Image gallery */}
         <ImageGallery images={gallery} title={pkg.title} />
 
-        {/* Title & quick info bar */}
-        <Card className="relative overflow-hidden p-0">
-          <div className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-start gap-3">
-              <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
-                Agency package
-              </span>
-              <span className="inline-flex items-center rounded-full bg-[var(--color-lavender-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-lavender-500)] shadow-[var(--shadow-clay-sm)]">
-                {durationLabel}
-              </span>
-              {pkg.status === "OPEN" && (
-                <span className="inline-flex items-center rounded-full bg-[var(--color-sea-600)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-[var(--shadow-clay-sm)]">
-                  Booking open
+        {/* Title card + pricing card in same row */}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <Card className="relative overflow-hidden p-0 border-0 shadow-md">
+            <div className="bg-gradient-to-br from-white to-[var(--color-sea-50)] p-5 sm:p-6 md:p-7">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-[var(--color-sea-100)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-sea-700)] border border-[var(--color-sea-200)]">
+                  Agency Package
                 </span>
-              )}
-            </div>
-
-            <h1 className="mt-4 font-display text-3xl leading-tight text-[var(--color-ink-950)] sm:text-4xl md:text-5xl">
-              {pkg.title}
-            </h1>
-
-            {/* Quick info strip */}
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[var(--color-ink-600)]">
-              <span className="inline-flex items-center gap-2">
-                <MapPin className="size-4 text-[var(--color-sea-600)]" />
-                {pkg.destination}
-                {pkg.destinationState ? `, ${pkg.destinationState}` : ""}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <CalendarRange className="size-4 text-[var(--color-sea-600)]" />
-                {formatDateRange(pkg.startDate, pkg.endDate)}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <Users className="size-4 text-[var(--color-sea-600)]" />
-                {currentSize}/{pkg.groupSizeMax} joined
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <DollarSign className="size-4 text-[var(--color-sea-600)]" />
-                From {formatCurrency(pkg.basePrice)}/person
-              </span>
-              {pkg.agency.avgRating > 0 && (
-                <span className="inline-flex items-center gap-2">
-                  <Star className="size-4 fill-current text-[var(--color-sunset-400)]" />
-                  {pkg.agency.avgRating.toFixed(1)} ({pkg.agency.totalReviews} reviews)
+                <span className="inline-flex items-center rounded-full bg-[var(--color-lavender-100)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-lavender-600)] border border-[var(--color-lavender-200)]">
+                  {durationLabel}
                 </span>
-              )}
-            </div>
-
-            {/* Vibes & activities */}
-            {(vibes.length > 0 || activities.length > 0) && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {vibes.map((vibe) => (
-                  <Badge key={vibe} variant="sea">
-                    {vibe}
-                  </Badge>
-                ))}
-                {activities.map((act) => (
-                  <Badge key={act} variant="lavender">
-                    {act}
-                  </Badge>
-                ))}
+                {pkg.status === "OPEN" && (
+                  <span className="inline-flex items-center rounded-full bg-gradient-to-r from-[var(--color-sea-500)] to-[var(--color-sea-600)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                    ✓ Booking Open
+                  </span>
+                )}
               </div>
-            )}
+
+              <h1 className="mt-4 font-display text-3xl leading-tight text-[var(--color-ink-950)] sm:text-4xl md:text-5xl font-bold">
+                {pkg.title}
+              </h1>
+
+              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-[var(--color-ink-700)] sm:text-sm">
+                <span className="inline-flex items-center gap-2">
+                  <MapPin className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                  <span className="font-medium">{pkg.destination}{pkg.destinationState ? `, ${pkg.destinationState}` : ""}</span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <CalendarRange className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                  <span className="font-medium">{formatDateRange(pkg.startDate, pkg.endDate)}</span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <Users className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                  <span className="font-medium">{currentSize}/{pkg.groupSizeMax} Travelers</span>
+                </span>
+                {pkg.agency.avgRating > 0 && (
+                  <span className="inline-flex items-center gap-2">
+                    <Star className="size-4 fill-current text-[var(--color-sunset-400)]" />
+                    <span className="font-medium">{pkg.agency.avgRating.toFixed(1)} ({pkg.agency.totalReviews} reviews)</span>
+                  </span>
+                )}
+              </div>
+
+              {(vibes.length > 0 || activities.length > 0) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {vibes.map((vibe) => (
+                    <Badge key={vibe} variant="sea">
+                      {vibe}
+                    </Badge>
+                  ))}
+                  {activities.map((act) => (
+                    <Badge key={act} variant="lavender">
+                      {act}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <div className="xl:pt-0.5">
+            <BookingSidebar
+              groupId={pkg.group?.id}
+              price={pkg.basePrice}
+              startDate={pkg.startDate}
+              endDate={pkg.endDate}
+              groupSizeMax={pkg.groupSizeMax}
+              currentSize={currentSize}
+              spotsLeft={spotsLeft}
+              shareUrl={shareUrl}
+              departureDates={pkg.departureDates}
+              label="Join this package"
+              compact
+              showQuickActions={false}
+            />
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* ═══ Main content + Sidebar ═══ */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
         {/* Main content area */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Tabbed content */}
-          <Card className="p-5 sm:p-6">
+          <Card className="p-6 sm:p-8 border-0 shadow-md">
             <TripTabs
               defaultTab="itinerary"
               tabs={[
@@ -355,7 +367,7 @@ export default async function PackageDetailPage({
 
           {/* Reviews section */}
           {agencyReviews.length > 0 && (
-            <Card className="p-5 sm:p-6">
+            <Card className="p-6 sm:p-8 border-0 shadow-md">
               <ReviewsSection
                 reviews={agencyReviews}
                 avgRating={pkg.agency.avgRating}
@@ -365,16 +377,16 @@ export default async function PackageDetailPage({
           )}
 
           {/* Cancellation policy */}
-          <Card className="p-5 sm:p-6">
+          <Card className="p-6 sm:p-8 border-0 shadow-md">
             <CancellationPolicy policy={pkg.cancellationPolicy} />
           </Card>
 
           {/* FAQ */}
-          <Card className="p-5 sm:p-6" id="enquiry-section">
-            <div className="mb-4 flex items-center gap-2">
-              <HelpCircle className="size-5 text-[var(--color-sea-600)]" />
-              <h2 className="font-display text-xl text-[var(--color-ink-950)]">
-                Frequently asked questions
+          <Card className="p-6 sm:p-8 border-0 shadow-md" id="enquiry-section">
+            <div className="mb-5 flex items-center gap-3">
+              <HelpCircle className="size-6 text-[var(--color-sea-600)]" />
+              <h2 className="font-display text-2xl font-semibold text-[var(--color-ink-950)]">
+                Frequently Asked Questions
               </h2>
             </div>
             <FaqAccordion items={DEFAULT_FAQS} />
@@ -383,47 +395,33 @@ export default async function PackageDetailPage({
 
         {/* ═══ Sidebar ═══ */}
         <div className="space-y-4">
-          {/* Booking widget */}
-          <BookingSidebar
-            groupId={pkg.group?.id}
-            price={pkg.basePrice}
-            startDate={pkg.startDate}
-            endDate={pkg.endDate}
-            groupSizeMax={pkg.groupSizeMax}
-            currentSize={currentSize}
-            spotsLeft={spotsLeft}
-            shareUrl={shareUrl}
-            departureDates={pkg.departureDates}
-            label="Join this package"
-          />
-
           {/* Agency card */}
-          <Card className="p-5">
-            <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
+          <Card className="p-6 border-0 shadow-md">
+            <span className="inline-flex items-center rounded-full bg-[var(--color-sea-100)] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--color-sea-700)] border border-[var(--color-sea-200)]">
               Organized by
             </span>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="flex size-14 items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] font-display text-lg text-[var(--color-sea-800)] shadow-[var(--shadow-clay-sm)]">
+            <div className="mt-5 flex items-center gap-4">
+              <div className="flex size-16 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--color-sea-50)] to-[var(--color-sea-100)] font-display text-lg text-[var(--color-sea-800)] shadow-md">
                 {pkg.agency.logoUrl ? (
                   <img
                     src={pkg.agency.logoUrl}
                     alt={pkg.agency.name}
-                    className="size-full rounded-[var(--radius-lg)] object-cover"
+                    className="size-full rounded-xl object-cover"
                   />
                 ) : (
                   initials(pkg.agency.name)
                 )}
               </div>
-              <div>
+              <div className="flex-1">
                 <Link
                   href={`/profile/${pkg.agency.slug}`}
-                  className="font-display text-lg text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
+                  className="font-display text-lg font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
                 >
                   {pkg.agency.name}
                 </Link>
-                <div className="mt-1 flex items-center gap-2 text-sm text-[var(--color-ink-600)]">
-                  <Star className="size-3.5 fill-current text-[var(--color-sunset-500)]" />
-                  {pkg.agency.avgRating.toFixed(1)} · {pkg.agency.totalReviews ?? 0} reviews
+                <div className="mt-2 flex items-center gap-2 text-sm text-[var(--color-ink-600)]">
+                  <Star className="size-4 fill-current text-[var(--color-sunset-500)]" />
+                  <span className="font-semibold">{pkg.agency.avgRating.toFixed(1)}</span> · {pkg.agency.totalReviews ?? 0} reviews
                 </div>
                 <div className="mt-2">
                   <AgencyVerificationBadge status={pkg.agency.verification} />
@@ -443,18 +441,18 @@ export default async function PackageDetailPage({
               </div>
             )}
             {(pkg.agency.totalTrips ?? 0) > 0 && (
-              <p className="mt-3 text-xs text-[var(--color-ink-500)]">
+              <p className="mt-4 text-sm font-medium text-[var(--color-sea-700)]">
                 {pkg.agency.totalTrips} trips organized
               </p>
             )}
           </Card>
 
           {/* Enrolled members */}
-          <Card className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Users className="size-4 text-[var(--color-sea-600)]" />
-              <p className="font-display text-base text-[var(--color-ink-950)]">
-                Who&apos;s going
+          <Card className="p-6 border-0 shadow-md">
+            <div className="mb-5 flex items-center gap-3">
+              <Users className="size-5 text-[var(--color-sea-600)]" />
+              <p className="font-display text-lg font-semibold text-[var(--color-ink-950)]">
+                Who&apos;s Going
               </p>
             </div>
             <EnrolledMembers
