@@ -10,7 +10,6 @@ import {
   Route,
   Compass,
   DollarSign,
-  HelpCircle,
   CheckCircle2,
   Car,
   Coffee,
@@ -20,7 +19,6 @@ import {
 import { ImageGallery } from "@/components/trip/image-gallery";
 import { DayStepper, type DayPlan } from "@/components/trip/day-stepper";
 import { TripTabs } from "@/components/trip/trip-tabs";
-import { FaqAccordion, type FaqItem } from "@/components/trip/faq-accordion";
 import { InclusionsCard } from "@/components/trip/inclusions-card";
 import { PricingTable } from "@/components/trip/pricing-table";
 import { EnrolledMembers } from "@/components/trip/enrolled-members";
@@ -90,39 +88,6 @@ export async function generateMetadata({
   };
 }
 
-// Default FAQ items for packages
-const DEFAULT_FAQS: FaqItem[] = [
-  {
-    question: "How is the group formed?",
-    answer:
-      "TravellersIn uses a social-first approach — travelers join based on shared interests, vibes, and schedules. You can see who else has enrolled before committing, so you travel with people you feel comfortable with.",
-  },
-  {
-    question: "Is the price per person or for the whole group?",
-    answer:
-      "All listed prices are per person. Group discounts may apply as more travelers join — check the pricing section for tier details.",
-  },
-  {
-    question: "How are payments handled?",
-    answer:
-      "Payments go through our secure escrow system powered by Razorpay. Your money is held safely and released to the agency in tranches — partial during booking confirmation and the rest after trip completion.",
-  },
-  {
-    question: "Can I cancel after booking?",
-    answer:
-      "Yes, cancellation policies vary by package. Check the cancellation policy section below for specific refund timelines. We recommend booking with confidence — you can always chat with co-travelers in the group before committing.",
-  },
-  {
-    question: "How do I verify other travelers?",
-    answer:
-      "TravellersIn has a 3-tier verification system: Basic (phone verified), Verified (Aadhaar eKYC), and Trusted (completed trips + high ratings). You can see each traveler's verification badge on their profile.",
-  },
-  {
-    question: "What if the minimum group size isn't met?",
-    answer:
-      "If the minimum group size isn't reached by the departure date, the agency may offer revised dates or a full refund. You'll be notified well in advance.",
-  },
-];
 
 export default async function PackageDetailPage({
   params,
@@ -482,17 +447,6 @@ export default async function PackageDetailPage({
             <Card className="p-5 sm:p-6 border-0 shadow-md">
               <CancellationPolicy policy={pkg.cancellationPolicy} />
             </Card>
-
-            {/* FAQ */}
-            <Card className="p-5 sm:p-6 border-0 shadow-md" id="enquiry-section">
-              <div className="mb-5 flex items-center gap-3">
-                <HelpCircle className="size-5 text-[var(--color-sea-600)]" />
-                <h2 className="font-display text-xl font-semibold text-[var(--color-ink-950)]">
-                  Frequently Asked Questions
-                </h2>
-              </div>
-              <FaqAccordion items={DEFAULT_FAQS} />
-            </Card>
           </div>
 
           {/* ── Right: Sticky Sidebar ── */}
@@ -535,49 +489,29 @@ export default async function PackageDetailPage({
                 </div>
               </Card>
 
-              {/* Package summary card */}
-              <Card className="p-4 border-0 shadow-md">
-                <p className="mb-2 text-xs font-bold text-[var(--color-ink-500)] uppercase tracking-widest truncate">
-                  {pkg.title}
-                </p>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-bold text-[var(--color-ink-900)]">{formatCurrency(pkg.basePrice)}</span>
-                  <span className="text-xs text-[var(--color-ink-500)]">/ person</span>
-                </div>
-              </Card>
-
-              {/* Agency card */}
+                {/* Agency card */}
               <Card className="p-5 border-0 shadow-md">
-                <span className="inline-flex items-center rounded-full bg-[var(--color-sea-100)] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[var(--color-sea-700)] border border-[var(--color-sea-200)]">
-                  Organized by
-                </span>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex size-14 items-center justify-center rounded-xl bg-[var(--color-sea-50)] font-display text-base text-[var(--color-sea-800)] border border-[var(--color-sea-200)]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-ink-500)] mb-3">Organized by</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-12 items-center justify-center rounded-xl bg-[var(--color-sea-50)] font-display text-base text-[var(--color-sea-800)] border border-[var(--color-sea-200)] shrink-0">
                     {pkg.agency.logoUrl ? (
-                      <img
-                        src={pkg.agency.logoUrl}
-                        alt={pkg.agency.name}
-                        className="size-full rounded-xl object-cover"
-                      />
+                      <img src={pkg.agency.logoUrl} alt={pkg.agency.name} className="size-full rounded-xl object-cover" />
                     ) : (
                       initials(pkg.agency.name)
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/profile/${pkg.agency.slug}`}
-                      className="font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] truncate block"
-                    >
+                    <Link href={`/profile/${pkg.agency.slug}`} className="font-semibold text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] truncate block text-sm">
                       {pkg.agency.name}
                     </Link>
                     {pkg.agency.avgRating > 0 && (
-                      <div className="mt-1 flex items-center gap-1.5 text-sm text-[var(--color-ink-600)]">
-                        <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--color-ink-600)]">
+                        <Star className="size-3 fill-amber-400 text-amber-400" />
                         <span className="font-semibold">{pkg.agency.avgRating.toFixed(1)}</span>
                         <span>· {pkg.agency.totalReviews ?? 0} reviews</span>
                       </div>
                     )}
-                    <div className="mt-1.5">
+                    <div className="mt-1">
                       <AgencyVerificationBadge status={pkg.agency.verification} />
                     </div>
                   </div>
