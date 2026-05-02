@@ -13,7 +13,7 @@ import {
   Star,
   Clock,
   MessageCircle,
-  CreditCard,
+  Ticket,
   ArrowRight,
   Waves,
   TreePine,
@@ -254,7 +254,7 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
 
         {/* ── CTAs — all logic preserved ── */}
         <div className="mt-3 space-y-2">
-          {/* Group Chat + Enroll Now */}
+          {/* Group Chat + Book Now */}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -277,8 +277,8 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
                 isPending && "opacity-70"
               )}
             >
-              <CreditCard className="size-3.5 shrink-0" />
-              {isPending ? "Joining..." : isFull ? "Full" : "Enroll Now"}
+              <Ticket className="size-3.5 shrink-0" />
+              {isPending ? "Joining..." : isFull ? "Full" : "Book Now"}
             </button>
           </div>
 

@@ -36,7 +36,7 @@ export function MobileBottomBar({
   spotsLeft,
   shareUrl,
   requiresFemaleProfile = false,
-  label = "Join this trip",
+  label = "Book Now",
   members = [],
 }: MobileBottomBarProps) {
   return (

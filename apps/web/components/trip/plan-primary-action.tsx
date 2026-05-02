@@ -29,7 +29,7 @@ interface PlanPrimaryActionProps {
 
 export function PlanPrimaryAction({
   groupId,
-  joinLabel = "Join this trip",
+  joinLabel = "Book Now",
   requiresFemaleProfile = false,
   members = [],
   planId,

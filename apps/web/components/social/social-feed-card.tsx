@@ -115,28 +115,14 @@ export function SocialFeedCard({ item }: { item: SocialFeedItem }) {
       <div className="flex items-center justify-between border-t border-[var(--color-border)] px-4 py-2.5">
         {/* Origin type label */}
         <span
-          className={`text-xs font-semibold ${
-            isPlan ? "text-[var(--color-lavender-500)]" : "text-[var(--color-sea-600)]"
-          }`}
+          className={`text-xs font-semibold ${isPlan ? "text-[var(--color-lavender-500)]" : "text-[var(--color-sea-600)]"
+            }`}
         >
           {isPlan ? "Travel Plan" : "Agency Package"}
         </span>
 
         {/* Share buttons */}
-        <div className="flex items-center gap-1">
-          <a
-            href={buildWhatsAppUrl(
-              `${typeof window !== "undefined" ? window.location.origin : ""}${detailHref}`,
-              `Check out this trip: ${item.title}`,
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="flex size-8 items-center justify-center rounded-full text-[var(--color-ink-500)] transition hover:bg-[var(--color-sea-50)] hover:text-[#128C7E]"
-            aria-label="Share on WhatsApp"
-          >
-            <Share2 className="size-4" />
-          </a>
-        </div>
+
       </div>
     </article>
   );

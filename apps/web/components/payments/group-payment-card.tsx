@@ -202,7 +202,7 @@ export function GroupPaymentCard({ groupId }: { groupId: string }) {
             <Wallet className="size-5 text-[var(--color-sea-700)]" />
           </div>
           <p className="text-sm text-[var(--color-ink-600)]">
-            Payment state is unavailable for this trip.
+            {feedback ?? "Payment state is unavailable for this trip."}
           </p>
         </div>
       </Card>

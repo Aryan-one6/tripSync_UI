@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Users, TrendingDown, CreditCard, MessageCircle, LogIn } from "lucide-react";
+import { Users, TrendingDown, Ticket, MessageCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatCurrency } from "@/lib/format";
@@ -44,7 +44,7 @@ export function PricingTable({
   const isLoggedIn = !!session && status === "authenticated";
   const checkoutHref = groupId ? `/dashboard/groups/${groupId}/checkout` : "/dashboard";
 
-  function handleEnroll() {
+  function handleBookNow() {
     if (!isLoggedIn) {
       router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
@@ -78,19 +78,19 @@ export function PricingTable({
             type="button"
             className="flex-1 gap-2 h-11 text-sm font-bold"
             disabled={isFull || !groupId}
-            onClick={handleEnroll}
+            onClick={handleBookNow}
           >
             {!isLoggedIn ? (
               <>
                 <LogIn className="size-4" />
-                Login to Enroll
+                Login to Book
               </>
             ) : isFull ? (
               <>Group Full</>
             ) : (
               <>
-                <CreditCard className="size-4" />
-                Enroll Now — Pay ₹{(activePrice).toLocaleString("en-IN")}
+                <Ticket className="size-4" />
+                Book Now — Pay ₹{(activePrice).toLocaleString("en-IN")}
               </>
             )}
           </Button>

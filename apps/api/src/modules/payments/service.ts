@@ -15,6 +15,7 @@ import { createSystemMessage } from '../chat/service.js';
 import { createStoredNotificationsBulk } from '../notifications/service.js';
 import {
   queueNotification,
+  scheduleConfirmingWindow,
   scheduleEscrowRelease,
 } from '../../lib/queue.js';
 
@@ -212,6 +213,7 @@ async function getGroupPaymentContext(groupId: string, userId: string) {
 
   if (membership.group.package) {
     if (
+      membership.group.package.status !== PlanStatus.OPEN &&
       membership.group.package.status !== PlanStatus.CONFIRMING &&
       membership.group.package.status !== PlanStatus.CONFIRMED
     ) {
@@ -443,9 +445,14 @@ async function finalizeCapturedPayment(
       capturedUserIds.add(payment.userId);
 
       const allCommitted = activeMembers.every((memberId) => capturedUserIds.has(memberId));
+      const minRequiredPayers =
+        payment.source === 'PLAN_OFFER'
+          ? payment.group.plan?.groupSizeMin ?? 1
+          : payment.group.package?.groupSizeMin ?? 1;
+      const canConfirm = allCommitted && capturedUserIds.size >= minRequiredPayers;
 
       if (payment.source === 'PLAN_OFFER' && payment.group.plan) {
-        if (allCommitted) {
+        if (canConfirm) {
           await tx.plan.update({
             where: { id: payment.group.plan.id },
             data: {
@@ -462,7 +469,7 @@ async function finalizeCapturedPayment(
       }
 
       if (payment.source === 'PACKAGE' && payment.group.package) {
-        if (allCommitted) {
+        if (canConfirm) {
           await tx.package.update({
             where: { id: payment.group.package.id },
             data: { status: PlanStatus.CONFIRMED },
@@ -495,7 +502,7 @@ async function finalizeCapturedPayment(
         },
       });
 
-      if (wallet.payoutMode === WalletPayoutMode.PRO && allCommitted) {
+      if (wallet.payoutMode === WalletPayoutMode.PRO && canConfirm) {
         const advancePercent = 0.3;
         const advanceGross = Math.round(payment.tripAmount * advancePercent);
         const advanceCommission = Math.round(payment.commissionAmount * advancePercent);
@@ -555,7 +562,7 @@ async function finalizeCapturedPayment(
         agency,
         user: payment.user,
         alreadyCaptured: false,
-        allCommitted,
+        allCommitted: canConfirm,
         stateName,
         groupId: payment.groupId,
       };
@@ -935,6 +942,41 @@ export async function createOrder(
   }
   if (!Number.isInteger(requestedWallet) || requestedWallet < 0) {
     throw new BadRequestError('walletAmountToUse must be a non-negative integer');
+  }
+
+  // Package checkout can start while package is OPEN.
+  // First order moves it into CONFIRMING and opens the 48h payment window.
+  if (context.package?.status === PlanStatus.OPEN) {
+    const runAt = new Date(Date.now() + PAYMENT_WINDOW_MS);
+    const moved = await prisma.$transaction(async (tx) => {
+      const pkgUpdated = await tx.package.updateMany({
+        where: {
+          id: context.package!.id,
+          status: PlanStatus.OPEN,
+        },
+        data: {
+          status: PlanStatus.CONFIRMING,
+        },
+      });
+
+      if (pkgUpdated.count === 0) return false;
+
+      await tx.group.update({
+        where: { id: context.group.id },
+        data: { paymentWindowEndsAt: runAt },
+      });
+
+      return true;
+    });
+
+    if (moved) {
+      await scheduleConfirmingWindow(context.group.id, runAt);
+      await createSystemMessage(
+        context.group.id,
+        'Payment window is now open for 48 hours.',
+        { groupId: context.group.id, action: 'payment_window_opened' },
+      );
+    }
   }
 
   if (context.existingPayment?.status === PaymentStatus.CAPTURED) {

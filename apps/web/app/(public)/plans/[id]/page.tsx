@@ -374,7 +374,7 @@ export default async function PlanDetailPage({
             spotsLeft={spotsLeft}
             shareUrl={shareUrl}
             requiresFemaleProfile={plan.genderPref === "female_only"}
-            label={hasSelectedOffer ? "Join this trip" : "Join this plan"}
+            label="Book Now"
             members={plan.group?.members ?? []}
           />
         </div>
@@ -908,7 +908,7 @@ export default async function PlanDetailPage({
         spotsLeft={spotsLeft}
         shareUrl={shareUrl}
         requiresFemaleProfile={plan.genderPref === "female_only"}
-        label={hasSelectedOffer ? "Join this trip" : "Join this plan"}
+        label="Book Now"
         members={plan.group?.members ?? []}
       />
     </div>

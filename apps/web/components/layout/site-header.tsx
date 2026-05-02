@@ -170,7 +170,6 @@ export function SiteHeader() {
 
   const publicNavLinks = [
     { href: discoverHref, label: "Discover" },
-    { href: "/packages", label: "Packages" },
     { href: "/agencies", label: "Agencies" },
     { href: "/#how-it-works", label: "How It Works" },
     { href: "/dashboard/refer-and-earn", label: "Refer & Earn" },

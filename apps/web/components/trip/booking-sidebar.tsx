@@ -1,8 +1,8 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Users, MessageCircle, CreditCard, Share2, ChevronRight, UserPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Calendar, Users, MessageCircle, Ticket } from "lucide-react";
 import { WhatsAppShareButton } from "@/components/ui/whatsapp-share-button";
 import { PlanPrimaryAction } from "@/components/trip/plan-primary-action";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -51,15 +51,18 @@ export function BookingSidebar({
   shareUrl,
   requiresFemaleProfile = false,
   departureDates,
-  label = "Enroll Now",
+  label = "Book Now",
   members = [],
   compact = false,
   showQuickActions,
 }: BookingSidebarProps) {
-  const { session } = useAuth();
+  const { session, apiFetchWithAuth } = useAuth();
   const router = useRouter();
+  const [bookingFeedback, setBookingFeedback] = useState<string | null>(null);
+  const [isBookingPending, startBookingTransition] = useTransition();
   const isLoggedIn = !!session;
   const isAgency = session?.role === "agency_admin";
+  const isPackageFlow = !planId;
 
   // Determine if current user is already a member
   const isMember = isLoggedIn && members.some(
@@ -80,6 +83,29 @@ export function BookingSidebar({
 
   const spotsLeftPct = Math.round(((groupSizeMax - currentSize) / groupSizeMax) * 100);
   const isFull = currentSize >= groupSizeMax;
+
+  function handlePackageBookNow() {
+    if (!groupId || isFull) return;
+    if (!isLoggedIn) {
+      router.push(`/login?next=${encodeURIComponent(checkoutHref)}`);
+      return;
+    }
+
+    startBookingTransition(async () => {
+      try {
+        setBookingFeedback(null);
+        await apiFetchWithAuth<GroupMember>(`/groups/${groupId}/join`, { method: "POST" });
+        router.push(checkoutHref);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to continue right now.";
+        if (/already in this group/i.test(message)) {
+          router.push(checkoutHref);
+          return;
+        }
+        setBookingFeedback(message);
+      }
+    });
+  }
 
   return (
     <div className="space-y-3">
@@ -150,8 +176,8 @@ export function BookingSidebar({
                 className="w-full h-12 rounded-xl bg-slate-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 flex items-center justify-center gap-2"
                 onClick={() => router.push(checkoutHref)}
               >
-                <CreditCard className="size-4" />
-                Enroll Now
+                <Ticket className="size-4" />
+                Book Now
               </button>
               {groupId && (
                 <button
@@ -180,21 +206,33 @@ export function BookingSidebar({
               </p>
             </>
           ) : (
-            /* Not a member: Enroll Now (dark) + Group Chat + WhatsApp */
+            /* Not a member: Book Now + Group Chat + WhatsApp */
             <>
-              <PlanPrimaryAction
-                groupId={groupId}
-                joinLabel={isFull ? "Group Full" : label}
-                requiresFemaleProfile={requiresFemaleProfile}
-                members={members}
-                planId={planId}
-                planTitle={planTitle}
-                destination={destination}
-                budgetMin={budgetMin}
-                budgetMax={budgetMax}
-                creatorUserId={creatorUserId}
-                offers={offers}
-              />
+              {isPackageFlow ? (
+                <button
+                  type="button"
+                  disabled={isFull || isBookingPending}
+                  onClick={handlePackageBookNow}
+                  className="w-full h-12 rounded-xl bg-slate-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  <Ticket className="size-4" />
+                  {isBookingPending ? "Processing..." : isFull ? "Group Full" : label}
+                </button>
+              ) : (
+                <PlanPrimaryAction
+                  groupId={groupId}
+                  joinLabel={isFull ? "Group Full" : label}
+                  requiresFemaleProfile={requiresFemaleProfile}
+                  members={members}
+                  planId={planId}
+                  planTitle={planTitle}
+                  destination={destination}
+                  budgetMin={budgetMin}
+                  budgetMax={budgetMax}
+                  creatorUserId={creatorUserId}
+                  offers={offers}
+                />
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -212,6 +250,9 @@ export function BookingSidebar({
                 </button>
                 <WhatsAppShareButton href={shareUrl} label="Share" size="sm" className="h-10 w-full" />
               </div>
+              {bookingFeedback && (
+                <p className="text-center text-xs text-[var(--color-sunset-700)]">{bookingFeedback}</p>
+              )}
               {!isLoggedIn && (
                 <p className="text-center text-xs text-slate-400">
                   Please <a href="/login" className="font-semibold text-emerald-600 hover:underline">log in</a> to continue

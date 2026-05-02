@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function WhatsAppShareButton({
   href,
-  label = "Share on WhatsApp",
+  label = "Share",
   size = "default",
   className,
 }: {
@@ -19,11 +19,11 @@ export function WhatsAppShareButton({
         type="button"
         variant="soft"
         size={size}
-        className="w-full gap-2 whitespace-nowrap bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20 shadow-[var(--shadow-clay-sm)]"
+        className="w-full gap-2 whitespace-nowrap bg-gray-300/10  hover:bg-[#25D366]/20 shadow-[var(--shadow-clay-sm)]"
       >
         <Share2 className="size-4" />
         {label}
       </Button>
     </a>
   );
-}
+} 
