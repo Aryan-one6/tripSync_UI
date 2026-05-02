@@ -549,7 +549,7 @@ export default async function PackageDetailPage({
             </a>
             <a
               href="#mobile-join-card"
-              className="flex h-10 items-center gap-2 rounded-xl bg-[var(--color-sea-600)] px-5 text-sm font-bold text-white shadow-[var(--shadow-clay-sm)] transition hover:bg-[var(--color-sea-700)]"
+              className="flex h-10 items-center gap-2 rounded-xl bg-green-900 px-5 text-sm font-bold text-white shadow-[var(--shadow-clay-sm)] transition hover:bg-green-700"
             >
               <Ticket className="size-4" />
               Book Now

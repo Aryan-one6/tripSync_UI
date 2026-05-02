@@ -273,7 +273,7 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
                 "flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition active:scale-[0.97]",
                 isFull
                   ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                  : "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500",
+                  : "bg-green-900 text-white shadow-sm hover:bg-green-700",
                 isPending && "opacity-70"
               )}
             >

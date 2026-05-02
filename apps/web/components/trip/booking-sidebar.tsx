@@ -173,7 +173,7 @@ export function BookingSidebar({
             <>
               <button
                 type="button"
-                className="w-full h-12 rounded-xl bg-slate-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 flex items-center justify-center gap-2"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-green-700"
                 onClick={() => router.push(checkoutHref)}
               >
                 <Ticket className="size-4" />
@@ -213,7 +213,7 @@ export function BookingSidebar({
                   type="button"
                   disabled={isFull || isBookingPending}
                   onClick={handlePackageBookNow}
-                  className="w-full h-12 rounded-xl bg-slate-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Ticket className="size-4" />
                   {isBookingPending ? "Processing..." : isFull ? "Group Full" : label}

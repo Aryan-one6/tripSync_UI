@@ -76,7 +76,7 @@ export function PricingTable({
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
-            className="flex-1 gap-2 h-11 text-sm font-bold"
+            className="h-11 flex-1 gap-2 bg-green-900 text-sm font-bold text-white hover:bg-green-700"
             disabled={isFull || !groupId}
             onClick={handleBookNow}
           >

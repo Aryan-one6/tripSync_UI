@@ -309,7 +309,7 @@ function OfferBanner() {
               <p className="mt-1 text-sm text-white/80">Use code <span className="font-bold text-white bg-white/20 px-2 py-0.5 rounded-md">FIRST500</span> at checkout</p>
             </div>
             <Link href="/discover"
-              className="shrink-0 flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-emerald-700 shadow-md transition hover:bg-emerald-50">
+              className="shrink-0 flex items-center gap-2 rounded-full bg-green-900 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-green-700">
               Book Now <ArrowRight className="size-4" />
             </Link>
           </div>

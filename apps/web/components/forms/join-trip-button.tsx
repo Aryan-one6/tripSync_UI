@@ -39,6 +39,7 @@ export function JoinTripButton({
 
   const joinedStatus = optimisticStatus ?? existingMembership?.status ?? null;
   const isCreator = existingMembership?.role === "CREATOR";
+  const bookNowThemeClass = "bg-green-900 text-white hover:bg-green-700";
 
   if (!groupId) {
     return (
@@ -62,7 +63,7 @@ export function JoinTripButton({
       <div className="space-y-2.5">
         <p className="text-xs font-semibold text-[var(--color-sea-700)]">{heading}</p>
         <Link href={checkoutHref} className="block">
-          <Button type="button" className="w-full gap-2">
+          <Button type="button" className={`w-full gap-2 ${bookNowThemeClass}`}>
             <Ticket className="size-4" />
             Book Now
           </Button>
@@ -100,7 +101,7 @@ export function JoinTripButton({
     <div className="space-y-2">
       <Button
         type="button"
-        className="gap-2 whitespace-nowrap w-full"
+        className={`gap-2 whitespace-nowrap w-full ${bookNowThemeClass}`}
         onClick={() =>
           startTransition(async () => {
             try {
