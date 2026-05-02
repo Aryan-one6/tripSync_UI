@@ -272,8 +272,8 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
               className={cn(
                 "flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition active:scale-[0.97]",
                 isFull
-                  ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                  : "bg-green-900 text-white shadow-sm hover:bg-green-700",
+                  ? "cursor-not-allowed border border-green-900 bg-slate-100 text-slate-400"
+                  : "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500",
                 isPending && "opacity-70"
               )}
             >

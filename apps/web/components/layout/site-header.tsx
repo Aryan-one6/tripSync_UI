@@ -233,7 +233,7 @@ export function SiteHeader() {
           isMobileMessengerRoute && "hidden md:block",
         )}
       >
-        <div className="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-6xl  items-center justify-between gap-4 px-4 sm:px-6">
 
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center">

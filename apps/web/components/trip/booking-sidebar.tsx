@@ -173,7 +173,7 @@ export function BookingSidebar({
             <>
               <button
                 type="button"
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-green-700"
+                className="w-full h-12 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-green-700 flex items-center justify-center gap-2"
                 onClick={() => router.push(checkoutHref)}
               >
                 <Ticket className="size-4" />
@@ -213,7 +213,7 @@ export function BookingSidebar({
                   type="button"
                   disabled={isFull || isBookingPending}
                   onClick={handlePackageBookNow}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full h-12 rounded-xl bg-green-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   <Ticket className="size-4" />
                   {isBookingPending ? "Processing..." : isFull ? "Group Full" : label}
@@ -277,13 +277,6 @@ export function BookingSidebar({
         />
       )}
 
-      {/* ── Trust note ── */}
-      <div className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2.5">
-        <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-emerald-500" />
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          Payments are held in <strong className="text-slate-700">secure escrow</strong> via Razorpay and released to the agency only after trip milestones are met.
-        </p>
-      </div>
     </div>
   );
 }

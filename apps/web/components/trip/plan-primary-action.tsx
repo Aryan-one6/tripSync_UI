@@ -137,7 +137,7 @@ export function PlanPrimaryAction({
   if (existingAgencyOffer) {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-[var(--color-ink-600)]">
+        <p className="text-xs text-[var(--color-sea-600)]">
           You already sent an offer on this plan ({existingAgencyOffer.status.toLowerCase()}).
         </p>
         <Link href={inboxHref} className="block">
