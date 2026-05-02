@@ -1,13 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  MapPin,
-  ChevronDown,
-  Sunrise,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { MapPin, ChevronDown, Coffee, Tent, Car, Zap, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DayPlan {
@@ -25,206 +19,213 @@ interface DayStepperProps {
   totalDays?: number;
 }
 
-function getDayIcon(day: number) {
-  const icons = [Sunrise, Sun, Moon];
-  return icons[day % icons.length];
-}
+const DAY_COLORS = [
+  { pill: "bg-emerald-600 text-white", border: "border-emerald-200", accent: "text-emerald-700", bg: "bg-emerald-50" },
+  { pill: "bg-sky-600 text-white", border: "border-sky-200", accent: "text-sky-700", bg: "bg-sky-50" },
+  { pill: "bg-violet-600 text-white", border: "border-violet-200", accent: "text-violet-700", bg: "bg-violet-50" },
+  { pill: "bg-amber-600 text-white", border: "border-amber-200", accent: "text-amber-700", bg: "bg-amber-50" },
+  { pill: "bg-rose-600 text-white", border: "border-rose-200", accent: "text-rose-700", bg: "bg-rose-50" },
+  { pill: "bg-teal-600 text-white", border: "border-teal-200", accent: "text-teal-700", bg: "bg-teal-50" },
+];
 
 export function DayStepper({ days, totalDays }: DayStepperProps) {
-  const allDayIndexes = useMemo(() => days.map((_, index) => index), [days]);
+  const allDayIndexes = useMemo(() => days.map((_, i) => i), [days]);
   const [expandedDays, setExpandedDays] = useState<number[]>(() => (days.length > 0 ? [0] : []));
-  const visibleExpandedDays = useMemo(
-    () => expandedDays.filter((index) => index < days.length),
+  const visibleExpanded = useMemo(
+    () => expandedDays.filter((i) => i < days.length),
     [days.length, expandedDays],
   );
 
   if (days.length === 0) {
     return (
-      <div className="rounded-[var(--radius-md)] border border-white/40 bg-[var(--color-surface-2)] p-6 text-center shadow-[var(--shadow-clay-inset)]">
-        <MapPin className="mx-auto size-8 text-[var(--color-ink-400)]" />
-        <p className="mt-2 text-sm text-[var(--color-ink-600)]">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
+        <MapPin className="mx-auto size-10 text-slate-300" />
+        <p className="mt-3 text-sm text-slate-500">
           Detailed day-by-day itinerary will be shared soon.
         </p>
       </div>
     );
   }
 
+  function toggleDay(index: number) {
+    setExpandedDays((prev) => {
+      const filtered = prev.filter((i) => i < days.length);
+      return filtered.includes(index)
+        ? filtered.filter((i) => i !== index)
+        : [...filtered, index].sort((a, b) => a - b);
+    });
+  }
+
   return (
-    <div className="space-y-0">
-      {/* Progress header */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 sm:mb-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">
-          {totalDays ?? days.length}-Day itinerary
-        </p>
+    <div>
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white">
+            {totalDays ?? days.length}-Day Itinerary
+          </span>
+        </div>
         <button
           type="button"
           onClick={() =>
-            setExpandedDays(visibleExpandedDays.length === days.length ? [] : allDayIndexes)
+            setExpandedDays(visibleExpanded.length === days.length ? [] : allDayIndexes)
           }
-          className="text-[11px] font-semibold text-[var(--color-sea-700)] transition hover:text-[var(--color-sea-600)] sm:text-xs"
+          className="flex items-center gap-1 text-[12px] font-semibold text-emerald-700 transition hover:text-emerald-600"
         >
-          {visibleExpandedDays.length === days.length ? "Collapse all" : "Expand all"}
+          {visibleExpanded.length === days.length ? "Collapse all" : "Expand all"}
+          <ArrowRight className="size-3" />
         </button>
       </div>
 
-      <div className="space-y-3 sm:space-y-4">
+      {/* Day list */}
+      <div className="relative space-y-0">
+        {/* Vertical connector line */}
+        <div className="absolute left-[18px] top-8 bottom-8 w-0.5 bg-gradient-to-b from-emerald-300 via-slate-200 to-slate-200 md:left-[22px]" />
+
         {days.map((day, index) => {
-          const isExpanded = visibleExpandedDays.includes(index);
-          const DayIcon = getDayIcon(index);
+          const isExpanded = visibleExpanded.includes(index);
           const isFirst = index === 0;
           const isLast = index === days.length - 1;
+          const color = DAY_COLORS[index % DAY_COLORS.length];
 
           return (
-            <div
-              key={`${day.day}-${index}`}
-              className="grid grid-cols-[2rem_minmax(0,1fr)] items-stretch gap-3 sm:grid-cols-[3rem_minmax(0,1fr)] sm:gap-4"
-            >
-              <div className="flex min-h-full flex-col items-center self-stretch">
-                {isFirst && (
-                  <span className="mb-2 inline-flex rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)] sm:px-2.5 sm:py-1 sm:text-[9px]">
-                    Start
-                  </span>
-                )}
-
-                <div
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-full border-2 transition-all duration-300 sm:size-12",
-                    isExpanded
-                      ? "scale-105 border-[var(--color-sea-400)] bg-gradient-to-b from-[var(--color-sea-400)] to-[var(--color-sea-600)] text-white shadow-[var(--shadow-clay-sea)]"
-                      : "border-white/60 bg-[var(--color-surface-raised)] text-[var(--color-ink-500)] shadow-[var(--shadow-clay-sm)]",
+            <div key={`day-${day.day}-${index}`} className="relative pb-4 last:pb-0">
+              <div className="flex gap-4 md:gap-5">
+                {/* Day pill + connector */}
+                <div className="relative z-10 flex flex-col items-center">
+                  {isFirst && (
+                    <span className="mb-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700">
+                      Start
+                    </span>
                   )}
-                >
-                  <span className="text-[10px] font-bold sm:text-sm">{day.day}</span>
-                </div>
-
-                {!isLast && (
-                  <div className="mt-1.5 w-0.5 flex-1 rounded-full bg-gradient-to-b from-[var(--color-sea-300)] via-[var(--color-sea-200)] to-[var(--color-sea-100)] sm:mt-2" />
-                )}
-
-                {isLast && (
-                  <span className="mt-2 inline-flex rounded-full bg-[var(--color-sunset-50)] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)] sm:px-2.5 sm:py-1 sm:text-[9px]">
-                    End
-                  </span>
-                )}
-              </div>
-
-              {/* Day card */}
-              <button
-                type="button"
-                onClick={() =>
-                  setExpandedDays((current) =>
-                    current
-                      .filter((item) => item < days.length)
-                      .includes(index)
-                      ? current.filter((item) => item !== index)
-                      : [...current.filter((item) => item < days.length), index].sort((a, b) => a - b),
-                  )
-                }
-                className={cn(
-                  "min-w-0 w-full rounded-xl border-2 text-left transition-all duration-300",
-                  isExpanded
-                    ? "border-[var(--color-sea-300)] bg-white shadow-md"
-                    : "border-[var(--color-ink-100)] bg-[var(--color-surface-2)] shadow-sm hover:shadow-md hover:border-[var(--color-sea-200)]",
-                )}
-              >
-                <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <DayIcon
-                      className={cn(
-                        "size-5 shrink-0 sm:size-5",
-                        isExpanded
-                          ? "text-[var(--color-sea-600)]"
-                          : "text-[var(--color-sea-400)]",
-                      )}
-                    />
-                    <div className="min-w-0">
-                      <p
-                        className={cn(
-                          "truncate font-display text-sm font-semibold leading-5 transition-colors sm:text-base sm:leading-6",
-                          isExpanded
-                            ? "text-[var(--color-ink-950)]"
-                            : "text-[var(--color-ink-800)]",
-                        )}
-                      >
-                        Day {day.day}: {day.title}
-                      </p>
-                      {!isExpanded && day.description && (
-                        <p className="mt-1 truncate text-xs text-[var(--color-ink-500)] sm:text-sm">
-                          {day.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <ChevronDown
+                  <div
                     className={cn(
-                      "size-5 shrink-0 text-[var(--color-ink-400)] transition-transform duration-300",
-                      isExpanded && "rotate-180 text-[var(--color-sea-600)]",
+                      "flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-black shadow-sm transition-all duration-200 md:size-11",
+                      isExpanded ? color.pill + " scale-105 shadow-md" : "bg-white border-2 border-slate-200 text-slate-600"
                     )}
-                  />
-                </div>
-
-                {/* Expanded content */}
-                <div
-                  className={cn(
-                    "overflow-hidden transition-all duration-300",
-                    isExpanded ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
-                  )}
-                >
-                  <div className="space-y-4 border-t border-[var(--color-ink-100)] px-3 pb-4 pt-4 sm:px-5 sm:pb-5 sm:space-y-5">
-                    {/* Day description - large and prominent */}
-                    {day.description && (
-                      <p className="text-sm leading-relaxed text-[var(--color-ink-700)] sm:text-base">
-                        {day.description}
-                      </p>
-                    )}
-
-                    {/* Highlights Section - better design */}
-                    {day.highlights && day.highlights.length > 0 && (
-                      <div className="space-y-2.5">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-600)]">
-                          Highlights
-                        </h4>
-                        <ul className="space-y-2">
-                          {day.highlights.map((h) => (
-                            <li
-                              key={h}
-                              className="flex items-start gap-3 text-sm text-[var(--color-ink-700)]"
-                            >
-                              <span className="mt-2 size-2 shrink-0 rounded-full bg-[var(--color-sea-500)]" />
-                              <span>{h}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Day Details Grid */}
-                    <div className="grid gap-2.5 sm:grid-cols-3">
-                      {day.meals && day.meals.length > 0 && (
-                        <div className="rounded-lg bg-[var(--color-sunset-50)] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sunset-700)]">Meals</p>
-                          <p className="mt-1.5 text-sm text-[var(--color-sunset-900)]">{day.meals.join(" • ")}</p>
-                        </div>
-                      )}
-                      {day.accommodation && (
-                        <div className="rounded-lg bg-[var(--color-lavender-50)] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-lavender-600)]">Stay</p>
-                          <p className="mt-1.5 text-sm text-[var(--color-lavender-900)]">{day.accommodation}</p>
-                        </div>
-                      )}
-                      {day.transport && (
-                        <div className="rounded-lg bg-[var(--color-sea-50)] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-sea-700)]">Transfer</p>
-                          <p className="mt-1.5 text-sm text-[var(--color-sea-900)]">{day.transport}</p>
-                        </div>
-                      )}
-                    </div>
+                  >
+                    {day.day}
                   </div>
+                  {isLast && (
+                    <span className="mt-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-rose-600">
+                      End
+                    </span>
+                  )}
                 </div>
-              </button>
+
+                {/* Day card */}
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleDay(index)}
+                    className={cn(
+                      "w-full overflow-hidden rounded-xl border text-left transition-all duration-300",
+                      isExpanded
+                        ? cn("border-2 shadow-md", color.border, "bg-white")
+                        : "border border-slate-200 bg-white shadow-sm hover:border-emerald-200 hover:shadow-md"
+                    )}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                            isExpanded ? color.pill : "bg-slate-100 text-slate-600"
+                          )}>
+                            Day {day.day}
+                          </span>
+                          <p className={cn(
+                            "truncate text-sm font-bold leading-tight",
+                            isExpanded ? "text-slate-900" : "text-slate-700"
+                          )}>
+                            {day.title}
+                          </p>
+                        </div>
+                        {!isExpanded && day.description && (
+                          <p className="mt-1 truncate text-xs text-slate-500 pl-0.5">
+                            {day.description}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-slate-400 transition-transform duration-300",
+                          isExpanded && cn("rotate-180", color.accent)
+                        )}
+                      />
+                    </div>
+
+                    {/* Expanded content */}
+                    <div className={cn(
+                      "overflow-hidden transition-all duration-300",
+                      isExpanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+                    )}>
+                      <div className={cn("border-t px-4 pb-5 pt-4 space-y-4", color.border)}>
+                        {day.description && (
+                          <p className="text-sm leading-relaxed text-slate-700">{day.description}</p>
+                        )}
+
+                        {day.highlights && day.highlights.length > 0 && (
+                          <div>
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Highlights</p>
+                            <ul className="space-y-2">
+                              {day.highlights.map((h, hi) => (
+                                <li key={hi} className="flex items-start gap-2.5 text-sm text-slate-700">
+                                  <Zap className={cn("mt-0.5 size-3.5 shrink-0", color.accent)} />
+                                  <span>{h}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(day.meals?.length || day.accommodation || day.transport) && (
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            {day.meals && day.meals.length > 0 && (
+                              <div className={cn("flex items-start gap-2 rounded-xl p-3", color.bg)}>
+                                <Coffee className={cn("mt-0.5 size-4 shrink-0", color.accent)} />
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Meals</p>
+                                  <p className="mt-0.5 text-xs font-semibold text-slate-800">{day.meals.join(" · ")}</p>
+                                </div>
+                              </div>
+                            )}
+                            {day.accommodation && (
+                              <div className={cn("flex items-start gap-2 rounded-xl p-3", color.bg)}>
+                                <Tent className={cn("mt-0.5 size-4 shrink-0", color.accent)} />
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Stay</p>
+                                  <p className="mt-0.5 text-xs font-semibold text-slate-800">{day.accommodation}</p>
+                                </div>
+                              </div>
+                            )}
+                            {day.transport && (
+                              <div className={cn("flex items-start gap-2 rounded-xl p-3", color.bg)}>
+                                <Car className={cn("mt-0.5 size-4 shrink-0", color.accent)} />
+                                <div>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Transfer</p>
+                                  <p className="mt-0.5 text-xs font-semibold text-slate-800">{day.transport}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
           );
         })}
+      </div>
+
+      {/* End of trip */}
+      <div className="mt-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+        <p className="font-display text-base italic text-slate-400">End of Trip</p>
+        <div className="h-px flex-1 bg-gradient-to-l from-slate-200 to-transparent" />
       </div>
     </div>
   );

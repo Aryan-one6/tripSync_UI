@@ -142,50 +142,84 @@ export function BookingSidebar({
       {/* ── CTAs ── */}
       {!isAgency ? (
         <div className="space-y-2">
-          {/* Enroll Now → payment */}
+          {/* If member is approved/committed → show Pay button + chat */}
           {isApproved ? (
-            <Button
-              type="button"
-              className="w-full gap-2 h-11 text-sm font-bold"
-              onClick={() => router.push(checkoutHref)}
-            >
-              <CreditCard className="size-4" />
-              Pay & Confirm Spot
-            </Button>
+            <>
+              <Button
+                type="button"
+                className="w-full gap-2 h-11 text-sm font-bold"
+                onClick={() => router.push(checkoutHref)}
+              >
+                <CreditCard className="size-4" />
+                Enroll Now — Pay & Confirm
+              </Button>
+              {groupId && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full gap-2 h-10 text-sm"
+                  onClick={() => router.push(chatHref)}
+                >
+                  <MessageCircle className="size-4" />
+                  Group Chat
+                </Button>
+              )}
+            </>
+          ) : isMember && groupId ? (
+            /* Member but not yet approved — show chat only */
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full gap-2 h-11 text-sm font-semibold"
+                onClick={() => router.push(chatHref)}
+              >
+                <MessageCircle className="size-4" />
+                Group Chat
+              </Button>
+              <p className="text-center text-xs text-[var(--color-ink-500)]">
+                Your join request is pending approval.
+              </p>
+            </>
           ) : (
-            <div className="space-y-2">
-              <PlanPrimaryAction
-                groupId={groupId}
-                joinLabel={isFull ? "Group Full" : label}
-                requiresFemaleProfile={requiresFemaleProfile}
-                members={members}
-                planId={planId}
-                planTitle={planTitle}
-                destination={destination}
-                budgetMin={budgetMin}
-                budgetMax={budgetMax}
-                creatorUserId={creatorUserId}
-                offers={offers}
-              />
+            /* Not a member → Enroll Now + Group Chat preview */
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="gap-2 h-11 text-sm"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      router.push(`/login?next=${encodeURIComponent(chatHref)}`);
+                      return;
+                    }
+                    router.push(chatHref);
+                  }}
+                >
+                  <MessageCircle className="size-4" />
+                  Group Chat
+                </Button>
+                <PlanPrimaryAction
+                  groupId={groupId}
+                  joinLabel={isFull ? "Group Full" : label}
+                  requiresFemaleProfile={requiresFemaleProfile}
+                  members={members}
+                  planId={planId}
+                  planTitle={planTitle}
+                  destination={destination}
+                  budgetMin={budgetMin}
+                  budgetMax={budgetMax}
+                  creatorUserId={creatorUserId}
+                  offers={offers}
+                />
+              </div>
               {!isLoggedIn && (
                 <p className="text-center text-xs text-[var(--color-ink-400)]">
                   Please <a href="/login" className="font-semibold text-[var(--color-sea-600)] hover:underline">log in</a> to continue
                 </p>
               )}
-            </div>
-          )}
-
-          {/* Chat button */}
-          {isMember && groupId && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full gap-2 h-10 text-sm"
-              onClick={() => router.push(chatHref)}
-            >
-              <MessageCircle className="size-4" />
-              Group Chat
-            </Button>
+            </>
           )}
 
           {/* Share */}

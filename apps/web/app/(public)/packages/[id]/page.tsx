@@ -15,6 +15,7 @@ import {
   Coffee,
   Eye,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import { ImageGallery } from "@/components/trip/image-gallery";
 import { DayStepper, type DayPlan } from "@/components/trip/day-stepper";
@@ -380,7 +381,7 @@ export default async function PackageDetailPage({
                     spotsLeft={spotsLeft}
                     shareUrl={shareUrl}
                     departureDates={pkg.departureDates}
-                    label="Join Group"
+                    label="Enroll Now"
                   />
                 </div>
               </Card>
@@ -484,7 +485,7 @@ export default async function PackageDetailPage({
                     spotsLeft={spotsLeft}
                     shareUrl={shareUrl}
                     departureDates={pkg.departureDates}
-                    label="Join Group"
+                    label="Enroll Now"
                     compact
                   />
                 </div>
@@ -585,7 +586,8 @@ export default async function PackageDetailPage({
               href="#mobile-join-card"
               className="flex h-10 items-center rounded-xl bg-gradient-to-r from-[var(--color-sea-500)] to-[var(--color-sea-700)] px-5 text-sm font-bold text-white shadow-md transition hover:brightness-110"
             >
-              Join Group
+              <CreditCard className="mr-1.5 size-4" />
+              Enroll Now
             </a>
           </div>
         </div>
