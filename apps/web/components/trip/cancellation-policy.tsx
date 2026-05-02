@@ -1,4 +1,4 @@
-import { ShieldAlert } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 interface CancellationPolicyProps {
   policy?: string | null;
@@ -13,39 +13,47 @@ const DEFAULT_TIERS = [
 
 export function CancellationPolicy({ policy }: CancellationPolicyProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center gap-2">
-        <ShieldAlert className="size-4 text-[var(--color-sunset-600)]" />
-        <p className="font-display text-base text-[var(--color-ink-950)]">
-          Cancellation policy
+        <ShieldCheck className="size-4 text-slate-500" />
+        <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">
+          Cancellation Policy
         </p>
       </div>
 
+      {/* Content */}
       {policy ? (
-        <div className="rounded-[var(--radius-md)] border border-white/40 bg-[var(--color-surface-2)] p-4 shadow-[var(--shadow-clay-inset)]">
-          <p className="text-sm leading-relaxed text-[var(--color-ink-600)] whitespace-pre-line">
-            {policy}
-          </p>
-        </div>
+        <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-line">
+          {policy}
+        </p>
       ) : (
         <div className="space-y-1.5">
           {DEFAULT_TIERS.map((tier) => (
             <div
               key={tier.window}
-              className="flex items-center justify-between rounded-[var(--radius-sm)] border border-white/40 bg-[var(--color-surface-2)] px-4 py-2.5 shadow-[var(--shadow-clay-inset)]"
+              className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0"
             >
-              <p className="text-sm text-[var(--color-ink-600)]">{tier.window}</p>
-              <p className="text-sm font-semibold text-[var(--color-ink-800)]">
-                {tier.charge}
-              </p>
+              <p className="text-sm text-slate-600">{tier.window}</p>
+              <p className="text-sm font-semibold text-slate-800">{tier.charge}</p>
             </div>
           ))}
         </div>
       )}
 
-      <p className="text-[10px] text-[var(--color-ink-500)]">
-        Cancellation requests must be submitted in writing. Force majeure events are handled per applicable law.
-      </p>
+      {/* Footer */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          Cancellation requests must be submitted in writing. Force majeure events are
+          handled per applicable law.
+        </p>
+        <button
+          type="button"
+          className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-slate-700 underline hover:text-slate-900 transition"
+        >
+          View Detailed Terms
+        </button>
+      </div>
     </div>
   );
 }

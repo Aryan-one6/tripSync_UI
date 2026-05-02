@@ -84,24 +84,24 @@ export function BookingSidebar({
   return (
     <div className="space-y-3">
       {/* ── Trip info strip ── */}
-      <div className="grid grid-cols-2 gap-2.5 text-sm">
-        <div className="flex items-center gap-2 rounded-lg bg-[var(--color-sea-50)] border border-[var(--color-sea-100)] px-3 py-2.5">
-          <Calendar className="size-4 shrink-0 text-[var(--color-sea-600)]" />
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <Calendar className="size-3.5 shrink-0 text-slate-400" />
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-ink-500)]">Dates</p>
-            <p className="text-xs font-semibold text-[var(--color-ink-800)] leading-tight mt-0.5 truncate">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Dates</p>
+            <p className="text-xs font-semibold text-slate-800 leading-tight mt-0.5 truncate">
               {formatDateRange(startDate, endDate)}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-[var(--color-sea-50)] border border-[var(--color-sea-100)] px-3 py-2.5">
-          <Users className="size-4 shrink-0 text-[var(--color-sea-600)]" />
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <Users className="size-3.5 shrink-0 text-slate-400" />
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-ink-500)]">Group</p>
-            <p className="text-xs font-semibold text-[var(--color-ink-800)] mt-0.5">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Group</p>
+            <p className="text-xs font-semibold text-slate-800 mt-0.5">
               {currentSize}/{groupSizeMax}
               {spotsLeft > 0 && spotsLeft <= 5 && (
-                <span className="ml-1 text-[var(--color-sunset-600)]">· {spotsLeft} left</span>
+                <span className="ml-1 text-orange-500">· {spotsLeft} left</span>
               )}
             </p>
           </div>
@@ -110,13 +110,13 @@ export function BookingSidebar({
 
       {/* ── Spots progress bar ── */}
       <div>
-        <div className="flex justify-between mb-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-ink-500)]">Spots filled</span>
-          <span className="text-[10px] font-bold text-[var(--color-sea-700)]">{100 - spotsLeftPct}%</span>
+        <div className="flex justify-between mb-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Spots Filled</span>
+          <span className="text-[10px] font-bold text-slate-600">{100 - spotsLeftPct}%</span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-[var(--color-sea-100)]">
+        <div className="h-1 w-full rounded-full bg-slate-100">
           <div
-            className="h-1.5 rounded-full bg-gradient-to-r from-[var(--color-sea-400)] to-[var(--color-sea-600)] transition-all"
+            className="h-1 rounded-full bg-slate-800 transition-all"
             style={{ width: `${Math.min(100, 100 - spotsLeftPct)}%` }}
           />
         </div>
@@ -124,16 +124,16 @@ export function BookingSidebar({
 
       {/* ── Available batches ── */}
       {departureDates && departureDates.length > 1 && (
-        <div className="rounded-lg border border-[var(--color-sea-100)] bg-[var(--color-sea-50)] p-3">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-sea-700)]">Available Batches</p>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Available Batches</p>
           <div className="flex flex-wrap gap-1.5">
             {departureDates.slice(0, 4).map((date) => (
-              <span key={date} className="rounded-md bg-white border border-[var(--color-sea-200)] px-2 py-1 text-xs font-semibold text-[var(--color-sea-700)] shadow-sm">
+              <span key={date} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm">
                 {new Date(date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
               </span>
             ))}
             {departureDates.length > 4 && (
-              <span className="text-xs text-[var(--color-ink-500)] px-2 py-1">+{departureDates.length - 4} more</span>
+              <span className="text-xs text-slate-400 px-2 py-1">+{departureDates.length - 4} more</span>
             )}
           </div>
         </div>
@@ -142,53 +142,63 @@ export function BookingSidebar({
       {/* ── CTAs ── */}
       {!isAgency ? (
         <div className="space-y-2">
-          {/* If member is approved/committed → show Pay button + chat */}
+          {/* Approved: full-width Pay & Confirm + chat */}
           {isApproved ? (
             <>
-              <Button
+              <button
                 type="button"
-                className="w-full gap-2 h-11 text-sm font-bold"
+                className="w-full h-12 rounded-xl bg-slate-900 text-sm font-bold tracking-wide text-white transition hover:bg-slate-800 flex items-center justify-center gap-2"
                 onClick={() => router.push(checkoutHref)}
               >
                 <CreditCard className="size-4" />
-                Enroll Now — Pay & Confirm
-              </Button>
+                Enroll Now
+              </button>
               {groupId && (
-                <Button
+                <button
                   type="button"
-                  variant="secondary"
-                  className="w-full gap-2 h-10 text-sm"
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-2"
                   onClick={() => router.push(chatHref)}
                 >
                   <MessageCircle className="size-4" />
                   Group Chat
-                </Button>
+                </button>
               )}
             </>
           ) : isMember && groupId ? (
-            /* Member but not yet approved — show chat only */
+            /* Pending: chat only */
             <>
-              <Button
+              <button
                 type="button"
-                variant="secondary"
-                className="w-full gap-2 h-11 text-sm font-semibold"
+                className="w-full h-11 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-2"
                 onClick={() => router.push(chatHref)}
               >
                 <MessageCircle className="size-4" />
                 Group Chat
-              </Button>
-              <p className="text-center text-xs text-[var(--color-ink-500)]">
+              </button>
+              <p className="text-center text-xs text-slate-400">
                 Your join request is pending approval.
               </p>
             </>
           ) : (
-            /* Not a member → Enroll Now + Group Chat preview */
+            /* Not a member: Enroll Now (dark) + Group Chat + WhatsApp */
             <>
+              <PlanPrimaryAction
+                groupId={groupId}
+                joinLabel={isFull ? "Group Full" : label}
+                requiresFemaleProfile={requiresFemaleProfile}
+                members={members}
+                planId={planId}
+                planTitle={planTitle}
+                destination={destination}
+                budgetMin={budgetMin}
+                budgetMax={budgetMax}
+                creatorUserId={creatorUserId}
+                offers={offers}
+              />
               <div className="grid grid-cols-2 gap-2">
-                <Button
+                <button
                   type="button"
-                  variant="secondary"
-                  className="gap-2 h-11 text-sm"
+                  className="h-10 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-2"
                   onClick={() => {
                     if (!isLoggedIn) {
                       router.push(`/login?next=${encodeURIComponent(chatHref)}`);
@@ -199,31 +209,16 @@ export function BookingSidebar({
                 >
                   <MessageCircle className="size-4" />
                   Group Chat
-                </Button>
-                <PlanPrimaryAction
-                  groupId={groupId}
-                  joinLabel={isFull ? "Group Full" : label}
-                  requiresFemaleProfile={requiresFemaleProfile}
-                  members={members}
-                  planId={planId}
-                  planTitle={planTitle}
-                  destination={destination}
-                  budgetMin={budgetMin}
-                  budgetMax={budgetMax}
-                  creatorUserId={creatorUserId}
-                  offers={offers}
-                />
+                </button>
+                <WhatsAppShareButton href={shareUrl} label="Share" size="sm" className="h-10 w-full" />
               </div>
               {!isLoggedIn && (
-                <p className="text-center text-xs text-[var(--color-ink-400)]">
-                  Please <a href="/login" className="font-semibold text-[var(--color-sea-600)] hover:underline">log in</a> to continue
+                <p className="text-center text-xs text-slate-400">
+                  Please <a href="/login" className="font-semibold text-emerald-600 hover:underline">log in</a> to continue
                 </p>
               )}
             </>
           )}
-
-          {/* Share */}
-          <WhatsAppShareButton href={shareUrl} className="block" />
         </div>
       ) : (
         <PlanPrimaryAction
@@ -242,10 +237,10 @@ export function BookingSidebar({
       )}
 
       {/* ── Trust note ── */}
-      <div className="flex items-start gap-2 rounded-lg bg-[var(--color-surface-2)] p-2.5">
-        <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-[var(--color-sea-500)]" />
-        <p className="text-[11px] text-[var(--color-ink-500)] leading-relaxed">
-          Payments are held in <strong className="text-[var(--color-ink-700)]">secure escrow</strong> via Razorpay and released to the agency only after trip milestones are met.
+      <div className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+        <span className="mt-0.5 size-1.5 shrink-0 rounded-full bg-emerald-500" />
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          Payments are held in <strong className="text-slate-700">secure escrow</strong> via Razorpay and released to the agency only after trip milestones are met.
         </p>
       </div>
     </div>

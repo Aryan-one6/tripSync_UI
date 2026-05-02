@@ -38,39 +38,45 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
   };
 
   const sideImages = images.slice(1, 5);
+  const sideCount = sideImages.length;
 
-  const tileSpanClass = (count: number, index: number) => {
-    if (count === 1) return "col-span-2 row-span-2";
-    if (count === 2) return "row-span-2";
-    if (count === 3 && index === 0) return "row-span-2";
+  const sideGridClass =
+    sideCount === 1
+      ? "grid grid-cols-1"
+      : sideCount === 2
+        ? "grid grid-cols-1 grid-rows-2"
+        : "grid grid-cols-2 grid-rows-2";
+
+  const sideTileClass = (index: number) => {
+    if (sideCount === 3 && index === 0) return "row-span-2";
     return "";
   };
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-white/40 bg-[var(--color-surface-raised)] shadow-[var(--shadow-clay-sm)]">
-        <div className="grid gap-2 p-2 md:grid-cols-[1.6fr_1fr] md:p-2.5">
+      <div className="overflow-hidden rounded-3xl bg-[var(--color-surface-raised)] shadow-[var(--shadow-clay-sm)]">
+        <div className="grid gap-2 p-2 md:grid-cols-[2fr_1fr] md:gap-3 md:p-3">
           <button
             type="button"
             onClick={() => openLightbox(0)}
-            className="group relative block overflow-hidden rounded-xl md:h-[420px]"
+            className="group relative block overflow-hidden rounded-2xl md:h-[520px]"
           >
             <img
               src={images[0]}
               alt={`${title} - 1`}
               className="aspect-[16/10] size-full object-cover transition-transform duration-500 group-hover:scale-105 md:aspect-auto"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-70" />
             {images.length > 1 && (
-              <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1.5 text-[11px] font-semibold text-white backdrop-blur">
+              <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur">
                 <ImagesIcon className="size-3.5" />
                 <span>{images.length} photos</span>
               </div>
             )}
           </button>
 
-          {sideImages.length > 0 && (
-            <div className="hidden h-[420px] grid-cols-2 grid-rows-2 gap-2 md:grid">
+          {sideCount > 0 && (
+            <div className={cn("hidden h-[520px] gap-3 md:grid", sideGridClass)}>
               {sideImages.map((url, i) => {
                 const imageIndex = i + 1;
                 const isLastVisible = i === sideImages.length - 1;
@@ -82,8 +88,8 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
                     type="button"
                     onClick={() => openLightbox(imageIndex)}
                     className={cn(
-                      "group relative overflow-hidden rounded-lg",
-                      tileSpanClass(sideImages.length, i),
+                      "group relative overflow-hidden rounded-2xl",
+                      sideTileClass(i),
                     )}
                   >
                     <img
@@ -91,10 +97,10 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
                       alt={`${title} - ${imageIndex + 1}`}
                       className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-75" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent opacity-80" />
                     {isLastVisible && (
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between rounded-md bg-black/45 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                        <span>View all photos</span>
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between rounded-lg bg-white/90 px-3 py-2 text-[11px] font-semibold text-[var(--color-ink-900)] shadow-sm backdrop-blur">
+                        <span>View all images</span>
                         {extraCount > 0 && <span>+{extraCount}</span>}
                       </div>
                     )}
@@ -112,7 +118,7 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
                 key={`${url}-${i + 1}`}
                 type="button"
                 onClick={() => openLightbox(i + 1)}
-                className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md"
+                className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg"
               >
                 <img
                   src={url}
@@ -125,7 +131,7 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
               <button
                 type="button"
                 onClick={() => openLightbox(0)}
-                className="flex h-16 w-24 shrink-0 items-center justify-center rounded-md border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-xs font-semibold text-[var(--color-sea-700)]"
+                className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-xs font-semibold text-[var(--color-sea-700)]"
               >
                 +{images.length - 6} more
               </button>
