@@ -12,6 +12,8 @@ interface ImageGalleryProps {
 export function ImageGallery({ images, title }: ImageGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
 
   if (images.length === 0) {
     return (
@@ -37,6 +39,27 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
     setLightboxOpen(true);
   };
 
+  const onTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const point = event.changedTouches[0];
+    if (!point) return;
+    setTouchStartX(point.clientX);
+    setTouchEndX(null);
+  };
+
+  const onTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const point = event.changedTouches[0];
+    if (!point) return;
+    setTouchEndX(point.clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const deltaX = touchStartX - touchEndX;
+    if (Math.abs(deltaX) < 40) return;
+    if (deltaX > 0) navigate("next");
+    else navigate("prev");
+  };
+
   const sideImages = images.slice(1, 5);
   const sideCount = sideImages.length;
 
@@ -55,7 +78,71 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
   return (
     <>
       <div className="overflow-hidden rounded-3xl bg-[var(--color-surface-raised)] shadow-[var(--shadow-clay-sm)]">
-        <div className="grid gap-2 p-2 md:grid-cols-[2fr_1fr] md:gap-3 md:p-3">
+        {/* Mobile carousel */}
+        <div
+          className="relative p-2 md:hidden"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <button
+            type="button"
+            onClick={() => openLightbox(selectedIndex)}
+            className="group relative block w-full overflow-hidden rounded-2xl"
+          >
+            <img
+              src={images[selectedIndex]}
+              alt={`${title} - ${selectedIndex + 1}`}
+              className="aspect-[16/10] size-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent opacity-90" />
+            <div className="absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+              {selectedIndex + 1}/{images.length}
+            </div>
+            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+              <ImagesIcon className="size-3.5" />
+              <span>{images.length} photos</span>
+            </div>
+          </button>
+
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate("prev")}
+                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/60 active:scale-95"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("next")}
+                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/45 p-2 text-white backdrop-blur-sm transition hover:bg-black/60 active:scale-95"
+                aria-label="Next image"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+              <div className="mt-2 flex justify-center gap-1.5 px-2 pb-1">
+                {images.map((_, i) => (
+                  <button
+                    key={`dot-${i}`}
+                    type="button"
+                    onClick={() => setSelectedIndex(i)}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all",
+                      i === selectedIndex ? "w-5 bg-[var(--color-sea-700)]" : "w-1.5 bg-[var(--color-ink-300)]",
+                    )}
+                    aria-label={`Go to image ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Desktop collage */}
+        <div className="hidden gap-2 p-2 md:grid md:grid-cols-[2fr_1fr] md:gap-3 md:p-3">
           <button
             type="button"
             onClick={() => openLightbox(0)}
@@ -111,33 +198,6 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
           )}
         </div>
 
-        {images.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto px-2 pb-2 md:hidden">
-            {images.slice(1, Math.min(images.length, 6)).map((url, i) => (
-              <button
-                key={`${url}-${i + 1}`}
-                type="button"
-                onClick={() => openLightbox(i + 1)}
-                className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg"
-              >
-                <img
-                  src={url}
-                  alt={`${title} - ${i + 2}`}
-                  className="size-full object-cover"
-                />
-              </button>
-            ))}
-            {images.length > 6 && (
-              <button
-                type="button"
-                onClick={() => openLightbox(0)}
-                className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg border border-[var(--color-sea-200)] bg-[var(--color-sea-50)] text-xs font-semibold text-[var(--color-sea-700)]"
-              >
-                +{images.length - 6} more
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Lightbox Modal */}
