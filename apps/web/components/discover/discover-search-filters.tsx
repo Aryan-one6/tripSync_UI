@@ -12,6 +12,7 @@ type DiscoverSearchFiltersProps = {
   destination: string;
   vibes: string;
   originType?: "plan" | "package";
+  planType?: "STANDARD" | "CORPORATE";
   sort: "price_low" | "price_high" | "popular" | "recent";
   audience: "traveler" | "agency";
   rail: "for-you" | "following" | "trending";
@@ -22,6 +23,7 @@ export function DiscoverSearchFilters({
   destination,
   vibes,
   originType,
+  planType,
   sort,
   audience,
   rail,
@@ -34,8 +36,11 @@ export function DiscoverSearchFilters({
   const [query, setQuery] = useState(q);
   const [destinationValue, setDestinationValue] = useState(destination);
   const [originTypeValue, setOriginTypeValue] = useState(originType ?? "");
+  const [planTypeValue, setPlanTypeValue] = useState(planType ?? "");
   const [sortValue, setSortValue] = useState(sort);
   const [railValue, setRailValue] = useState(rail);
+
+  const isAgency = audience === "agency";
 
   const baseQuery = useMemo(
     () => ({
@@ -44,10 +49,11 @@ export function DiscoverSearchFilters({
       q: query.trim(),
       destination: destinationValue.trim(),
       originType: originTypeValue,
+      planType: planTypeValue,
       sort: sortValue,
       rail: railValue,
     }),
-    [audience, destinationValue, originTypeValue, query, railValue, sortValue, vibes]
+    [audience, destinationValue, originTypeValue, planTypeValue, query, railValue, sortValue, vibes]
   );
 
   useEffect(() => {
@@ -95,6 +101,7 @@ export function DiscoverSearchFilters({
   function resetFilters() {
     setDestinationValue("");
     setOriginTypeValue("");
+    setPlanTypeValue("");
     setSortValue("recent");
     setRailValue("for-you");
   }
@@ -142,13 +149,20 @@ export function DiscoverSearchFilters({
       {desktopOpen && (
         <div
           ref={desktopPanelRef}
-          className="absolute right-0 top-[calc(100%+0.65rem)] z-30 hidden w-[340px] rounded-xl border border-(--color-border) bg-(--color-surface-raised) p-4 shadow-(--shadow-md) md:block"
+          className="absolute right-0 top-[calc(100%+0.65rem)] z-30 hidden w-[360px] rounded-xl border border-(--color-border) bg-(--color-surface-raised) p-4 shadow-(--shadow-md) md:block"
         >
           <FilterFields
+            isAgency={isAgency}
             destinationValue={destinationValue}
             onDestinationChange={setDestinationValue}
             originTypeValue={originTypeValue}
-            onOriginTypeChange={setOriginTypeValue}
+            onOriginTypeChange={(v) => {
+              setOriginTypeValue(v);
+              // Reset planType if switching away from plan
+              if (v !== "plan") setPlanTypeValue("");
+            }}
+            planTypeValue={planTypeValue}
+            onPlanTypeChange={setPlanTypeValue}
             sortValue={sortValue}
             onSortChange={setSortValue}
             railValue={railValue}
@@ -183,10 +197,16 @@ export function DiscoverSearchFilters({
               </button>
             </div>
             <FilterFields
+              isAgency={isAgency}
               destinationValue={destinationValue}
               onDestinationChange={setDestinationValue}
               originTypeValue={originTypeValue}
-              onOriginTypeChange={setOriginTypeValue}
+              onOriginTypeChange={(v) => {
+                setOriginTypeValue(v);
+                if (v !== "plan") setPlanTypeValue("");
+              }}
+              planTypeValue={planTypeValue}
+              onPlanTypeChange={setPlanTypeValue}
               sortValue={sortValue}
               onSortChange={setSortValue}
               railValue={railValue}
@@ -202,10 +222,13 @@ export function DiscoverSearchFilters({
 }
 
 function FilterFields({
+  isAgency,
   destinationValue,
   onDestinationChange,
   originTypeValue,
   onOriginTypeChange,
+  planTypeValue,
+  onPlanTypeChange,
   sortValue,
   onSortChange,
   railValue,
@@ -213,10 +236,13 @@ function FilterFields({
   onReset,
   onApply,
 }: {
+  isAgency: boolean;
   destinationValue: string;
   onDestinationChange: (value: string) => void;
   originTypeValue: string;
   onOriginTypeChange: (value: string) => void;
+  planTypeValue: string;
+  onPlanTypeChange: (value: string) => void;
   sortValue: "price_low" | "price_high" | "popular" | "recent";
   onSortChange: (value: "price_low" | "price_high" | "popular" | "recent") => void;
   railValue: "for-you" | "following" | "trending";
@@ -224,6 +250,8 @@ function FilterFields({
   onReset: () => void;
   onApply: () => void;
 }) {
+  const showPlanType = isAgency && (originTypeValue === "plan" || originTypeValue === "");
+
   return (
     <div className="space-y-4">
       <div>
@@ -253,6 +281,30 @@ function FilterFields({
           className="h-11"
         />
       </div>
+
+      {/* Agency-only: plan type filter shown when viewing plans */}
+      {showPlanType && (
+        <div>
+          <div className="mb-1.5 flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-(--color-ink-500)">
+              Plan type
+            </p>
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-700">
+              Agencies only
+            </span>
+          </div>
+          <Select
+            value={planTypeValue}
+            onChange={(event) => onPlanTypeChange(event.target.value)}
+            options={[
+              { value: "", label: "All plan types" },
+              { value: "STANDARD", label: "User plans (standard)" },
+              { value: "CORPORATE", label: "Corporate plans" },
+            ]}
+            className="h-11"
+          />
+        </div>
+      )}
 
       <div>
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-(--color-ink-500)">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass, TrendingUp, Users } from "lucide-react";
+import { Compass, TrendingUp, Users, Building2 } from "lucide-react";
 import { DiscoverCard, DiscoverCardCompact } from "@/components/cards/discover-card";
 import { FollowingDiscoverResults } from "@/components/discover/following-discover-results";
 import { DiscoverSearchFilters } from "@/components/discover/discover-search-filters";
@@ -11,14 +11,41 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const QUICK_FILTERS = [
-  { id: "all", label: "All", originType: undefined, vibes: undefined },
-  { id: "adventure", label: "Adventure", originType: undefined, vibes: "Adventure" },
-  { id: "beach", label: "Beach", originType: undefined, vibes: "Beach" },
-  { id: "mountains", label: "Mountains", originType: undefined, vibes: "Mountains" },
-  { id: "culture", label: "Culture", originType: undefined, vibes: "Culture" },
-  { id: "packages", label: "Packages", originType: "package" as const, vibes: undefined },
+// Quick filters shown to ALL audiences
+const QUICK_FILTERS_BASE = [
+  { id: "all", label: "All", originType: undefined, vibes: undefined, planType: undefined },
+  { id: "adventure", label: "Adventure", originType: undefined, vibes: "Adventure", planType: undefined },
+  { id: "beach", label: "Beach", originType: undefined, vibes: "Beach", planType: undefined },
+  { id: "mountains", label: "Mountains", originType: undefined, vibes: "Mountains", planType: undefined },
+  { id: "culture", label: "Culture", originType: undefined, vibes: "Culture", planType: undefined },
+  { id: "packages", label: "Packages", originType: "package" as const, vibes: undefined, planType: undefined },
 ] as const;
+
+// Extra filter chips only shown to agency audience
+const AGENCY_QUICK_FILTERS = [
+  {
+    id: "user-plans",
+    label: "User Plans",
+    originType: "plan" as const,
+    vibes: undefined,
+    planType: "STANDARD" as const,
+    icon: Users,
+    description: "Open traveler plans looking for agency quotes",
+  },
+  {
+    id: "corporate-plans",
+    label: "Corporate Plans",
+    originType: "plan" as const,
+    vibes: undefined,
+    planType: "CORPORATE" as const,
+    icon: Building2,
+    description: "Corporate travel requests for business groups",
+  },
+] as const;
+
+type QuickFilter = (typeof QUICK_FILTERS_BASE)[number];
+type AgencyFilter = (typeof AGENCY_QUICK_FILTERS)[number];
+type AnyFilter = QuickFilter | AgencyFilter;
 
 export default async function DiscoverPage({
   searchParams,
@@ -31,6 +58,10 @@ export default async function DiscoverPage({
   const originType =
     params.originType === "plan" || params.originType === "package"
       ? params.originType
+      : undefined;
+  const planType =
+    params.planType === "STANDARD" || params.planType === "CORPORATE"
+      ? (params.planType as "STANDARD" | "CORPORATE")
       : undefined;
   const sort =
     params.sort === "price_low" ||
@@ -46,8 +77,12 @@ export default async function DiscoverPage({
       ? params.rail
       : "for-you";
 
+  const isAgency = audience === "agency";
+
   const [forYouItems, trending] = await Promise.all([
-    q ? searchDiscover(q) : getDiscoverItems({ audience, destination, vibes, originType, sort }),
+    q
+      ? searchDiscover(q)
+      : getDiscoverItems({ audience, destination, vibes, originType, planType, sort }),
     getTrendingItems(),
   ]);
 
@@ -75,9 +110,19 @@ export default async function DiscoverPage({
 
   const railContent = {
     "for-you": {
-      overline: "Personalized feed",
-      title: "Popular Plans",
-      description: "Balanced results from travelers and agencies across the platform.",
+      overline: isAgency && planType === "CORPORATE" ? "Corporate feed" : "Personalized feed",
+      title:
+        isAgency && planType === "CORPORATE"
+          ? "Corporate Plans"
+          : isAgency && planType === "STANDARD"
+          ? "User Plans"
+          : "Popular Plans",
+      description:
+        isAgency && planType === "CORPORATE"
+          ? "Corporate trip requests open for agency proposals."
+          : isAgency && planType === "STANDARD"
+          ? "Open traveler plans seeking agency packages and quotes."
+          : "Balanced results from travelers and agencies across the platform.",
     },
     following: {
       overline: "Your network",
@@ -99,6 +144,7 @@ export default async function DiscoverPage({
       destination: destination || undefined,
       vibes: vibes || undefined,
       originType,
+      planType,
       sort,
       rail,
       ...overrides,
@@ -109,19 +155,25 @@ export default async function DiscoverPage({
     return qs ? `/discover?${qs}` : `/discover?audience=${audience}`;
   }
 
-  function buildQuickFilterHref(filter: (typeof QUICK_FILTERS)[number]) {
+  function buildQuickFilterHref(filter: AnyFilter) {
     return buildDiscoverHref({
       vibes: filter.vibes ?? undefined,
       originType: filter.originType ?? undefined,
+      planType: ("planType" in filter ? filter.planType : undefined) ?? undefined,
     });
   }
 
-  function isQuickFilterActive(filter: (typeof QUICK_FILTERS)[number]) {
-    if (filter.id === "all") return !vibes && !originType;
+  function isQuickFilterActive(filter: AnyFilter) {
+    if (filter.id === "all") return !vibes && !originType && !planType;
+    if ("planType" in filter && filter.planType) {
+      return planType === filter.planType && originType === filter.originType;
+    }
     if (filter.vibes) return vibes === filter.vibes;
-    if (filter.originType) return originType === filter.originType;
+    if (filter.originType) return originType === filter.originType && !planType;
     return false;
   }
+
+  const quickFilters = [...QUICK_FILTERS_BASE];
 
   return (
     <div className="page-shell pb-mobile-nav">
@@ -152,13 +204,65 @@ export default async function DiscoverPage({
         destination={destination}
         vibes={vibes}
         originType={originType}
+        planType={planType}
         sort={sort}
         audience={audience}
         rail={rail}
       />
 
+      {/* Agency-only: Corporate / User Plans filter cards */}
+      {isAgency && (
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          {AGENCY_QUICK_FILTERS.map((filter) => {
+            const Icon = filter.icon;
+            const active = isQuickFilterActive(filter);
+            return (
+              <Link key={filter.id} href={buildQuickFilterHref(filter)} className="block">
+                <div
+                  className={`flex items-start gap-3 rounded-xl border p-3.5 transition ${
+                    active
+                      ? filter.id === "corporate-plans"
+                        ? "border-violet-300 bg-violet-50 shadow-[0_4px_14px_rgba(139,92,246,0.15)]"
+                        : "border-emerald-300 bg-emerald-50 shadow-[0_4px_14px_rgba(16,185,129,0.15)]"
+                      : "border-[var(--color-border)] bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                      active
+                        ? filter.id === "corporate-plans"
+                          ? "bg-violet-500 text-white"
+                          : "bg-emerald-500 text-white"
+                        : "bg-[var(--color-surface-2)] text-[var(--color-ink-600)]"
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                  </div>
+                  <div>
+                    <p
+                      className={`text-sm font-semibold ${
+                        active
+                          ? filter.id === "corporate-plans"
+                            ? "text-violet-800"
+                            : "text-emerald-800"
+                          : "text-[var(--color-ink-900)]"
+                      }`}
+                    >
+                      {filter.label}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-500)]">
+                      {filter.description}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mb-8 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {QUICK_FILTERS.map((filter) => {
+        {quickFilters.map((filter) => {
           const active = isQuickFilterActive(filter);
           return (
             <Link key={filter.id} href={buildQuickFilterHref(filter)} className="shrink-0">
@@ -210,8 +314,16 @@ export default async function DiscoverPage({
               />
             ) : items.length === 0 ? (
               <EmptyState
-                title="No results found"
-                description="Try broader filters or switch between plans and packages."
+                title={
+                  isAgency && planType === "CORPORATE"
+                    ? "No corporate plans yet"
+                    : "No results found"
+                }
+                description={
+                  isAgency && planType === "CORPORATE"
+                    ? "No corporate trip requests are currently open. Check back soon."
+                    : "Try broader filters or switch between plans and packages."
+                }
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">

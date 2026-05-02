@@ -56,7 +56,8 @@ const DISCOVER_VIEW = Prisma.sql`
     "createdAt",
     "ownerId",
     "agencyId",
-    "joinedCount"
+    "joinedCount",
+    "planType"
   FROM discover_feed
 `;
 
@@ -140,12 +141,24 @@ function getDiscoverOrderBy(
 function getDiscoverFilters(query: DiscoverQuery): Prisma.Sql[] {
   const filters: Prisma.Sql[] = [];
 
-  // Corporate plans are restricted — only agencies browse them via /plans/corporate/open.
-  // Exclude CORPORATE planType from the public discover feed.
-  filters.push(Prisma.sql`("planType" IS NULL OR "planType" = 'STANDARD')`);
+  // Corporate plans are only visible to agency-audience requests.
+  // Travelers can never see CORPORATE plans in the discover feed.
+  if (getAudience(query) === 'agency' && query.planType === 'CORPORATE') {
+    // Agency explicitly browsing corporate plans
+    filters.push(Prisma.sql`"planType" = 'CORPORATE'`);
+  } else {
+    // Default: hide corporate plans (traveler audience, or agency without explicit CORPORATE filter)
+    filters.push(Prisma.sql`("planType" IS NULL OR "planType" = 'STANDARD')`);
+  }
 
   if (query.destination) {
-    filters.push(Prisma.sql`destination ILIKE ${`%${query.destination.trim()}%`}`);
+    const destinationTerm = `%${query.destination.trim()}%`;
+    filters.push(
+      Prisma.sql`(
+        destination ILIKE ${destinationTerm}
+        OR COALESCE("destinationState", '') ILIKE ${destinationTerm}
+      )`,
+    );
   }
 
   if (query.budgetMin !== undefined) {
@@ -408,7 +421,8 @@ export async function search(query: SearchQuery) {
       "createdAt",
       "ownerId",
       "agencyId",
-      "joinedCount"
+      "joinedCount",
+      "planType"
     FROM discover_feed
     ${buildWhereClause(searchFilters)}
     ORDER BY ${rankExpr} DESC, "createdAt" DESC, id DESC

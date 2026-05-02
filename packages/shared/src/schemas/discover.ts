@@ -9,6 +9,7 @@ const DiscoverQueryBaseSchema = z.object({
   budgetMax: z.coerce.number().int().min(0).optional(),
   vibes: z.string().optional(), // comma-separated
   originType: z.enum(['plan', 'package']).optional(),
+  planType: z.enum(['STANDARD', 'CORPORATE']).optional(),
   groupType: z.enum(['friends', 'couples', 'solo', 'family', 'female_only']).optional(),
   sort: z.enum(['recent', 'price_low', 'price_high', 'popular']).default('recent'),
   cursor: z.string().uuid().optional(),

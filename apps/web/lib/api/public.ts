@@ -17,6 +17,7 @@ interface DiscoverQuery extends QueryParams {
   budgetMax?: number;
   vibes?: string;
   originType?: "plan" | "package";
+  planType?: "STANDARD" | "CORPORATE";
   groupType?: "friends" | "couples" | "solo" | "family" | "female_only";
   sort?: "recent" | "price_low" | "price_high" | "popular";
 }
