@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:travellersin/core/notification_service.dart';
 import 'package:travellersin/firebase_options.dart';
+import 'package:travellersin/screens/splash.dart';
 import 'package:travellersin/screens/web_view_screen.dart';
 
 void main() async {
@@ -13,6 +14,8 @@ void main() async {
 
   await NotificationService.init();
 
+  await getFcmToken();
+
   runApp(const MyApp());
 }
 
@@ -20,8 +23,7 @@ Future<void> getFcmToken() async {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
   // Android 13+ / iOS
-  NotificationSettings settings =
-      await messaging.requestPermission();
+  NotificationSettings settings = await messaging.requestPermission();
 
   debugPrint("Permission: ${settings.authorizationStatus}");
 
@@ -45,14 +47,9 @@ class MyApp extends StatelessWidget {
       title: 'Travellers.in',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        appBarTheme: AppBarTheme(
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.white,
-            statusBarIconBrightness: Brightness.dark,
-          ),
-        ),
       ),
-      home: MainWebView(),
+
+      home: SplashScreen(),
     );
   }
 }
