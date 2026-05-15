@@ -8,6 +8,11 @@ TravellersIn is a Turborepo with:
 
 This repo already uses PostgreSQL through Prisma. The simplest Supabase setup is to use Supabase free tier as the hosted Postgres database and keep the existing auth and API code unchanged.
 
+## Prerequisite
+
+- Node.js `20.x` is required (see `.nvmrc` and root `package.json` `engines`).
+- If you use `nvm`: `nvm install 20 && nvm use 20`
+
 ## Supabase Free Tier Setup
 
 ### 1. Create a Supabase project

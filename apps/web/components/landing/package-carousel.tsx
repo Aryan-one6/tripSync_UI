@@ -2,8 +2,8 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Star, MapPin, Users, Calendar } from "lucide-react";
-import { getTrendingItems, getSocialFeed } from "@/lib/api/public";
+import { ChevronLeft, ChevronRight, Star, MapPin, Users, BookOpen, MessageCircle } from "lucide-react";
+import { getTrendingItems } from "@/lib/api/public";
 import type { DiscoverItem } from "@/lib/api/types";
 import { formatCurrency, formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -18,20 +18,27 @@ function PackageCard({ item }: { item: DiscoverItem }) {
   const href = item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
   const dur = formatDuration(item.startDate, item.endDate);
   const durLabel = dur ? `${dur.days}D / ${dur.nights}N` : "Flexible";
-  const price = formatCurrency(item.priceLow ?? item.priceHigh ?? null);
-  const { rating, count } = seedRating(item.id);
+  const currentPriceValue = item.priceLow ?? item.priceHigh ?? null;
+  const fallbackOriginal =
+    typeof currentPriceValue === "number" ? currentPriceValue + 1500 : null;
+  const originalPriceValue = item.priceHigh ?? fallbackOriginal;
+  const savingsValue =
+    typeof originalPriceValue === "number" && typeof currentPriceValue === "number"
+      ? Math.max(0, originalPriceValue - currentPriceValue)
+      : null;
+  const currentPrice = formatCurrency(currentPriceValue);
+  const originalPrice = formatCurrency(originalPriceValue);
+  const savingsLabel = formatCurrency(savingsValue);
+  const { rating } = seedRating(item.id);
   const fillPct = Math.min(100, Math.round((item.joinedCount / item.groupSizeMax) * 100));
 
   return (
-    <Link
-      href={href}
-      className="group snap-start flex-shrink-0 w-56 sm:w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl block"
-    >
+    <article className="group/card snap-start flex w-[252px] flex-shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-[284px] sm:min-h-[390px]">
       {/* Image */}
-      <div className="relative overflow-hidden" style={{ height: "160px" }}>
+      <Link href={href} className="relative block overflow-hidden" style={{ height: "188px" }}>
         {item.coverImageUrl ? (
           <img src={item.coverImageUrl} alt={item.title}
-            className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+            className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover/card:scale-105" loading="lazy" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-800 to-teal-600" />
         )}
@@ -52,27 +59,56 @@ function PackageCard({ item }: { item: DiscoverItem }) {
         <div className="absolute bottom-0 inset-x-0 h-0.5 bg-white/20">
           <div className="h-0.5 bg-emerald-400" style={{ width: `${fillPct}%` }} />
         </div>
-      </div>
+      </Link>
 
       {/* Body */}
-      <div className="p-3">
-        <h3 className="line-clamp-2 text-sm font-bold text-slate-900 leading-snug">{item.title}</h3>
+      <div className="flex flex-1 flex-col p-3.5">
+        <Link href={href} className="line-clamp-2 text-[1.06rem] font-bold leading-snug text-slate-900 hover:text-emerald-700">
+          {item.title}
+        </Link>
         <div className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
           <MapPin className="size-3 text-slate-400" />
           <span className="truncate">{item.destination}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
-          <div>
-            <span className="text-sm font-black text-slate-900">{price}</span>
-            <span className="text-[10px] text-slate-400 ml-1">/person</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 line-through">{originalPrice}</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                SAVE {savingsLabel}
+              </span>
+            </div>
+            <div>
+              <span className="text-[1.65rem] font-black leading-none text-slate-900">{currentPrice}</span>
+              <span className="ml-1 text-[12px] text-slate-500">/Adult</span>
+            </div>
           </div>
           <div className="flex items-center gap-1 text-[10px] text-slate-500">
             <Users className="size-3" />
             {item.joinedCount}/{item.groupSizeMax}
           </div>
         </div>
+
+        <div className="mt-auto pt-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Link
+              href={`${href}#chat`}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500 bg-white py-2.5 text-xs font-semibold text-emerald-500 transition hover:border-emerald-500 hover:bg-emerald-500 hover:text-emerald-600"
+            >
+              <MessageCircle className="size-3.5 shrink-0" />
+              Chat
+            </Link>
+            <Link
+              href={href}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-600)]"
+            >
+              <BookOpen className="size-3.5 shrink-0" />
+              Book Now
+            </Link>
+          </div>
+        </div>
       </div>
-    </Link>
+    </article>
   );
 }
 
@@ -107,7 +143,7 @@ export function PackageCarousel({ title, subtitle, filter, viewAllHref = "/disco
 
   return (
     <section className={cn("py-10", bg)}>
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="mb-5 flex items-end justify-between">
           <div>
             {subtitle && <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-emerald-600">{subtitle}</p>}

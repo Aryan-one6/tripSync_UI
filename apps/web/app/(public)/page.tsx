@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight, CheckCircle2, Compass,
   Star, MapPin, Shield, Lock, Search,
-  Handshake, Zap, Gift, TrendingUp,
-  ChevronLeft, ChevronRight, Users,
+  Handshake, Zap, Gift, Info, Users,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { getSocialFeed, getTrendingItems, searchDiscover } from "@/lib/api/public";
 import type { DiscoverItem } from "@/lib/api/types";
@@ -21,6 +21,13 @@ const DESTINATIONS = [
   { name: "Ladakh", sub: "High Altitude", trips: "87 trips", emoji: "🗻", image: "/destinations/leh ladhak.jpg" },
   { name: "Goa", sub: "Beach & Nightlife", trips: "145 trips", emoji: "🏖️", image: "/destinations/goa.webp" },
   { name: "Coorg", sub: "Coffee Country", trips: "63 trips", emoji: "☕", image: "/destinations/cooorg.jpg" },
+  { name: "Andaman", sub: "Island Escapes", trips: "71 trips", emoji: "🌊", image: "/destinations/andaman.jpg" },
+  { name: "Rishikesh", sub: "River & Retreats", trips: "112 trips", emoji: "🛶", image: "/destinations/rishikesh.webp" },
+  { name: "Kasol", sub: "Parvati Valley", trips: "96 trips", emoji: "🌲", image: "/destinations/pravati-valley-kasol.webp" },
+  { name: "Shoja", sub: "Hidden Himachal", trips: "54 trips", emoji: "🏕️", image: "/destinations/shoja-.avif" },
+  { name: "Tirthan", sub: "Valley Trails", trips: "67 trips", emoji: "🏞️", image: "/destinations/TirthanValley.jpg" },
+  { name: "Bir Billing", sub: "Paragliding Hub", trips: "89 trips", emoji: "🪂", image: "/destinations/bir Billing.jpg" },
+  { name: "Chandrashila", sub: "Summit Trek", trips: "48 trips", emoji: "🥾", image: "/destinations/chandrashila.jpg" },
 ];
 
 const HOW_IT_WORKS = [
@@ -196,7 +203,7 @@ function DestinationsSlider() {
 
   return (
     <section className="bg-white pb-8 pt-10">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="mb-5 flex items-end justify-between">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-emerald-600">Explore India</p>
@@ -211,15 +218,13 @@ function DestinationsSlider() {
         <div ref={ref} className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2" style={{ scrollbarWidth: "none" }}>
           {DESTINATIONS.map((d) => (
             <Link key={d.name} href={`/discover?destination=${encodeURIComponent(d.name)}`}
-              className="group snap-start flex-shrink-0 w-40 sm:w-48 overflow-hidden rounded-2xl transition hover:-translate-y-1 hover:shadow-lg">
+              className="group snap-start flex-shrink-0 w-40 sm:w-48 overflow-hidden rounded-lg transition hover:-translate-y-1 hover:shadow-lg">
               <div className="relative flex h-44 flex-col justify-end p-3.5 sm:h-52">
                 <Image src={d.image} alt={d.name} fill sizes="192px" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-                <div className="relative mb-1 text-3xl">{d.emoji}</div>
                 <div className="relative">
                   <p className="font-display text-[15px] font-bold text-white leading-tight">{d.name}</p>
                   <p className="text-[9px] text-white/60 mt-0.5">{d.sub}</p>
-                  <p className="text-[9px] text-emerald-300 font-semibold mt-1">{d.trips}</p>
                 </div>
               </div>
             </Link>
@@ -234,7 +239,7 @@ function DestinationsSlider() {
 function HowItWorks() {
   return (
     <section id="how-it-works" className="bg-gray-50 py-10">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="mb-6 text-center">
           <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-emerald-600">Simple process</p>
           <h2 className="mt-0.5 font-display text-xl font-black text-gray-950 sm:text-2xl">How TravellersIn Works</h2>
@@ -263,7 +268,7 @@ function HowItWorks() {
 function Reviews() {
   return (
     <section className="bg-white py-10">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="mb-6 text-center">
           <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-emerald-600">What travelers say</p>
           <h2 className="mt-0.5 font-display text-xl font-black text-gray-950 sm:text-2xl">Loved by Thousands</h2>
@@ -294,7 +299,7 @@ function Reviews() {
 function OfferBanner() {
   return (
     <section className="py-8 bg-white">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 p-6 sm:p-8 shadow-lg">
           <div className="pointer-events-none absolute -right-10 -top-10 size-48 rounded-full bg-white/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-10 -left-10 size-48 rounded-full bg-teal-400/20 blur-2xl" />
@@ -309,7 +314,7 @@ function OfferBanner() {
               <p className="mt-1 text-sm text-white/80">Use code <span className="font-bold text-white bg-white/20 px-2 py-0.5 rounded-md">FIRST500</span> at checkout</p>
             </div>
             <Link href="/discover"
-              className="shrink-0 flex items-center gap-2 rounded-full bg-green-900 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-green-700">
+              className="shrink-0 flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700">
               Book Now <ArrowRight className="size-4" />
             </Link>
           </div>
@@ -323,51 +328,85 @@ function OfferBanner() {
 function ReferAndEarn() {
   return (
     <section className="py-12">
-      <div className="container mx-auto px-4">
-        <div className="relative overflow-hidden rounded-3xl border border-emerald-400/25 bg-gradient-to-br from-emerald-950 via-[#08332f] to-[#0b2236] p-6 shadow-xl sm:p-8 lg:p-10">
-          <div className="pointer-events-none absolute -right-20 -top-16 size-72 rounded-full bg-emerald-400/15 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-20 -left-24 size-72 rounded-full bg-cyan-400/10 blur-3xl" />
-          <div className="relative grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">
-                <Gift className="size-3" /> Referral Program
+      <div className="mx-auto page-shell px-4">
+        <div className="overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-[0_10px_26px_rgba(15,23,42,0.08)]">
+          <div className="grid lg:grid-cols-[1.16fr_0.84fr]">
+            <div className="p-5 sm:p-7 lg:p-10">
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-900">
+                <Gift className="size-3.5 text-emerald-600" /> Referral rewards
               </div>
-              <h3 className="font-display text-2xl font-black tracking-tight text-white sm:text-3xl">Earn While You Explore</h3>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/75">
-                Invite your travel circle and unlock instant platform credits. Both of you receive ₹250 rewards.
+              <h3 className="font-display text-[clamp(1.3rem,2.2vw,2.25rem)] font-black leading-[1.02] tracking-tight text-[#032f2a]">
+                Earn While You Explore
+              </h3>
+              <p className="mt-4 max-w-2xl text-[clamp(1rem,1.6vw,1.05rem)] leading-relaxed text-slate-600">
+                Invite your friends to the community and unlock travel credits.
+                <br className="hidden sm:block" />
+                You both receive <span className="font-bold text-[#063f38]">₹250</span> on their first booking.
               </p>
-              <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
-                {["You earn ₹250 in points", "Friend gets ₹250 welcome bonus", "Credits apply at checkout", "Track rewards in dashboard"].map((item) => (
-                  <div key={item} className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2">
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-300" />
-                    <span className="text-xs font-medium text-white/85">{item}</span>
+
+              <div className="mt-8 grid gap-x-8 gap-y-4 sm:grid-cols-2 text-[4px]">
+                {[
+                  "You earn ₹250 points",
+                  "Friend gets ₹250 bonus",
+                  "Apply credits at checkout",
+                  "Track in real-time",
+                ].map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                      <CheckCircle2 className="size-4" />
+                    </span>
+                    <span className="text-[clamp(0.85rem,0.25vw,1.05rem)] font-semibold text-slate-700">{item}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/signup" className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white transition hover:-translate-y-px hover:bg-emerald-400">
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/signup"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-emerald-500 px-7 py-3 text-base font-bold text-[#05261f] transition hover:-translate-y-px hover:bg-emerald-400"
+                >
                   Start Earning <ArrowRight className="size-4" />
                 </Link>
-                <Link href="/discover" className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-6 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">
+                <Link
+                  href="/discover"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-7 py-3 text-base font-bold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700"
+                >
                   Explore Trips
                 </Link>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-md">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-200">Referral Snapshot</p>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/15 bg-white/5 p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-white/60">Your reward</p>
-                  <p className="mt-1 font-display text-2xl font-black text-white">₹250</p>
+
+            <div className="border-t border-[var(--color-border)] bg-[#f8fafc] p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-10">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Referral snapshot</p>
+
+              <div className="mt-5 space-y-3.5">
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)]">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-tight text-slate-400">Your reward</p>
+                    <p className="mt-1 font-display text-3xl font-black leading-none text-[#033f37]">₹250</p>
+                  </div>
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                    <Gift className="size-5" />
+                  </span>
                 </div>
-                <div className="rounded-xl border border-white/15 bg-white/5 p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-white/60">Friend reward</p>
-                  <p className="mt-1 font-display text-2xl font-black text-white">₹250</p>
+
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)]">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-tight text-slate-400">Friend reward</p>
+                    <p className="mt-1 font-display text-3xl font-black leading-none text-[#033f37]">₹250</p>
+                  </div>
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                    <Users className="size-5" />
+                  </span>
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-300/25 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">
-                <TrendingUp className="size-3.5" />
-                High-converting referral flow for trip groups and friends.
+
+              <div className="mt-6 flex items-start gap-2 text-sm italic leading-relaxed text-slate-500">
+                <Info className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                <p>
+                  Share your link with fellow travellers and watch your credits grow. Redeemable on any
+                  verified trip.
+                </p>
               </div>
             </div>
           </div>
@@ -381,7 +420,7 @@ function ReferAndEarn() {
 function StatsBar() {
   return (
     <section className="border-y border-gray-100 bg-white py-5">
-      <div className="mx-auto max-w-7xl px-4">
+      <div className="mx-auto page-shell px-4">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { v: "10,257+", l: "Active Travelers" },
@@ -414,7 +453,7 @@ export default function HomePage() {
       <DestinationsSlider />
 
       {/* 4. Stats */}
-      <StatsBar />
+      {/* <StatsBar /> */}
 
       {/* 5. How It Works */}
       <HowItWorks />

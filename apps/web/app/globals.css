@@ -53,6 +53,12 @@
   --color-lavender-400: #9678ff;
   --color-lavender-500: #7c5cfc;
 
+  /* Amber accent */
+  --color-amber-50: #fff4e8;
+  --color-amber-100: #ffe5c6;
+  --color-amber-500: #fa9017;
+  --color-amber-600: #e7820d;
+
   /* Rose — accent */
   --color-rose-50: #fff0f3;
   --color-rose-100: #ffe0e6;

@@ -3,23 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  CalendarDays,
   Compass,
   MapPin,
   Mountain,
-  Palmtree,
   Sunrise,
   Users,
   Star,
-  Clock,
   MessageCircle,
-  Ticket,
-  ArrowRight,
   Waves,
   TreePine,
   Flame,
-  Building2,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { formatCurrency, formatDuration, formatDateRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -30,7 +25,7 @@ import type { GroupMember } from "@/lib/api/types";
 
 const palettes = [
   { gradient: "from-teal-900 via-teal-700 to-emerald-500", Icon: Mountain },
-  { gradient: "from-orange-900 via-amber-700 to-orange-500", Icon: Sunrise },
+  { gradient: "from-orange-900 via-emerald-700 to-orange-500", Icon: Sunrise },
   { gradient: "from-blue-900 via-sky-700 to-cyan-500", Icon: Waves },
   { gradient: "from-green-900 via-emerald-700 to-lime-500", Icon: TreePine },
   { gradient: "from-violet-900 via-purple-700 to-pink-500", Icon: Compass },
@@ -49,7 +44,14 @@ function seedRating(id: string) {
   };
 }
 
-/* Dot pagination indicators — like Thrillophilia */
+function seedSavings(id: string, price: number | null) {
+  const n = hash(id);
+  const base = price ?? 15000;
+  const saveAmt = Math.round((base * (10 + (n % 20))) / 100 / 250) * 250;
+  return { saveAmt, originalPrice: base + saveAmt };
+}
+
+/* Dot pagination indicators */
 function DotIndicator({ count, active }: { count: number; active: number }) {
   if (count <= 1) return null;
   return (
@@ -75,9 +77,12 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const href = item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
   const isPlan = item.originType === "plan";
   const dur = formatDuration(item.startDate, item.endDate);
-  const durLabel = dur ? `${dur.days}D / ${dur.nights}N` : "Flexible";
-  const nightLabel = dur ? `${dur.days} days & ${dur.nights} nights` : null;
+  const durLabel = dur ? `${dur.days} days & ${dur.nights} nights` : "Flexible dates";
   const budgetLabel = formatCurrency(item.priceLow ?? item.priceHigh ?? null);
+  const rawPrice = item.priceLow ?? item.priceHigh ?? null;
+  const { saveAmt, originalPrice } = seedSavings(item.id, rawPrice);
+  const originalLabel = formatCurrency(originalPrice);
+  const savingsLabel = formatCurrency(saveAmt);
   const palette = palettes[hash(item.title) % palettes.length];
   const { Icon } = palette;
   const vibes = item.vibes ?? [];
@@ -93,6 +98,11 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const fillPct = Math.min(100, Math.round((item.joinedCount / item.groupSizeMax) * 100));
   const isFull = spotsLeft <= 0;
   const isAlmostFull = spotsLeft > 0 && spotsLeft <= 3;
+
+  // Build stop pills from destination + vibes (simulate waypoints)
+  const stops: string[] = item.destination
+    ? [item.destination, ...(item.destinationState ? [item.destinationState] : []), ...vibes.slice(0, 2)]
+    : vibes.slice(0, 3);
 
   function handleGroupChat(e: React.MouseEvent) {
     e.preventDefault();
@@ -125,172 +135,127 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
     }
   }
 
-  return (
-    <div className="group/card flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-
-      {/* ── Hero image ── */}
-      <Link href={href} className="relative block overflow-hidden" style={{ aspectRatio: "4/3" }}>
-        {item.coverImageUrl ? (
-          <img
-            src={item.coverImageUrl}
-            alt={item.title}
-            className="size-full object-cover transition-transform duration-500 group-hover/card:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className={cn("size-full bg-gradient-to-br", palette.gradient)}>
-            <Icon className="absolute bottom-4 right-4 size-16 text-white/10" />
-          </div>
-        )}
-
-        {/* Gradient overlay — stronger at bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-        {/* Top-left: Type badge */}
-        <div className="absolute left-2.5 top-2.5 z-10">
-          <span className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-sm",
-            isPlan ? "bg-emerald-500/90" : "bg-blue-600/90"
-          )}>
-            {isPlan ? <Users className="size-2.5" /> : <Building2 className="size-2.5" />}
-            {isPlan ? "User Plan" : "Agency Package"}
-          </span>
+return (
+  <div className="group/card flex h-full flex-col overflow-hidden rounded-lg border border-[var(--color-border)] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-sea-500)]/25 hover:shadow-[0_18px_48px_rgba(15,23,42,0.14)]">
+    <Link href={href} className="relative block overflow-hidden" style={{ aspectRatio: "16/11" }}>
+      {item.coverImageUrl ? (
+        <img
+          src={item.coverImageUrl}
+          alt={item.title}
+          className="size-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+          loading="lazy"
+        />
+      ) : (
+        <div className={cn("size-full bg-gradient-to-br", palette.gradient)}>
+          <Icon className="absolute bottom-4 right-4 size-14 text-white/15" />
         </div>
+      )}
 
-        {/* Top-right: Rating */}
-        <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 backdrop-blur-sm">
-          <Star className="size-3 fill-amber-400 text-amber-400" />
-          <span className="text-[11px] font-bold text-white">{rating}</span>
-          <span className="text-[9px] text-white/60">({count})</span>
-        </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-        {/* Almost-full urgency badge */}
-        {isAlmostFull && (
-          <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 backdrop-blur-sm">
-            <Zap className="size-2.5 text-white" />
-            <span className="text-[9px] font-bold text-white">Only {spotsLeft} left!</span>
-          </div>
-        )}
+      <span className="absolute left-0 top-3 rounded-r-full bg-[var(--color-amber-500)] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-md">
+        SAVE {savingsLabel}
+      </span>
 
-        {/* Spots fill bar — at very bottom of image */}
-        <div className="absolute bottom-0 inset-x-0 z-10">
-          <div className="flex items-center justify-between px-2.5 pb-1.5 pt-0">
-            <span className="text-[8px] font-semibold uppercase tracking-widest text-white/60">Spots filled</span>
-            <span className="text-[8px] font-bold text-white/70">{item.joinedCount}/{item.groupSizeMax}</span>
-          </div>
-          <div className="h-0.5 w-full bg-white/20">
-            <div
-              className={cn("h-0.5 transition-all", isFull ? "bg-red-400" : isAlmostFull ? "bg-amber-400" : "bg-emerald-400")}
-              style={{ width: `${fillPct}%` }}
-            />
-          </div>
-        </div>
+      <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
+        {fillPct}% filled
+      </span>
 
-        {/* Dot indicators */}
-        <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
-          <DotIndicator count={3} active={0} />
-        </div>
-      </Link>
+      {isAlmostFull && (
+        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[var(--color-sea-500)] px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
+          <Zap className="size-3" />
+          Only {spotsLeft} left
+        </span>
+      )}
+    </Link>
 
-      {/* ── Card body — Thrillophilia style ── */}
-      <div className="flex flex-1 flex-col p-3.5">
+    <div className="flex flex-1 flex-col p-3.5 sm:p-4">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <p className="truncate text-xs text-slate-500">{durLabel}</p>
 
-        {/* Duration + date row */}
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-xs text-slate-500">
-            {nightLabel ?? durLabel}
-          </span>
-          <div className="flex items-center gap-1">
-            <Star className="size-3 fill-amber-400 text-amber-400" />
-            <span className="text-xs font-semibold text-slate-700">{rating}</span>
-            <span className="text-[10px] text-slate-400">({count})</span>
-          </div>
-        </div>
-
-        {/* Title */}
-        <Link href={href}>
-          <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 hover:text-emerald-700 transition-colors">
-            {item.title}
-          </h3>
-        </Link>
-
-        {/* Location + date sub-row */}
-        <div className="mt-1 flex items-center gap-3 text-[11px] text-slate-500">
-          <span className="flex items-center gap-1 truncate">
-            <MapPin className="size-3 shrink-0 text-slate-400" />
-            {item.destination}{item.destinationState ? `, ${item.destinationState}` : ""}
-          </span>
-          {(item.startDate || item.endDate) && (
-            <span className="flex shrink-0 items-center gap-1">
-              <CalendarDays className="size-3 text-slate-400" />
-              {formatDateRange(item.startDate, item.endDate)}
-            </span>
-          )}
-        </div>
-
-        {/* Vibe tags */}
-        {vibes.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {vibes.slice(0, 3).map((v) => (
-              <span key={v} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold text-slate-600">
-                {v}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Price row */}
-        <div className="mt-2.5 flex items-baseline gap-1.5">
-          <span className="text-base font-black text-slate-900">{budgetLabel}</span>
-          <span className="text-[11px] text-slate-400">/Adult</span>
-          <span className="ml-auto flex items-center gap-1 text-[10px] text-slate-500">
-            <Users className="size-3" />
-            {item.joinedCount}/{item.groupSizeMax}
-          </span>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* ── CTAs — all logic preserved ── */}
-        <div className="mt-3 space-y-2">
-          {/* Group Chat + Book Now */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={handleGroupChat}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 active:scale-[0.97]"
-            >
-              <MessageCircle className="size-3.5 shrink-0" />
-              Group Chat
-            </button>
-
-            <button
-              type="button"
-              disabled={isFull || isPending}
-              onClick={handleEnrollNow}
-              className={cn(
-                "flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition active:scale-[0.97]",
-                isFull
-                  ? "cursor-not-allowed border border-green-900 bg-slate-100 text-slate-400"
-                  : "bg-emerald-600 text-white shadow-sm hover:bg-emerald-500",
-                isPending && "opacity-70"
-              )}
-            >
-              <Ticket className="size-3.5 shrink-0" />
-              {isPending ? "Joining..." : isFull ? "Full" : "Book Now"}
-            </button>
-          </div>
-
-          {/* View details */}
-          <Link href={href} className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 active:scale-[0.98]">
-            {isPlan ? "View Plan Details" : "View Package Details"}
-            <ArrowRight className="size-3.5" />
-          </Link>
+        <div className="flex shrink-0 items-center gap-1">
+          <Star className="size-3.5 fill-[var(--color-sea-500)] text-[var(--color-sea-500)]" />
+          <span className="text-xs font-bold text-[var(--color-sea-700)]">{rating}</span>
+          <span className="text-[10px] text-slate-400">({count})</span>
         </div>
       </div>
+
+      <Link href={href}>
+        <h3 className="line-clamp-2 min-h-[42px] text-[15px] font-extrabold leading-snug text-[var(--color-ink-950)] transition-colors hover:text-[var(--color-sea-700)] sm:text-base">
+          {item.title}
+        </h3>
+      </Link>
+
+      <div className="mt-2  px-2.5 py-2">
+        <div className="flex items-center gap-1.5">
+          <MapPin className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+          <p className="truncate text-[11px] font-semibold text-[var(--color-ink-700)]">
+            {stops.slice(0, 2).join(" • ")}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        <span className="inline-flex rounded-full bg-[var(--color-amber-100)] px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[var(--color-ink-950)]">
+          Best Value Deal
+        </span>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-slate-400 line-through">{originalLabel}</span>
+          <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[var(--color-sea-700)]">
+            SAVE {savingsLabel}
+          </span>
+        </div>
+
+        <div className="flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-xl font-extrabold text-[var(--color-ink-950)]">
+              {budgetLabel}
+            </span>
+            <span className="ml-1 text-[11px] text-slate-500">/Adult</span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface)] px-2 py-1 text-[11px] font-bold text-[var(--color-ink-700)]">
+            <Users className="size-3.5 text-[var(--color-sea-600)]" />
+            {item.joinedCount}/{item.groupSizeMax}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-[var(--color-sea-500)] transition-all"
+          style={{ width: `${fillPct}%` }}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-[44px_1fr] gap-2.5">
+        <button
+          type="button"
+          onClick={handleGroupChat}
+          className="flex h-11 items-center justify-center rounded-xl border border-[var(--color-sea-500)]/35 bg-white text-[var(--color-sea-700)] transition hover:border-[var(--color-sea-500)] hover:bg-[var(--color-sea-50)] active:scale-[0.97]"
+        >
+          <MessageCircle className="size-4" />
+        </button>
+
+        <button
+          type="button"
+          disabled={isFull || isPending}
+          onClick={handleEnrollNow}
+          className={cn(
+            "flex h-11 items-center justify-center rounded-xl text-sm font-extrabold transition active:scale-[0.98]",
+            isFull
+              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              : "bg-[var(--color-sea-500)] text-white shadow-sm hover:bg-[var(--color-sea-600)]",
+            isPending && "opacity-70"
+          )}
+        >
+          {isPending ? "Joining..." : isFull ? "Full" : "Book Now"}
+        </button>
+      </div>
     </div>
-  );
+  </div>
+);
 }
 
 /** Compact card for "Trending Near You" */
@@ -299,14 +264,13 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
   const palette = palettes[hash(item.title) % palettes.length];
   const { Icon } = palette;
   const dateLabel = formatDateRange(item.startDate, item.endDate);
-  const isPlan = item.originType === "plan";
   const budgetLabel = formatCurrency(item.priceLow ?? item.priceHigh ?? null);
   const { rating } = seedRating(item.id);
 
   return (
     <Link href={href} className="group/compact block">
       <div className={cn(
-        "relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
+        "relative overflow-hidden rounded-sm border border-slate-200 bg-white shadow-sm",
         "transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
       )}>
         {/* Image */}
@@ -327,7 +291,7 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
 
           {/* Rating */}
           <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-full bg-black/50 px-1.5 py-0.5 backdrop-blur-sm">
-            <Star className="size-2.5 fill-amber-400 text-amber-400" />
+            <Star className="size-2.5 fill-emerald-400 text-emerald-400" />
             <span className="text-[9px] font-bold text-white">{rating}</span>
           </div>
 
