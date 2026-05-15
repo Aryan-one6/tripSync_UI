@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Compass, TrendingUp, Users, Building2 } from "lucide-react";
+import { Compass, TrendingUp, Users, Building2, Layers } from "lucide-react";
 import { DiscoverCard, DiscoverCardCompact } from "@/components/cards/discover-card";
+import { AgencyPlanFilterCards } from "@/components/discover/agency-plan-filter-cards";
 import { FollowingDiscoverResults } from "@/components/discover/following-discover-results";
 import { DiscoverSearchFilters } from "@/components/discover/discover-search-filters";
 import { Card } from "@/components/ui/card";
@@ -21,31 +22,8 @@ const QUICK_FILTERS_BASE = [
   { id: "packages", label: "Packages", originType: "package" as const, vibes: undefined, planType: undefined },
 ] as const;
 
-// Extra filter chips only shown to agency audience
-const AGENCY_QUICK_FILTERS = [
-  {
-    id: "user-plans",
-    label: "User Plans",
-    originType: "plan" as const,
-    vibes: undefined,
-    planType: "STANDARD" as const,
-    icon: Users,
-    description: "Open traveler plans looking for agency quotes",
-  },
-  {
-    id: "corporate-plans",
-    label: "Corporate Plans",
-    originType: "plan" as const,
-    vibes: undefined,
-    planType: "CORPORATE" as const,
-    icon: Building2,
-    description: "Corporate travel requests for business groups",
-  },
-] as const;
-
 type QuickFilter = (typeof QUICK_FILTERS_BASE)[number];
-type AgencyFilter = (typeof AGENCY_QUICK_FILTERS)[number];
-type AnyFilter = QuickFilter | AgencyFilter;
+type AnyFilter = QuickFilter;
 
 export default async function DiscoverPage({
   searchParams,
@@ -174,6 +152,29 @@ export default async function DiscoverPage({
   }
 
   const quickFilters = [...QUICK_FILTERS_BASE];
+  const listingTypeFilters = [
+    {
+      id: "all",
+      label: "All Listings",
+      description: "Show both community plans and agency packages.",
+      originType: undefined as undefined | "plan" | "package",
+      icon: Layers,
+    },
+    {
+      id: "community",
+      label: "Community Plans",
+      description: "User/community-created travel plans.",
+      originType: "plan" as const,
+      icon: Users,
+    },
+    {
+      id: "agency",
+      label: "Agency Packages",
+      description: "Packages published by verified agencies.",
+      originType: "package" as const,
+      icon: Building2,
+    },
+  ] as const;
 
   return (
     <div className="page-shell pb-mobile-nav">
@@ -231,53 +232,16 @@ export default async function DiscoverPage({
         rail={rail}
       />
 
-      {/* Agency-only: Corporate / User Plans filter cards */}
-      {isAgency && (
-        <div className="mb-5 grid grid-cols-2 gap-3">
-          {AGENCY_QUICK_FILTERS.map((filter) => {
-            const Icon = filter.icon;
-            const active = isQuickFilterActive(filter);
-            return (
-              <Link key={filter.id} href={buildQuickFilterHref(filter)} className="block">
-                <div
-                  className={`flex items-start gap-3 rounded-xl border p-3.5 transition ${active
-                    ? filter.id === "corporate-plans"
-                      ? "border-violet-300 bg-violet-50 shadow-[0_4px_14px_rgba(139,92,246,0.15)]"
-                      : "border-emerald-300 bg-emerald-50 shadow-[0_4px_14px_rgba(16,185,129,0.15)]"
-                    : "border-[var(--color-border)] bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
-                    }`}
-                >
-                  <div
-                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${active
-                      ? filter.id === "corporate-plans"
-                        ? "bg-violet-500 text-white"
-                        : "bg-emerald-500 text-white"
-                      : "bg-[var(--color-surface-2)] text-[var(--color-ink-600)]"
-                      }`}
-                  >
-                    <Icon className="size-4" />
-                  </div>
-                  <div>
-                    <p
-                      className={`text-sm font-semibold ${active
-                        ? filter.id === "corporate-plans"
-                          ? "text-violet-800"
-                          : "text-emerald-800"
-                        : "text-[var(--color-ink-900)]"
-                        }`}
-                    >
-                      {filter.label}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-500)]">
-                      {filter.description}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <AgencyPlanFilterCards
+        audience={audience}
+        q={q}
+        destination={destination}
+        vibes={vibes}
+        originType={originType}
+        planType={planType}
+        sort={sort}
+        rail={rail}
+      />
 
       <div className="mb-8 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         {quickFilters.map((filter) => {
@@ -484,41 +448,61 @@ export default async function DiscoverPage({
             </div>
           </div>
 
-          {trending.length > 0 && (
-            <div className="overflow-hidden  p-2 ">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600">Momentum board</p>
-                  <h3 className="mt-1 font-display text-lg font-black text-[var(--color-ink-950)]">Top trending picks</h3>
-                </div>
-               
+          <div className="overflow-hidden p-2">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600">Listing type</p>
+                <h3 className="mt-1 font-display text-base font-black text-[var(--color-ink-950)]">
+                  Filter by source
+                </h3>
               </div>
-              <div className="mt-4 space-y-2.5">
-                {trending.slice(0, 4).map((item, idx) => (
+            </div>
+
+            <div className="space-y-2">
+              {listingTypeFilters.map((filter) => {
+                const Icon = filter.icon;
+                const isActive =
+                  filter.id === "all" ? !originType : originType === filter.originType;
+
+                return (
                   <Link
-                    key={`${item.originType}-${item.id}-sidebar`}
-                    href={item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`}
-                    className="group block rounded-lg bg-white border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-emerald-200 hover:bg-emerald-50"
+                    key={filter.id}
+                    href={buildDiscoverHref({
+                      originType: filter.originType,
+                      planType: filter.originType === "package" ? undefined : planType,
+                    })}
+                    className={`group block rounded-lg border px-3 py-2.5 transition ${
+                      isActive
+                        ? "border-emerald-300 bg-emerald-50 shadow-[0_8px_20px_rgba(16,185,129,0.1)]"
+                        : "border-[var(--color-border)] bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
+                    }`}
                   >
                     <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
-                        {idx + 1}
-                      </span>
+                      <div
+                        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                          isActive
+                            ? "bg-emerald-600 text-white"
+                            : "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100"
+                        }`}
+                      >
+                        <Icon className="size-4" />
+                      </div>
                       <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-semibold text-[var(--color-ink-900)] group-hover:text-emerald-800">
-                          {item.title}
+                        <p className="text-sm font-semibold text-[var(--color-ink-900)]">
+                          {filter.label}
                         </p>
                         <p className="mt-0.5 text-xs text-[var(--color-ink-600)]">
-                          {item.destination}
-                          {item.destinationState ? `, ${item.destinationState}` : ""}
+                          {filter.description}
                         </p>
                       </div>
                     </div>
                   </Link>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+      
         </aside>
       </div>
     </div>

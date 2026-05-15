@@ -93,31 +93,31 @@ function Hero() {
   const getItemHref = (item: DiscoverItem) => item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
 
   return (
-    <section className="relative -mt-14 flex flex-col" style={{ minHeight: "90svh" }}>
+    <section className="relative -mt-14 flex flex-col" style={{ minHeight: "72svh" }}>
       <div className="absolute inset-0">
         <Image src="/hero_bg.png" alt="Group travel in India" fill priority fetchPriority="high"
           className="object-cover object-[50%_30%]" sizes="100vw" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/35 to-black/70" />
       </div>
 
-      <div className="relative z-20 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center px-4 pb-10 pt-32 text-center">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[10px] font-semibold text-white/90 backdrop-blur-md">
+      <div className="relative z-20 mx-auto flex w-full max-w-7xl flex-1 flex-col items-center justify-center px-4 pb-6 pt-24 text-center sm:pb-8 sm:pt-28">
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[10px] font-semibold text-white/90 backdrop-blur-md">
           India&apos;s #1 Group Travel Marketplace
         </div>
 
-        <h1 style={{ lineHeight: 1.08 }} className="max-w-6xl font-display font-black tracking-tight text-white drop-shadow-xl text-[clamp(1.25rem,5.3vw,4.1rem)]">
+        <h1 style={{ lineHeight: 1.06 }} className="max-w-6xl font-display font-black tracking-tight text-white drop-shadow-xl text-[clamp(1.4rem,4.6vw,3.5rem)]">
           Plan Trips Together.<br />
           <span className="text-emerald-400">Get the Best Deals.</span>
         </h1>
 
-        <p className="mt-4 max-w-lg text-sm text-white/70 leading-relaxed sm:text-base">
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/70 sm:text-[0.95rem]">
           Connect with real travelers, negotiate directly with verified agencies, and travel safely — all on one platform.
         </p>
 
-        <div className="mt-6 w-full max-w-xl">
+        <div className="mt-4 w-full max-w-xl">
           <div ref={searchWrapRef} className="relative">
             <form onSubmit={(e) => { e.preventDefault(); setShowLiveResults(false); router.push(`/discover${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`); }}
-              className="flex items-center overflow-hidden rounded-2xl border border-white/20 bg-black/30 p-1.5 backdrop-blur-xl shadow-2xl">
+              className="flex items-center overflow-hidden rounded-2xl border border-white/20 bg-black/30 p-1.5 shadow-2xl backdrop-blur-xl">
               <Search className="ml-3 mr-1 size-4 shrink-0 text-white/50" />
               <input
                 data-no-focus-ring="true"
@@ -125,10 +125,10 @@ function Hero() {
                 onChange={(e) => { setQ(e.target.value); if (e.target.value.trim().length >= 2) { setIsSearching(true); setShowLiveResults(true); } else setShowLiveResults(false); }}
                 onFocus={() => { if (q.trim().length >= 2 || seedResults.length > 0) setShowLiveResults(true); }}
                 placeholder="Search live plans and agency packages..."
-                className="flex-1 border-0 bg-transparent py-2.5 pr-2 text-sm text-white placeholder:text-white/40 outline-none"
+                className="flex-1 border-0 bg-transparent py-2 pr-2 text-sm text-white placeholder:text-white/40 outline-none"
                 style={{ boxShadow: "none" }}
               />
-              <button type="submit" className="flex-shrink-0 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-400">Search</button>
+              <button type="submit" className="flex-shrink-0 rounded-xl bg-emerald-500 px-5 py-2 text-sm font-bold text-white transition hover:bg-emerald-400">Search</button>
             </form>
 
             {showLiveResults && (
@@ -159,17 +159,17 @@ function Hero() {
             )}
           </div>
 
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1 text-white text-center justify-between" style={{ scrollbarWidth: "none" }}>
             {["Solo-Friendly", "Group Trip", "Budget", "Weekend", "Adventure", "Beach", "Trek"].map((tag) => (
               <Link key={tag} href={`/discover?style=${encodeURIComponent(tag)}`}
-                className="flex-shrink-0 px-3 py-1.5 text-[10px] font-semibold text-white">
+                className="flex-shrink-0 px-3 py-1 text-[10px] font-semibold text-white">
                 {tag}
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
           <div className="flex items-center gap-2">
             <div className="flex -space-x-1.5">
               {travelerAvatars.map((avatar, i) => (
@@ -277,7 +277,7 @@ function Reviews() {
           {REVIEWS.map((r) => (
             <div key={r.name} className="rounded-2xl border border-gray-100 bg-gray-50 p-4 shadow-sm">
               <div className="flex items-center gap-0.5 mb-2">
-                {[1,2,3,4,5].map(i => <Star key={i} className="size-3 fill-amber-400 text-amber-400" />)}
+                {[1, 2, 3, 4, 5].map(i => <Star key={i} className="size-3 fill-amber-400 text-amber-400" />)}
               </div>
               <p className="text-sm text-gray-700 leading-relaxed mb-3">&ldquo;{r.text}&rdquo;</p>
               <div className="flex items-center gap-2">
@@ -376,8 +376,7 @@ function ReferAndEarn() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--color-border)] bg-[#f8fafc] p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-10">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Referral snapshot</p>
+            <div className="border-t border-[var(--color-border)] bg-gradient-to-br from-emerald-50 via-white to-emerald-100 p-5 sm:p-7 lg:border-l lg:border-t-0 lg:p-10 justify-between items-center">              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Referral snapshot</p>
 
               <div className="mt-5 space-y-3.5">
                 <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_2px_8px_rgba(15,23,42,0.05)]">

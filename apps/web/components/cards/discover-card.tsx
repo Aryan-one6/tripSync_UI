@@ -14,7 +14,6 @@ import {
   TreePine,
   Flame,
   Zap,
-  BookOpen,
 } from "lucide-react";
 import { formatCurrency, formatDuration, formatDateRange } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -51,24 +50,6 @@ function seedSavings(id: string, price: number | null) {
   return { saveAmt, originalPrice: base + saveAmt };
 }
 
-/* Dot pagination indicators */
-function DotIndicator({ count, active }: { count: number; active: number }) {
-  if (count <= 1) return null;
-  return (
-    <div className="flex items-center gap-1">
-      {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
-        <span
-          key={i}
-          className={cn(
-            "size-1.5 rounded-full transition-all",
-            i === active ? "bg-white w-3" : "bg-white/50"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function DiscoverCard({ item }: { item: DiscoverItem }) {
   const { session, apiFetchWithAuth } = useAuth();
   const router = useRouter();
@@ -76,6 +57,11 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
 
   const href = item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
   const isPlan = item.originType === "plan";
+  const sourceBadge = isPlan
+    ? { label: "Community Plan", classes: "bg-amber-500 text-white" }
+    : { label: "Agency Package", classes: "bg-violet-500 text-white" };
+  const isAgencyViewer = session?.role === "agency_admin";
+  const showSendOfferCta = isAgencyViewer && isPlan;
   const dur = formatDuration(item.startDate, item.endDate);
   const durLabel = dur ? `${dur.days} days & ${dur.nights} nights` : "Flexible dates";
   const budgetLabel = formatCurrency(item.priceLow ?? item.priceHigh ?? null);
@@ -136,7 +122,7 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
   }
 
 return (
-  <div className="group/card flex h-full flex-col overflow-hidden rounded-lg border border-[var(--color-border)] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-sea-500)]/25 hover:shadow-[0_18px_48px_rgba(15,23,42,0.14)]">
+  <div className="group/card flex h-full flex-col overflow-hidden rounded-sm border border-[var(--color-border)] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-sea-500)]/25 hover:shadow-[0_18px_48px_rgba(15,23,42,0.14)]">
     <Link href={href} className="relative block overflow-hidden" style={{ aspectRatio: "16/11" }}>
       {item.coverImageUrl ? (
         <img
@@ -153,8 +139,13 @@ return (
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-      <span className="absolute left-0 top-3 rounded-r-full bg-[var(--color-amber-500)] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-md">
-        SAVE {savingsLabel}
+      <span
+        className={cn(
+          "absolute left-0 top-3 rounded-r-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide shadow-md",
+          sourceBadge.classes
+        )}
+      >
+        {sourceBadge.label}
       </span>
 
       <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
@@ -174,19 +165,19 @@ return (
         <p className="truncate text-xs text-slate-500">{durLabel}</p>
 
         <div className="flex shrink-0 items-center gap-1">
-          <Star className="size-3.5 fill-[var(--color-sea-500)] text-[var(--color-sea-500)]" />
+          <Star className="size-3.5 fill-[var(--color-amber-500)] text-[var(--color-amber-500)]" />
           <span className="text-xs font-bold text-[var(--color-sea-700)]">{rating}</span>
           <span className="text-[10px] text-slate-400">({count})</span>
         </div>
       </div>
 
       <Link href={href}>
-        <h3 className="line-clamp-2 min-h-[42px] text-[15px] font-extrabold leading-snug text-[var(--color-ink-950)] transition-colors hover:text-[var(--color-sea-700)] sm:text-base">
+        <h3 className="line-clamp-2 min-h-[22px] text-[20px] font-bold leading-snug text-[var(--color-ink-950)] transition-colors hover:text-[var(--color-sea-700)] sm:text-lg">
           {item.title}
         </h3>
       </Link>
 
-      <div className="mt-2  px-2.5 py-2">
+      <div className="mt-  px-2.5 py-1">
         <div className="flex items-center gap-1.5">
           <MapPin className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
           <p className="truncate text-[11px] font-semibold text-[var(--color-ink-700)]">
@@ -196,11 +187,8 @@ return (
       </div>
 
       <div className="mt-3 space-y-1.5">
-        <span className="inline-flex rounded-full bg-[var(--color-amber-100)] px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-[var(--color-ink-950)]">
-          Best Value Deal
-        </span>
-
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+         
           <span className="text-[11px] text-slate-400 line-through">{originalLabel}</span>
           <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[var(--color-sea-700)]">
             SAVE {savingsLabel}
@@ -218,6 +206,8 @@ return (
           <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface)] px-2 py-1 text-[11px] font-bold text-[var(--color-ink-700)]">
             <Users className="size-3.5 text-[var(--color-sea-600)]" />
             {item.joinedCount}/{item.groupSizeMax}
+            <span className="text-slate-400">•</span>
+            <span className="text-[var(--color-sea-700)]">{fillPct}%</span>
           </div>
         </div>
       </div>
@@ -233,24 +223,30 @@ return (
         <button
           type="button"
           onClick={handleGroupChat}
-          className="flex h-11 items-center justify-center rounded-xl border border-[var(--color-sea-500)]/35 bg-white text-[var(--color-sea-700)] transition hover:border-[var(--color-sea-500)] hover:bg-[var(--color-sea-50)] active:scale-[0.97]"
+          className="flex h-11 items-center justify-center rounded-sm border border-[var(--color-sea-500)]/35 bg-white text-[var(--color-sea-700)] transition hover:border-[var(--color-sea-500)] hover:bg-[var(--color-sea-50)] active:scale-[0.97]"
         >
           <MessageCircle className="size-4" />
         </button>
 
         <button
           type="button"
-          disabled={isFull || isPending}
+          disabled={showSendOfferCta ? false : isFull || isPending}
           onClick={handleEnrollNow}
           className={cn(
-            "flex h-11 items-center justify-center rounded-xl text-sm font-extrabold transition active:scale-[0.98]",
-            isFull
+            "flex h-11 items-center justify-center rounded-sm text-sm font-extrabold transition active:scale-[0.98]",
+            !showSendOfferCta && isFull
               ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-[var(--color-sea-500)] text-white shadow-sm hover:bg-[var(--color-sea-600)]",
+              : "bg-[var(--color-amber-600)] text-white shadow-sm hover:bg-[var(--color-amber-600)]",
             isPending && "opacity-70"
           )}
         >
-          {isPending ? "Joining..." : isFull ? "Full" : "Book Now"}
+          {showSendOfferCta
+            ? "Send Offer"
+            : isPending
+              ? "Joining..."
+              : isFull
+                ? "Full"
+                : "Book Now"}
         </button>
       </div>
     </div>
@@ -261,6 +257,10 @@ return (
 /** Compact card for "Trending Near You" */
 export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
   const href = item.originType === "plan" ? `/plans/${item.slug}` : `/packages/${item.slug}`;
+  const isPlan = item.originType === "plan";
+  const sourceBadge = isPlan
+    ? { label: "Plan", classes: "bg-emerald-500 text-white" }
+    : { label: "Package", classes: "bg-violet-500 text-white" };
   const palette = palettes[hash(item.title) % palettes.length];
   const { Icon } = palette;
   const dateLabel = formatDateRange(item.startDate, item.endDate);
@@ -294,6 +294,15 @@ export function DiscoverCardCompact({ item }: { item: DiscoverItem }) {
             <Star className="size-2.5 fill-emerald-400 text-emerald-400" />
             <span className="text-[9px] font-bold text-white">{rating}</span>
           </div>
+
+          <span
+            className={cn(
+              "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em]",
+              sourceBadge.classes
+            )}
+          >
+            {sourceBadge.label}
+          </span>
 
           {/* Bottom */}
           <div className="absolute bottom-0 left-0 right-0 p-2.5">

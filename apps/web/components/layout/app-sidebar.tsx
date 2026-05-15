@@ -21,6 +21,7 @@ import {
   Ticket,
   Wallet,
   User,
+  IndianRupee,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,13 +48,13 @@ const agencyNavMain = [
   { href: "/agency/packages", label: "My Packages", icon: Package },
   { href: "/agency/packages/new", label: "Create Package", icon: FilePlus2 },
   { href: "/agency/bids", label: "Bid Manager", icon: Handshake },
-  { href: "/agency/referrals", label: "Referrals", icon: BriefcaseBusiness },
+  { href: "/agency/analytics", label: "Earnings", icon: IndianRupee },
 ];
 
 const agencyNavSecondary = [
   { href: "/agency/storefront", label: "Storefront", icon: Store },
-  { href: "/agency/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/agency/invoices", label: "Invoices", icon: FileText },
+  { href: "/agency/referrals", label: "Referrals", icon: BriefcaseBusiness },
   { href: "/agency/settings", label: "Verification", icon: Settings },
 ];
 
@@ -118,17 +119,16 @@ export function AppSidebar({
         </div>
       </div>
 
-      {/* Main nav items */}
+      {/* Main nav */}
       <nav className="space-y-0.5">
         {mainItems.map((item) => (
           <NavItem key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
         ))}
       </nav>
 
-      {/* Divider */}
       <div className="my-3 border-t border-(--color-border)" />
 
-      {/* Secondary nav items */}
+      {/* Secondary nav */}
       <nav className="space-y-0.5">
         {secondaryItems.map((item) => (
           <NavItem key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
