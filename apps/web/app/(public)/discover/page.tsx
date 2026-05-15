@@ -178,48 +178,48 @@ export default async function DiscoverPage({
 
   return (
     <div className="page-shell pb-mobile-nav">
-     <section className="relative mb-5 mt-3 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:px-5 sm:py-4">
-  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.10),transparent_32%)]" />
+      <section className="relative mb-5 mt-3 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:px-5 sm:py-4">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.10),transparent_32%)]" />
 
-  <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div className="min-w-0">
-      <div className="flex items-center gap-2">
-        <span className="size-2 rounded-full bg-[var(--color-sea-500)] shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--color-sea-700)]">
-          Live Trip Marketplace
-        </p>
-      </div>
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-[var(--color-sea-500)] shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--color-sea-700)]">
+                Live Trip Marketplace
+              </p>
+            </div>
 
-      <h1 className="mt-2 font-display text-[clamp(1.45rem,3vw,2rem)] font-black leading-none tracking-tight text-[var(--color-ink-950)]">
-        Discover Better Trips.
-      </h1>
+            <h1 className="mt-2 font-display text-[clamp(1.45rem,3vw,2rem)] font-black leading-none tracking-tight text-[var(--color-ink-950)]">
+              Discover Better Trips.
+            </h1>
 
-      <p className="mt-1.5 max-w-xl text-[13px] leading-snug text-[var(--color-ink-600)] sm:text-sm">
-        Compare live plans and packages by destination, budget, and vibe.
-      </p>
-    </div>
+            <p className="mt-1.5 max-w-xl text-[13px] leading-snug text-[var(--color-ink-600)] sm:text-sm">
+              Compare live plans and packages by destination, budget, and vibe.
+            </p>
+          </div>
 
-    <div className="grid grid-cols-2 gap-2 sm:w-[230px]">
-      <div className="rounded-xl border border-[var(--color-border)] bg-white/80 px-3 py-2 shadow-[0_6px_18px_rgba(15,23,42,0.04)] backdrop-blur">
-        <p className="text-base font-black leading-none text-[var(--color-ink-950)]">
-          {items.length.toLocaleString("en-IN")}
-        </p>
-        <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
-          Live Results
-        </p>
-      </div>
+          <div className="grid grid-cols-2 gap-2 sm:w-[230px]">
+            <div className="rounded-xl border border-[var(--color-border)] bg-white/80 px-3 py-2 shadow-[0_6px_18px_rgba(15,23,42,0.04)] backdrop-blur">
+              <p className="text-base font-black leading-none text-[var(--color-ink-950)]">
+                {items.length.toLocaleString("en-IN")}
+              </p>
+              <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-ink-500)]">
+                Live Results
+              </p>
+            </div>
 
-      <div className="rounded-xl border border-[var(--color-sea-500)]/20 bg-[var(--color-sea-50)] px-3 py-2 shadow-[0_6px_18px_rgba(16,185,129,0.08)]">
-        <p className="text-base font-black leading-none text-[var(--color-sea-700)]">
-          {trending.length.toLocaleString("en-IN")}
-        </p>
-        <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)]">
-          Trending
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
+            <div className="rounded-xl border border-[var(--color-sea-500)]/20 bg-[var(--color-sea-50)] px-3 py-2 shadow-[0_6px_18px_rgba(16,185,129,0.08)]">
+              <p className="text-base font-black leading-none text-[var(--color-sea-700)]">
+                {trending.length.toLocaleString("en-IN")}
+              </p>
+              <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--color-sea-700)]">
+                Trending
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <DiscoverSearchFilters
         q={q}
@@ -471,19 +471,17 @@ export default async function DiscoverPage({
                       originType: filter.originType,
                       planType: filter.originType === "package" ? undefined : planType,
                     })}
-                    className={`group block rounded-lg border px-3 py-2.5 transition ${
-                      isActive
+                    className={`group block rounded-lg border px-3 py-2.5 transition ${isActive
                         ? "border-emerald-300 bg-emerald-50 shadow-[0_8px_20px_rgba(16,185,129,0.1)]"
                         : "border-[var(--color-border)] bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start gap-2.5">
                       <div
-                        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                          isActive
+                        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${isActive
                             ? "bg-emerald-600 text-white"
                             : "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100"
-                        }`}
+                          }`}
                       >
                         <Icon className="size-4" />
                       </div>
@@ -502,7 +500,7 @@ export default async function DiscoverPage({
             </div>
           </div>
 
-      
+
         </aside>
       </div>
     </div>

@@ -121,137 +121,138 @@ export function DiscoverCard({ item }: { item: DiscoverItem }) {
     }
   }
 
-return (
-  <div className="group/card flex h-full flex-col overflow-hidden rounded-sm border border-[var(--color-border)] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-sea-500)]/25 hover:shadow-[0_18px_48px_rgba(15,23,42,0.14)]">
-    <Link href={href} className="relative block overflow-hidden" style={{ aspectRatio: "16/11" }}>
-      {item.coverImageUrl ? (
-        <img
-          src={item.coverImageUrl}
-          alt={item.title}
-          className="size-full object-cover transition-transform duration-500 group-hover/card:scale-105"
-          loading="lazy"
-        />
-      ) : (
-        <div className={cn("size-full bg-gradient-to-br", palette.gradient)}>
-          <Icon className="absolute bottom-4 right-4 size-14 text-white/15" />
-        </div>
-      )}
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-
-      <span
-        className={cn(
-          "absolute left-0 top-3 rounded-r-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide shadow-md",
-          sourceBadge.classes
+  return (
+    <div className="group/card flex h-full flex-col overflow-hidden rounded-sm border border-[var(--color-border)] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--color-sea-500)]/25 hover:shadow-[0_18px_48px_rgba(15,23,42,0.14)]">
+      <Link href={href} className="relative block overflow-hidden" style={{ aspectRatio: "16/11" }}>
+        {item.coverImageUrl ? (
+          <img
+            src={item.coverImageUrl}
+            alt={item.title}
+            className="size-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className={cn("size-full bg-gradient-to-br", palette.gradient)}>
+            <Icon className="absolute bottom-4 right-4 size-14 text-white/15" />
+          </div>
         )}
-      >
-        {sourceBadge.label}
-      </span>
 
-      <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
-        {fillPct}% filled
-      </span>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-      {isAlmostFull && (
-        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[var(--color-sea-500)] px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
-          <Zap className="size-3" />
-          Only {spotsLeft} left
-        </span>
-      )}
-    </Link>
-
-    <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-      <div className="mb-1.5 flex items-center justify-between gap-3">
-        <p className="truncate text-xs text-slate-500">{durLabel}</p>
-
-        <div className="flex shrink-0 items-center gap-1">
-          <Star className="size-3.5 fill-[var(--color-amber-500)] text-[var(--color-amber-500)]" />
-          <span className="text-xs font-bold text-[var(--color-sea-700)]">{rating}</span>
-          <span className="text-[10px] text-slate-400">({count})</span>
-        </div>
-      </div>
-
-      <Link href={href}>
-        <h3 className="line-clamp-2 min-h-[22px] text-[20px] font-bold leading-snug text-[var(--color-ink-950)] transition-colors hover:text-[var(--color-sea-700)] sm:text-lg">
-          {item.title}
-        </h3>
-      </Link>
-
-      <div className="mt-  px-2.5 py-1">
-        <div className="flex items-center gap-1.5">
-          <MapPin className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
-          <p className="truncate text-[11px] font-semibold text-[var(--color-ink-700)]">
-            {stops.slice(0, 2).join(" • ")}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-         
-          <span className="text-[11px] text-slate-400 line-through">{originalLabel}</span>
-          <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[var(--color-sea-700)]">
-            SAVE {savingsLabel}
-          </span>
-        </div>
-
-        <div className="flex items-end justify-between gap-2">
-          <div className="min-w-0">
-            <span className="text-xl font-extrabold text-[var(--color-ink-950)]">
-              {budgetLabel}
-            </span>
-            <span className="ml-1 text-[11px] text-slate-500">/Adult</span>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface)] px-2 py-1 text-[11px] font-bold text-[var(--color-ink-700)]">
-            <Users className="size-3.5 text-[var(--color-sea-600)]" />
-            {item.joinedCount}/{item.groupSizeMax}
-            <span className="text-slate-400">•</span>
-            <span className="text-[var(--color-sea-700)]">{fillPct}%</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-[var(--color-sea-500)] transition-all"
-          style={{ width: `${fillPct}%` }}
-        />
-      </div>
-
-      <div className="mt-4 grid grid-cols-[44px_1fr] gap-2.5">
-        <button
-          type="button"
-          onClick={handleGroupChat}
-          className="flex h-11 items-center justify-center rounded-sm border border-[var(--color-sea-500)]/35 bg-white text-[var(--color-sea-700)] transition hover:border-[var(--color-sea-500)] hover:bg-[var(--color-sea-50)] active:scale-[0.97]"
-        >
-          <MessageCircle className="size-4" />
-        </button>
-
-        <button
-          type="button"
-          disabled={showSendOfferCta ? false : isFull || isPending}
-          onClick={handleEnrollNow}
+        <span
           className={cn(
-            "flex h-11 items-center justify-center rounded-sm text-sm font-extrabold transition active:scale-[0.98]",
-            !showSendOfferCta && isFull
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-[var(--color-amber-600)] text-white shadow-sm hover:bg-[var(--color-amber-600)]",
-            isPending && "opacity-70"
+            "absolute left-0 top-3 rounded-r-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide shadow-md",
+            sourceBadge.classes
           )}
         >
-          {showSendOfferCta
-            ? "Send Offer"
-            : isPending
-              ? "Joining..."
-              : isFull
-                ? "Full"
-                : "Book Now"}
-        </button>
+          {sourceBadge.label}
+        </span>
+
+        <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
+          {fillPct}% filled
+        </span>
+
+        {isAlmostFull && (
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[var(--color-sea-500)] px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
+            <Zap className="size-3" />
+            Only {spotsLeft} left
+          </span>
+        )}
+      </Link>
+
+      <div className="flex flex-1 flex-col p-3.5 sm:p-4">
+        <div className="mb-1.5 flex items-center justify-between gap-3">
+          <p className="truncate text-xs text-slate-500">{durLabel}</p>
+
+          <div className="flex shrink-0 items-center gap-1">
+            <Star className="size-3.5 fill-[var(--color-amber-500)] text-[var(--color-amber-500)]" />
+            <span className="text-xs font-bold text-[var(--color-sea-700)]">{rating}</span>
+            <span className="text-[10px] text-slate-400">({count})</span>
+          </div>
+        </div>
+
+        <Link href={href}>
+          <h3 className="line-clamp-2 min-h-[22px] text-[20px] font-bold leading-snug text-[var(--color-ink-950)] transition-colors hover:text-[var(--color-sea-700)] sm:text-lg">
+            {item.title}
+          </h3>
+        </Link>
+
+        <div className="mt-  px-2.5 py-1">
+          <div className="flex items-center gap-1.5">
+            <MapPin className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+            <p className="truncate text-[11px] font-semibold text-[var(--color-ink-700)]">
+              {stops.slice(0, 2).join(" • ")}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+
+            <span className="text-[11px] text-slate-400 line-through">{originalLabel}</span>
+            <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[var(--color-sea-700)]">
+              SAVE {savingsLabel}
+            </span>
+          </div>
+
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-xl font-extrabold text-[var(--color-ink-950)]">
+                {budgetLabel}
+              </span>
+              <span className="ml-1 text-[11px] text-slate-500">/Adult</span>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface)] px-2 py-1 text-[11px] font-bold text-[var(--color-ink-700)]">
+              <Users className="size-3.5 text-[var(--color-sea-600)]" />
+              {item.joinedCount}/{item.groupSizeMax}
+              <span className="text-slate-400">•</span>
+              <span className="text-[var(--color-sea-700)]">{fillPct}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-[var(--color-sea-500)] transition-all"
+            style={{ width: `${fillPct}%` }}
+          />
+        </div>
+
+        <div className="mt-4 grid grid-cols-[44px_1fr] gap-2.5">
+          <button
+            type="button"
+            onClick={handleGroupChat}
+            className="group relative flex h-10 w-10 items-center justify-center rounded-sm bg-[var(--color-sea-600)] text-white shadow-lg shadow-[var(--color-sea-600)]/25 transition-all duration-300 ease-out hover:bg-[var(--color-sea-700)] hover:shadow-[var(--color-sea-600)]/40 hover:scale-105 active:scale-95 active:shadow-md"
+          >
+            <MessageCircle className="size-4 transition-transform duration-300 group-hover:scale-110" />
+           
+          </button>
+
+          <button
+            type="button"
+            disabled={showSendOfferCta ? false : isFull || isPending}
+            onClick={handleEnrollNow}
+            className={cn(
+              "flex h-11 items-center justify-center rounded-sm text-sm font-extrabold transition active:scale-[0.98]",
+              !showSendOfferCta && isFull
+                ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                : "bg-[var(--color-amber-600)] text-white shadow-sm hover:bg-[var(--color-amber-600)]",
+              isPending && "opacity-70"
+            )}
+          >
+            {showSendOfferCta
+              ? "Send Offer"
+              : isPending
+                ? "Joining..."
+                : isFull
+                  ? "Full"
+                  : "Book Now"}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 /** Compact card for "Trending Near You" */
