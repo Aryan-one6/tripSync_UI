@@ -68,6 +68,9 @@ function getTransporter(): Transporter {
     host: env.ZOHO_SMTP_HOST,
     port: env.ZOHO_SMTP_PORT,
     secure: env.ZOHO_SMTP_SECURE, // true → port 465 (SSL), false → STARTTLS
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     auth: {
       user: env.ZOHO_EMAIL,
       pass: env.ZOHO_EMAIL_PASSWORD,
