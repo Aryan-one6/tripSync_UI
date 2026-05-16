@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, UserRoundPlus, Building2, Shield } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, UserRoundPlus, Building2, Shield, RefreshCw } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema } from "@tripsync/shared";
@@ -11,6 +11,7 @@ import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth/auth-context";
+import { apiFetch } from "@/lib/api/client";
 
 type LoginValues = z.input<typeof LoginSchema>;
 
@@ -38,6 +39,7 @@ export function LoginForm({
   const [isPending, startTransition] = useTransition();
   const [showPw, setShowPw] = useState(false);
   const [isSuccess, setIsSuccess] = useState(Boolean(successMessage));
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(LoginSchema),
@@ -135,11 +137,48 @@ export function LoginForm({
         </div>
 
         {/* Error banner */}
-        {!isSuccess && feedback && (
-          <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-            {feedback}
-          </div>
-        )}
+        {!isSuccess && feedback && (() => {
+          const isVerificationError = feedback.toLowerCase().includes("verify your email");
+          const identifier = form.getValues("identifier") || "";
+          const looksLikeEmail = identifier.includes("@");
+
+          async function handleResend() {
+            if (!looksLikeEmail || resendState !== "idle") return;
+            setResendState("sending");
+            try {
+              await apiFetch("/auth/resend-verification", {
+                method: "POST",
+                body: JSON.stringify({ email: identifier }),
+              });
+              setResendState("sent");
+            } catch {
+              setResendState("idle");
+            }
+          }
+
+          return (
+            <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700 space-y-2">
+              <p>{feedback}</p>
+              {isVerificationError && looksLikeEmail && (
+                resendState === "sent" ? (
+                  <p className="text-emerald-700 text-xs font-semibold">
+                    ✅ Verification email sent! Check your inbox.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleResend()}
+                    disabled={resendState === "sending"}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-red-800 underline underline-offset-2 hover:text-red-900 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`size-3 ${resendState === "sending" ? "animate-spin" : ""}`} />
+                    {resendState === "sending" ? "Sending…" : "Resend verification email"}
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })()}
 
         <Button type="submit" className="w-full h-11 text-sm font-bold" disabled={isPending}>
           {isPending ? (

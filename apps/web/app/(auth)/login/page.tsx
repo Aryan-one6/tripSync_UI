@@ -23,9 +23,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           ? params.username
           : "";
   const successMessage =
-    params.signup === "traveler" ? "Account created! Sign in to start exploring." :
-    params.signup === "agency" ? "Agency account created. Sign in to your dashboard." :
-    undefined;
+    params.signup === "traveler"
+      ? "Account created! Please check your email for a verification link before signing in."
+      : params.signup === "agency"
+        ? "Agency account created! Please check your email for a verification link before signing in."
+        : params.verified === "1"
+          ? "Your email has been verified! You can now sign in."
+          : undefined;
   const referralCode =
     typeof params.ref === "string" && /^[A-Za-z0-9]{6,8}$/.test(params.ref.trim())
       ? params.ref.trim().toUpperCase()

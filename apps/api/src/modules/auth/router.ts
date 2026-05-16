@@ -104,3 +104,17 @@ authRouter.get(
     res.json({ data: result });
   }),
 );
+
+/**
+ * POST /auth/resend-verification
+ * Body: { email: string }
+ * Sends a fresh verification email. Always returns 200 (no user enumeration).
+ */
+authRouter.post(
+  '/resend-verification',
+  asyncHandler(async (req, res) => {
+    const email = String(req.body?.email ?? '');
+    const result = await authService.resendVerificationEmail(email);
+    res.json({ data: result });
+  }),
+);

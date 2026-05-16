@@ -134,7 +134,10 @@ export function TravelerSignupForm({
 
   async function goNext() {
     const valid = await form.trigger(currentStep.fields);
-    if (valid) setStep((c) => c + 1);
+    if (valid) {
+      setFeedback(null); // clear any previous submit errors when moving steps
+      setStep((c) => c + 1);
+    }
   }
 
   return (
@@ -263,10 +266,22 @@ export function TravelerSignupForm({
           </div>
         )}
 
-        {/* Error */}
+        {/* Error banner */}
         {feedback && (
           <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-            {feedback}
+            {feedback.toLowerCase().includes("log in") ? (
+              <>
+                {feedback.split("Please log in instead.")[0]}
+                <Link
+                  href={`/login?next=${encodeURIComponent(loginNextPath)}`}
+                  className="font-semibold underline underline-offset-2 hover:text-red-900"
+                >
+                  Login instead.
+                </Link>
+              </>
+            ) : (
+              feedback
+            )}
           </div>
         )}
 

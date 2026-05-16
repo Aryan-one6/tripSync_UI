@@ -252,7 +252,9 @@ async function assertUserIdentityAvailable(input: {
 
   const existingUser = matches[0];
   if (existingUser.passwordHash) {
-    throw new ConflictError('Account already exists. Login instead.');
+    throw new ConflictError(
+      'An account already exists with this email or phone. Please log in instead.',
+    );
   }
 
   if (existingUser.username) {
@@ -269,26 +271,32 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   const existingUser = await assertUserIdentityAvailable({ username, email, phone });
 
-  // Validate referral code if provided (before creating the user)
+  // Validate referral code if provided — silently skip if invalid/expired (optional field)
   let inviterUserId: string | null = null;
   let referralLinkId: string | null = null;
   const referralCode = data.referralCode?.trim();
   if (referralCode) {
-    const { assertValidReferralCodeFormat, validateReferralCode } = await import('../referrals/service.js');
-    const normalizedCode = assertValidReferralCodeFormat(referralCode);
-    const validatedReferral = await validateReferralCode(normalizedCode);
+    try {
+      const { assertValidReferralCodeFormat, validateReferralCode } = await import('../referrals/service.js');
+      const normalizedCode = assertValidReferralCodeFormat(referralCode);
+      const validatedReferral = await validateReferralCode(normalizedCode);
 
-    if (!validatedReferral) {
-      throw new BadRequestError('Referral code is invalid or expired');
+      if (validatedReferral) {
+        inviterUserId = validatedReferral.referrerId;
+
+        const existingLink = await prisma.referralLink.findUnique({
+          where: { code: normalizedCode },
+          select: { id: true },
+        });
+        referralLinkId = existingLink?.id ?? null;
+      } else {
+        // Invalid/expired referral code — log and continue without applying it
+        console.warn(`[auth] Referral code "${referralCode}" is invalid or expired — skipping.`);
+      }
+    } catch (err) {
+      // Format error or any other issue — skip referral silently
+      console.warn(`[auth] Referral code "${referralCode}" could not be validated — skipping.`, err);
     }
-
-    inviterUserId = validatedReferral.referrerId;
-
-    const existingLink = await prisma.referralLink.findUnique({
-      where: { code: normalizedCode },
-      select: { id: true },
-    });
-    referralLinkId = existingLink?.id ?? null;
   }
 
   const passwordHash = await hashPassword(data.password);
@@ -572,7 +580,15 @@ export async function login(
   }
 
   // ─── Email verification gate ───────────────────────────────────────────────
-  if (!user.emailVerified) {
+  // Only enforce verification for accounts created AFTER email verification
+  // was introduced (i.e., those that have a token or are already marked as
+  // needing verification). Users who registered before this feature have
+  // emailVerified = false but no token → let them through.
+  const fullUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { emailVerified: true, emailVerificationToken: true },
+  });
+  if (fullUser && !fullUser.emailVerified && fullUser.emailVerificationToken !== null) {
     throw new UnauthorizedError(
       'Please verify your email address before logging in. Check your inbox for the verification link.',
     );
@@ -644,6 +660,49 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
   });
 
   return { message: 'Email verified successfully. You can now log in.' };
+}
+
+/**
+ * Re-sends the verification email to a user who hasn't verified yet.
+ * Always returns a generic success message to avoid leaking user existence.
+ */
+export async function resendVerificationEmail(email: string): Promise<{ message: string }> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      id: true,
+      fullName: true,
+      emailVerified: true,
+    },
+  });
+
+  // Always return success to avoid revealing whether the email is registered
+  if (!user || user.emailVerified) {
+    return { message: 'If that email is registered and unverified, a new link has been sent.' };
+  }
+
+  const { token: verificationToken, expiry: verificationExpiry } = generateEmailVerificationToken();
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerificationToken: verificationToken,
+      emailVerificationExpiry: verificationExpiry,
+    },
+  });
+
+  // Send new verification email (non-blocking)
+  sendVerificationEmail({
+    to: normalizedEmail,
+    fullName: user.fullName,
+    verificationToken,
+  }).catch((err) => {
+    console.error('[auth] resendVerificationEmail failed:', err);
+  });
+
+  return { message: 'If that email is registered and unverified, a new link has been sent.' };
 }
 
 export async function getProfile(userId: string) {
