@@ -19,8 +19,13 @@ import { env } from '../../lib/env.js';
 import { syncUserVerificationTier } from '../../lib/verification.js';
 import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { isValidGSTIN, assertGstinUnique, verifyGstinFromApi } from '../../lib/gst.js';
+import {
+  sendVerificationEmail,
+  sendTravellerWelcomeEmail,
+  sendAgencyWelcomeEmail,
+} from '../../lib/email/index.js';
 
 const slugify = (slugifyModule as any).default ?? slugifyModule;
 type SafeAgency = {
@@ -127,6 +132,16 @@ function generateAgencySlug(name: string): string {
   const base = (slugify(name, { lower: true, strict: true }) as string) || 'agency';
   const suffix = Math.random().toString(36).slice(2, 8);
   return `${base}-${suffix}`;
+}
+
+/**
+ * Generates a cryptographically secure email verification token
+ * and its expiry timestamp (24 hours from now).
+ */
+function generateEmailVerificationToken(): { token: string; expiry: Date } {
+  const token = randomBytes(32).toString('hex');
+  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  return { token, expiry };
 }
 
 async function loadUserWithAgency(userId: string) {
@@ -277,6 +292,7 @@ export async function signupTraveler(data: TravelerSignupInput) {
   }
 
   const passwordHash = await hashPassword(data.password);
+  const { token: verificationToken, expiry: verificationExpiry } = generateEmailVerificationToken();
 
   const user = existingUser
     ? await prisma.user.update({
@@ -294,6 +310,10 @@ export async function signupTraveler(data: TravelerSignupInput) {
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
           referredByUserId: inviterUserId ?? undefined,
+          // Reset verification token in case they are re-registering
+          emailVerified: false,
+          emailVerificationToken: verificationToken,
+          emailVerificationExpiry: verificationExpiry,
         },
         select: { id: true },
       })
@@ -311,6 +331,9 @@ export async function signupTraveler(data: TravelerSignupInput) {
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
           referredByUserId: inviterUserId ?? undefined,
+          emailVerified: false,
+          emailVerificationToken: verificationToken,
+          emailVerificationExpiry: verificationExpiry,
         },
         select: { id: true },
       });
@@ -330,8 +353,24 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   // Referral bonus credits are granted in updateProfile() after profile completion.
 
+  // ─── Send emails (non-blocking – do not fail signup on email errors) ────────
+  const emailRecipient = email;
+  const fullName = data.fullName.trim();
+
+  Promise.allSettled([
+    sendVerificationEmail({ to: emailRecipient, fullName, verificationToken }),
+    sendTravellerWelcomeEmail({ to: emailRecipient, fullName }),
+  ]).then((results) => {
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.error(`[auth] Traveller signup email #${i + 1} failed:`, r.reason);
+      }
+    });
+  });
+
   return {
-    message: 'Traveler account created successfully. Please log in.',
+    message:
+      'Traveler account created successfully. Please check your email to verify your address.',
   };
 }
 
@@ -374,6 +413,8 @@ export async function signupAgency(data: AgencySignupInput) {
     }
   }
 
+  const { token: verificationToken, expiry: verificationExpiry } = generateEmailVerificationToken();
+
   const user = await prisma.$transaction(async (tx) => {
     const user = existingUser
       ? await tx.user.update({
@@ -390,6 +431,10 @@ export async function signupAgency(data: AgencySignupInput) {
             travelPreferences: data.travelPreferences.trim(),
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
+            // Reset email verification for re-registering users
+            emailVerified: false,
+            emailVerificationToken: verificationToken,
+            emailVerificationExpiry: verificationExpiry,
           },
           select: { id: true },
         })
@@ -406,6 +451,9 @@ export async function signupAgency(data: AgencySignupInput) {
             travelPreferences: data.travelPreferences.trim(),
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
+            emailVerified: false,
+            emailVerificationToken: verificationToken,
+            emailVerificationExpiry: verificationExpiry,
           },
           select: { id: true },
         });
@@ -459,8 +507,25 @@ export async function signupAgency(data: AgencySignupInput) {
   const { getOrCreateReferralLink } = await import('../referrals/service.js');
   await getOrCreateReferralLink(user.id);
 
+  // ─── Send emails (non-blocking – do not fail signup on email errors) ────────
+  const agencyEmail = data.agencyEmail ? normalizeEmail(data.agencyEmail) : email;
+  const fullName = data.fullName.trim();
+  const agencyName = data.agencyName.trim();
+
+  Promise.allSettled([
+    sendVerificationEmail({ to: agencyEmail, fullName, verificationToken }),
+    sendAgencyWelcomeEmail({ to: agencyEmail, fullName, agencyName }),
+  ]).then((results) => {
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.error(`[auth] Agency signup email #${i + 1} failed:`, r.reason);
+      }
+    });
+  });
+
   return {
-    message: 'Agency account created successfully. Please log in.',
+    message:
+      'Agency account created successfully. Please check your email to verify your address.',
   };
 }
 
@@ -490,6 +555,7 @@ export async function login(
       email: true,
       username: true,
       phone: true,
+      emailVerified: true,
     },
   });
 
@@ -503,6 +569,13 @@ export async function login(
 
   if (!user.isActive) {
     throw new UnauthorizedError('User not found or inactive');
+  }
+
+  // ─── Email verification gate ───────────────────────────────────────────────
+  if (!user.emailVerified) {
+    throw new UnauthorizedError(
+      'Please verify your email address before logging in. Check your inbox for the verification link.',
+    );
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
@@ -525,6 +598,52 @@ export async function refreshTokens(token: string) {
   }
 
   return createSession(user.id);
+}
+
+/**
+ * Verifies an email address using a one-time token.
+ * Marks the user's email as verified and clears the token fields.
+ */
+export async function verifyEmail(token: string): Promise<{ message: string }> {
+  if (!token || token.length < 10) {
+    throw new BadRequestError('Invalid verification token');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { emailVerificationToken: token },
+    select: {
+      id: true,
+      emailVerified: true,
+      emailVerificationExpiry: true,
+    },
+  });
+
+  if (!user) {
+    throw new BadRequestError('Verification token is invalid or has already been used.');
+  }
+
+  if (user.emailVerified) {
+    return { message: 'Email is already verified. You can now log in.' };
+  }
+
+  // Check expiry
+  if (!user.emailVerificationExpiry || user.emailVerificationExpiry < new Date()) {
+    throw new BadRequestError(
+      'Verification link has expired. Please sign up again to receive a new one.',
+    );
+  }
+
+  // Mark as verified and clear token fields
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
+    },
+  });
+
+  return { message: 'Email verified successfully. You can now log in.' };
 }
 
 export async function getProfile(userId: string) {

@@ -90,3 +90,17 @@ authRouter.post(
     res.json({ data: result });
   }),
 );
+
+/**
+ * GET /auth/verify-email?token=<hex-token>
+ * Verifies the user's email using the one-time token sent during signup.
+ * Accessible without authentication (the token acts as the credential).
+ */
+authRouter.get(
+  '/verify-email',
+  asyncHandler(async (req, res) => {
+    const token = String(req.query['token'] ?? '');
+    const result = await authService.verifyEmail(token);
+    res.json({ data: result });
+  }),
+);

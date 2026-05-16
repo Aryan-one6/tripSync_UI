@@ -31,6 +31,10 @@ model User {
   referralCode                   String?
   referredByUserId               String?
   referralBonusPaid              Boolean                         @default(false)
+  // ─── Email verification ────────────────────────────────────────────────────
+  emailVerified                  Boolean                         @default(false)
+  emailVerificationToken         String?                         @unique
+  emailVerificationExpiry        DateTime?
   agency                         Agency?
   crmProfiles                    AgencyCustomer[]
   agencyMemberships              AgencyMember[]

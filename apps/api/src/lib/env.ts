@@ -27,6 +27,16 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   VERCEL: z.string().default(''),
+  // ─── Zoho Business Email (SMTP) ────────────────────────────────────────────
+  ZOHO_SMTP_HOST: z.string().default('smtp.zoho.com'),
+  ZOHO_SMTP_PORT: z.coerce.number().default(465),
+  ZOHO_SMTP_SECURE: z
+    .string()
+    .transform((v) => v === 'true' || v === '1')
+    .default('true'),
+  ZOHO_EMAIL: z.string().default(''),
+  ZOHO_EMAIL_PASSWORD: z.string().default(''),
+  APP_NAME: z.string().default('Travellers India'),
 });
 
 export type Env = z.infer<typeof envSchema>;
