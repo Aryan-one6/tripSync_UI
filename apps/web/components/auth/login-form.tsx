@@ -39,7 +39,7 @@ export function LoginForm({
   const [isPending, startTransition] = useTransition();
   const [showPw, setShowPw] = useState(false);
   const [isSuccess, setIsSuccess] = useState(Boolean(successMessage));
-  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(LoginSchema),
@@ -146,13 +146,19 @@ export function LoginForm({
             if (!looksLikeEmail || resendState !== "idle") return;
             setResendState("sending");
             try {
-              await apiFetch("/auth/resend-verification", {
-                method: "POST",
-                body: JSON.stringify({ email: identifier }),
-              });
-              setResendState("sent");
+              const result = await apiFetch<{ sent: boolean; message: string; detail?: string }>(
+                "/auth/resend-verification",
+                { method: "POST", body: JSON.stringify({ email: identifier }) },
+              );
+              if (result.sent) {
+                setResendState("sent");
+              } else {
+                // SMTP failed on the server — show the real reason
+                setResendState("failed");
+                console.error("[resend] SMTP failed:", result.detail ?? result.message);
+              }
             } catch {
-              setResendState("idle");
+              setResendState("failed");
             }
           }
 
@@ -163,6 +169,10 @@ export function LoginForm({
                 resendState === "sent" ? (
                   <p className="text-emerald-700 text-xs font-semibold">
                     ✅ Verification email sent! Check your inbox.
+                  </p>
+                ) : resendState === "failed" ? (
+                  <p className="text-orange-700 text-xs font-semibold">
+                    ⚠️ Could not send email right now. Please try again in a minute.
                   </p>
                 ) : (
                   <button

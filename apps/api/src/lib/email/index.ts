@@ -67,14 +67,15 @@ function getTransporter(): Transporter {
   _transporter = nodemailer.createTransport({
     host: env.ZOHO_SMTP_HOST,
     port: env.ZOHO_SMTP_PORT,
-    secure: env.ZOHO_SMTP_SECURE, // true → port 465 (SSL), false → STARTTLS
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
+    secure: env.ZOHO_SMTP_SECURE, // false = STARTTLS (port 587), true = SSL (port 465)
+    requireTLS: !env.ZOHO_SMTP_SECURE, // enforce TLS upgrade on STARTTLS connections
     auth: {
       user: env.ZOHO_EMAIL,
       pass: env.ZOHO_EMAIL_PASSWORD,
     },
+    connectionTimeout: 15_000, // 15 s — Render can be slow to establish outbound TCP
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
   });
 
   return _transporter;

@@ -691,15 +691,27 @@ export async function resendVerificationEmail(email: string): Promise<{ message:
     },
   });
 
-  sendVerificationEmail({
-    to: normalizedEmail,
-    fullName: user.fullName,
-    verificationToken: newVerificationToken,
-  }).catch((err) => {
-    console.error('[auth] resendVerificationEmail failed:', err);
-  });
-
-  return { message: 'If that email is registered and unverified, a new link has been sent.' };
+  // Await the send so we can surface SMTP errors to the caller.
+  try {
+    await sendVerificationEmail({
+      to: normalizedEmail,
+      fullName: user.fullName,
+      verificationToken: newVerificationToken,
+    });
+    console.log(`[auth] Verification email resent to ${normalizedEmail}`);
+    return {
+      sent: true,
+      message: 'A new verification link has been sent to your email.',
+    };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[auth] resendVerificationEmail SMTP failed for ${normalizedEmail}:`, detail);
+    return {
+      sent: false,
+      message: 'Failed to send the verification email. Please try again in a few minutes.',
+      detail, // returned so we can debug from frontend network tab
+    };
+  }
 }
 
 export async function getProfile(userId: string) {
