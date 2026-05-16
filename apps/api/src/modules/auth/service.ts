@@ -318,7 +318,6 @@ export async function signupTraveler(data: TravelerSignupInput) {
           bio: data.bio?.trim() || undefined,
           avatarUrl: data.avatarUrl,
           referredByUserId: inviterUserId ?? undefined,
-          // Reset verification token in case they are re-registering
           emailVerified: false,
           emailVerificationToken: verificationToken,
           emailVerificationExpiry: verificationExpiry,
@@ -421,7 +420,7 @@ export async function signupAgency(data: AgencySignupInput) {
     }
   }
 
-  const { token: verificationToken, expiry: verificationExpiry } = generateEmailVerificationToken();
+  const { token: agencyVerificationToken, expiry: agencyVerificationExpiry } = generateEmailVerificationToken();
 
   const user = await prisma.$transaction(async (tx) => {
     const user = existingUser
@@ -439,10 +438,9 @@ export async function signupAgency(data: AgencySignupInput) {
             travelPreferences: data.travelPreferences.trim(),
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
-            // Reset email verification for re-registering users
             emailVerified: false,
-            emailVerificationToken: verificationToken,
-            emailVerificationExpiry: verificationExpiry,
+            emailVerificationToken: agencyVerificationToken,
+            emailVerificationExpiry: agencyVerificationExpiry,
           },
           select: { id: true },
         })
@@ -460,8 +458,8 @@ export async function signupAgency(data: AgencySignupInput) {
             bio: data.bio?.trim() || undefined,
             avatarUrl: data.avatarUrl,
             emailVerified: false,
-            emailVerificationToken: verificationToken,
-            emailVerificationExpiry: verificationExpiry,
+            emailVerificationToken: agencyVerificationToken,
+            emailVerificationExpiry: agencyVerificationExpiry,
           },
           select: { id: true },
         });
@@ -521,7 +519,7 @@ export async function signupAgency(data: AgencySignupInput) {
   const agencyName = data.agencyName.trim();
 
   Promise.allSettled([
-    sendVerificationEmail({ to: agencyEmail, fullName, verificationToken }),
+    sendVerificationEmail({ to: agencyEmail, fullName, verificationToken: agencyVerificationToken }),
     sendAgencyWelcomeEmail({ to: agencyEmail, fullName, agencyName }),
   ]).then((results) => {
     results.forEach((r, i) => {
@@ -579,11 +577,15 @@ export async function login(
     throw new UnauthorizedError('User not found or inactive');
   }
 
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    throw new UnauthorizedError('Incorrect password');
+  }
+
   // ─── Email verification gate ───────────────────────────────────────────────
-  // Only enforce verification for accounts created AFTER email verification
-  // was introduced (i.e., those that have a token or are already marked as
-  // needing verification). Users who registered before this feature have
-  // emailVerified = false but no token → let them through.
+  // Only block users who registered AFTER the verification feature was added
+  // (those with a non-null emailVerificationToken). Pre-existing users have
+  // emailVerified=false but no token, so they pass through immediately.
   const fullUser = await prisma.user.findUnique({
     where: { id: user.id },
     select: { emailVerified: true, emailVerificationToken: true },
@@ -592,11 +594,6 @@ export async function login(
     throw new UnauthorizedError(
       'Please verify your email address before logging in. Check your inbox for the verification link.',
     );
-  }
-
-  const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) {
-    throw new UnauthorizedError('Incorrect password');
   }
 
   return createSession(user.id);
@@ -683,21 +680,21 @@ export async function resendVerificationEmail(email: string): Promise<{ message:
     return { message: 'If that email is registered and unverified, a new link has been sent.' };
   }
 
-  const { token: verificationToken, expiry: verificationExpiry } = generateEmailVerificationToken();
+  // Generate a fresh token and send a new verification email via Zoho SMTP.
+  const { token: newVerificationToken, expiry: newVerificationExpiry } = generateEmailVerificationToken();
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      emailVerificationToken: verificationToken,
-      emailVerificationExpiry: verificationExpiry,
+      emailVerificationToken: newVerificationToken,
+      emailVerificationExpiry: newVerificationExpiry,
     },
   });
 
-  // Non-blocking send to avoid delaying API response on SMTP network hiccups.
   sendVerificationEmail({
     to: normalizedEmail,
     fullName: user.fullName,
-    verificationToken,
+    verificationToken: newVerificationToken,
   }).catch((err) => {
     console.error('[auth] resendVerificationEmail failed:', err);
   });

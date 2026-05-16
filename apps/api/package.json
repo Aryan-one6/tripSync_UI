@@ -30,6 +30,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1033.0",
     "@prisma/client": "^6.5.0",
     "@socket.io/redis-adapter": "^8.3.0",
+    "@supabase/supabase-js": "^2.105.4",
     "@tripsync/shared": "*",
     "@types/nodemailer": "^8.0.0",
     "bullmq": "^5.44.0",

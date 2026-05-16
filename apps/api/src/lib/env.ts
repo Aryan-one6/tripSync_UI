@@ -27,6 +27,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   VERCEL: z.string().default(''),
+  // ─── Supabase Auth (email verification) ────────────────────────────────────
+  SUPABASE_URL: z.string().default(''),
+  SUPABASE_ANON_KEY: z.string().default(''),
   // ─── Zoho Business Email (SMTP) ────────────────────────────────────────────
   ZOHO_SMTP_HOST: z.string().default('smtp.zoho.com'),
   ZOHO_SMTP_PORT: z.coerce.number().default(465),
