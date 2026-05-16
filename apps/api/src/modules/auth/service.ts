@@ -693,14 +693,17 @@ export async function resendVerificationEmail(email: string): Promise<{ message:
     },
   });
 
-  // Send new verification email (non-blocking)
-  sendVerificationEmail({
-    to: normalizedEmail,
-    fullName: user.fullName,
-    verificationToken,
-  }).catch((err) => {
+  // Attempt send before returning so resend behavior is deterministic.
+  // We still keep a generic outward response to avoid user enumeration.
+  try {
+    await sendVerificationEmail({
+      to: normalizedEmail,
+      fullName: user.fullName,
+      verificationToken,
+    });
+  } catch (err) {
     console.error('[auth] resendVerificationEmail failed:', err);
-  });
+  }
 
   return { message: 'If that email is registered and unverified, a new link has been sent.' };
 }
