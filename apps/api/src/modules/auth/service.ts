@@ -663,7 +663,9 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
  * Re-sends the verification email to a user who hasn't verified yet.
  * Always returns a generic success message to avoid leaking user existence.
  */
-export async function resendVerificationEmail(email: string): Promise<{ message: string }> {
+export async function resendVerificationEmail(
+  email: string,
+): Promise<{ message: string; sent?: boolean; detail?: string }> {
   const normalizedEmail = email.trim().toLowerCase();
 
   const user = await prisma.user.findUnique({
