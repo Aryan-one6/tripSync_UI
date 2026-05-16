@@ -14,6 +14,25 @@ import * as authService from './service.js';
 
 export const authRouter = Router();
 
+function normalizeSecretCandidates(input: string): string[] {
+  const candidates = new Set<string>();
+  const raw = input.trim();
+  if (!raw) return [];
+
+  candidates.add(raw);
+  candidates.add(raw.replace(/ /g, '+'));
+
+  try {
+    const decoded = decodeURIComponent(raw);
+    candidates.add(decoded);
+    candidates.add(decoded.replace(/ /g, '+'));
+  } catch {
+    // Ignore invalid percent-encoding and continue with raw candidates.
+  }
+
+  return [...candidates];
+}
+
 authRouter.post(
   '/signup/traveler',
   validate(TravelerSignupSchema),
@@ -122,15 +141,25 @@ authRouter.post(
 /**
  * GET /auth/smtp-test?to=you@example.com&secret=<SMTP_TEST_SECRET>
  * Sends a test email to verify SMTP connectivity on production.
- * Protected by a secret query param. Remove or disable after testing.
+ * Protected by a shared secret (query param or x-smtp-test-secret header).
+ * Remove or disable after testing.
  */
 authRouter.get(
   '/smtp-test',
   asyncHandler(async (req, res) => {
-    const secret = String(req.query['secret'] ?? '');
+    const querySecret = String(req.query['secret'] ?? '');
+    const headerSecretValue = req.header('x-smtp-test-secret') ?? '';
+    const providedSecret = headerSecretValue || querySecret;
+    const expectedSecret = String(process.env['SMTP_TEST_SECRET'] ?? '').trim();
     const to = String(req.query['to'] ?? '');
 
-    if (!secret || secret !== process.env['SMTP_TEST_SECRET']) {
+    if (!expectedSecret) {
+      res.status(500).json({ error: 'SMTP_TEST_SECRET is not configured on server' });
+      return;
+    }
+
+    const matches = normalizeSecretCandidates(providedSecret).includes(expectedSecret);
+    if (!matches) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }

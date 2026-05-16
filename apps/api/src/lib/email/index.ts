@@ -36,6 +36,10 @@ export interface SendEmailOptions {
 
 let _transporter: Transporter | null = null;
 
+function hasSmtpCredentials() {
+  return Boolean(env.ZOHO_EMAIL && env.ZOHO_EMAIL_PASSWORD);
+}
+
 /** Call this in tests or after env changes to force a fresh transporter. */
 export function resetTransporter(): void {
   _transporter = null;
@@ -44,7 +48,12 @@ export function resetTransporter(): void {
 function getTransporter(): Transporter {
   if (_transporter) return _transporter;
 
-  if (!env.ZOHO_EMAIL || !env.ZOHO_EMAIL_PASSWORD) {
+  if (!hasSmtpCredentials()) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error(
+        'SMTP is not configured: ZOHO_EMAIL and ZOHO_EMAIL_PASSWORD are required in production.',
+      );
+    }
     // Dev/test mode – log emails to console instead of sending
     console.warn('[email] ZOHO_EMAIL / ZOHO_EMAIL_PASSWORD not set. Emails will be logged only.');
     _transporter = nodemailer.createTransport({ jsonTransport: true });
@@ -86,7 +95,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   };
 
   // Dev mode – transporter uses jsonTransport, print the message
-  if (!env.ZOHO_EMAIL || !env.ZOHO_EMAIL_PASSWORD) {
+  if (!hasSmtpCredentials()) {
     const info = await transporter.sendMail(mailOptions);
     console.log(
       `[email:dev] Would send "${options.subject}" to ${options.to}\n`,
