@@ -118,3 +118,38 @@ authRouter.post(
     res.json({ data: result });
   }),
 );
+
+/**
+ * GET /auth/smtp-test?to=you@example.com&secret=<SMTP_TEST_SECRET>
+ * Sends a test email to verify SMTP connectivity on production.
+ * Protected by a secret query param. Remove or disable after testing.
+ */
+authRouter.get(
+  '/smtp-test',
+  asyncHandler(async (req, res) => {
+    const secret = String(req.query['secret'] ?? '');
+    const to = String(req.query['to'] ?? '');
+
+    if (!secret || secret !== process.env['SMTP_TEST_SECRET']) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    if (!to || !to.includes('@')) {
+      res.status(400).json({ error: 'Provide a valid ?to= email address' });
+      return;
+    }
+
+    const { sendEmail } = await import('../../lib/email/index.js');
+    try {
+      await sendEmail({
+        to,
+        subject: '[TripSync] SMTP Test Email',
+        html: `<p>SMTP is working ✅</p><p>Host: <strong>${process.env['ZOHO_SMTP_HOST']}</strong></p><p>From: <strong>${process.env['ZOHO_EMAIL']}</strong></p>`,
+        text: `SMTP is working. Host: ${process.env['ZOHO_SMTP_HOST']}. From: ${process.env['ZOHO_EMAIL']}.`,
+      });
+      res.json({ data: { ok: true, message: `Test email sent to ${to}` } });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : 'SMTP send failed' });
+    }
+  }),
+);

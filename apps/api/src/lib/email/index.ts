@@ -36,6 +36,11 @@ export interface SendEmailOptions {
 
 let _transporter: Transporter | null = null;
 
+/** Call this in tests or after env changes to force a fresh transporter. */
+export function resetTransporter(): void {
+  _transporter = null;
+}
+
 function getTransporter(): Transporter {
   if (_transporter) return _transporter;
 
@@ -45,6 +50,10 @@ function getTransporter(): Transporter {
     _transporter = nodemailer.createTransport({ jsonTransport: true });
     return _transporter;
   }
+
+  console.log(
+    `[email] Creating SMTP transporter → host=${env.ZOHO_SMTP_HOST} port=${env.ZOHO_SMTP_PORT} secure=${env.ZOHO_SMTP_SECURE} user=${env.ZOHO_EMAIL}`,
+  );
 
   _transporter = nodemailer.createTransport({
     host: env.ZOHO_SMTP_HOST,

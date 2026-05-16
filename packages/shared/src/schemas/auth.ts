@@ -61,8 +61,12 @@ export const TravelerSignupSchema = baseSignupSchema.extend({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9]{6,8}$/, 'Referral code must be 6-8 alphanumeric characters')
-    .optional(),
+    .optional()
+    .refine(
+      (value) => value === undefined || value.length === 0 || /^[A-Z0-9]{6,8}$/.test(value),
+      'Referral code must be 6-8 alphanumeric characters',
+    )
+    .transform((value) => (value === '' ? undefined : value)),
 });
 
 export const AgencySignupSchema = baseSignupSchema.extend({
