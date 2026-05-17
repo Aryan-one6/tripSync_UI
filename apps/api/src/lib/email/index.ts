@@ -36,6 +36,33 @@ function hasZeptoConfig() {
   return Boolean(env.ZEPTOMAIL_API_KEY && fromAddress);
 }
 
+async function postZeptoEmail(
+  apiUrl: string,
+  apiKey: string,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number; bodyText: string; bodyJson: unknown }> {
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `zoho-enczapikey ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  const bodyText = await response.text();
+  let bodyJson: unknown = null;
+  try {
+    bodyJson = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    bodyJson = bodyText;
+  }
+
+  return { ok: response.ok, status: response.status, bodyText, bodyJson };
+}
+
 // ─── Core send helper ─────────────────────────────────────────────────────────
 
 /**
@@ -66,38 +93,48 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     from: { address: fromAddress, name: env.APP_NAME },
     to: [{ email_address: { address: options.to } }],
     subject: options.subject,
-    htmlbody: options.html,
   };
 
-  if (options.text) {
+  // ZeptoMail docs specify either htmlbody or textbody.
+  if (options.html?.trim()) {
+    payload['htmlbody'] = options.html;
+  } else if (options.text?.trim()) {
     payload['textbody'] = options.text;
+  } else {
+    payload['textbody'] = '';
   }
 
   try {
-    const response = await fetch(env.ZEPTOMAIL_API_URL, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Zoho-enczapikey ${env.ZEPTOMAIL_API_KEY}`,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(15_000),
-    });
+    const primary = await postZeptoEmail(env.ZEPTOMAIL_API_URL, env.ZEPTOMAIL_API_KEY, payload);
 
-    const bodyText = await response.text();
-    let bodyJson: unknown = null;
-    try {
-      bodyJson = bodyText ? JSON.parse(bodyText) : null;
-    } catch {
-      bodyJson = bodyText;
+    // Some setups use .in endpoint while docs prefer .com; retry once on 5xx.
+    if (
+      !primary.ok &&
+      primary.status >= 500 &&
+      env.ZEPTOMAIL_API_URL.includes('api.zeptomail.in')
+    ) {
+      const fallbackUrl = env.ZEPTOMAIL_API_URL.replace('api.zeptomail.in', 'api.zeptomail.com');
+      console.warn(`[email] ZeptoMail primary endpoint failed; retrying with ${fallbackUrl}`);
+      const fallback = await postZeptoEmail(fallbackUrl, env.ZEPTOMAIL_API_KEY, payload);
+      if (!fallback.ok) {
+        throw new Error(
+          `ZeptoMail API failed (${fallback.status}) at ${fallbackUrl}: ${JSON.stringify(fallback.bodyJson || fallback.bodyText)}`,
+        );
+      }
+      console.log(
+        `[email] Sent "${options.subject}" to ${options.to} via ZeptoMail (fallback endpoint)`,
+        fallback.bodyJson,
+      );
+      return;
     }
 
-    if (!response.ok) {
-      throw new Error(`ZeptoMail API failed (${response.status}): ${JSON.stringify(bodyJson)}`);
+    if (!primary.ok) {
+      throw new Error(
+        `ZeptoMail API failed (${primary.status}) at ${env.ZEPTOMAIL_API_URL}: ${JSON.stringify(primary.bodyJson || primary.bodyText)}`,
+      );
     }
 
-    console.log(`[email] Sent "${options.subject}" to ${options.to} via ZeptoMail`, bodyJson);
+    console.log(`[email] Sent "${options.subject}" to ${options.to} via ZeptoMail`, primary.bodyJson);
   } catch (err) {
     console.error(`[email] Failed to send "${options.subject}" to ${options.to} via ZeptoMail:`, err);
     throw err;
