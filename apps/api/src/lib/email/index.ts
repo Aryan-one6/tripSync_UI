@@ -33,7 +33,14 @@ export interface SendEmailOptions {
 
 function hasZeptoConfig() {
   const fromAddress = env.ZEPTOMAIL_FROM_ADDRESS || env.ZOHO_EMAIL;
-  return Boolean(env.ZEPTOMAIL_API_KEY && fromAddress);
+  return Boolean(getSanitizedZeptoToken(env.ZEPTOMAIL_API_KEY) && fromAddress);
+}
+
+function getSanitizedZeptoToken(rawToken: string): string {
+  return rawToken
+    .trim()
+    .replace(/^zoho-enczapikey\s+/i, '')
+    .replace(/^["']|["']$/g, '');
 }
 
 async function postZeptoEmail(
@@ -46,7 +53,7 @@ async function postZeptoEmail(
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Authorization: `zoho-enczapikey ${apiKey}`,
+      Authorization: `zoho-enczapikey ${getSanitizedZeptoToken(apiKey)}`,
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(15_000),
