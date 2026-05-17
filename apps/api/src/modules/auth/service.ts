@@ -651,12 +651,32 @@ export async function login(
   // emailVerified=false but no token, so they pass through immediately.
   const fullUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { emailVerified: true, emailVerificationToken: true },
+    select: {
+      emailVerified: true,
+      emailVerificationToken: true,
+      referredByUserId: true,
+      referralBonusPaid: true,
+    },
   });
   if (fullUser && !fullUser.emailVerified && fullUser.emailVerificationToken !== null) {
     throw new UnauthorizedError(
       'Please verify your email address before logging in. Check your inbox for the verification link.',
     );
+  }
+
+  // Backfill referral payouts for accounts that were already verified before
+  // referral completion was moved to verification time.
+  if (fullUser?.emailVerified && fullUser.referredByUserId && !fullUser.referralBonusPaid) {
+    try {
+      const { completeReferral } = await import('../referrals/service.js');
+      await completeReferral(fullUser.referredByUserId, user.id);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { referralBonusPaid: true },
+      });
+    } catch (err) {
+      console.error(`[auth] Referral backfill failed for user ${user.id}:`, err);
+    }
   }
 
   return createSession(user.id);
@@ -698,6 +718,8 @@ export async function verifyEmail(tokenOrWrappedToken: string): Promise<{ messag
       email: true,
       emailVerified: true,
       emailVerificationExpiry: true,
+      referredByUserId: true,
+      referralBonusPaid: true,
       agency: {
         select: {
           id: true,
@@ -731,6 +753,19 @@ export async function verifyEmail(tokenOrWrappedToken: string): Promise<{ messag
       emailVerificationExpiry: null,
     },
   });
+
+  if (user.referredByUserId && !user.referralBonusPaid) {
+    try {
+      const { completeReferral } = await import('../referrals/service.js');
+      await completeReferral(user.referredByUserId, user.id);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { referralBonusPaid: true },
+      });
+    } catch (err) {
+      console.error(`[auth] Referral completion failed after verify for user ${user.id}:`, err);
+    }
+  }
 
   // Send welcome email after successful verification (non-blocking).
   const recipientEmail = user.email?.trim().toLowerCase();
