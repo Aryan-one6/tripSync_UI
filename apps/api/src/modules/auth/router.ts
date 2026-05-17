@@ -140,7 +140,7 @@ authRouter.post(
 
 /**
  * GET /auth/smtp-test?to=you@example.com&secret=<SMTP_TEST_SECRET>
- * Sends a test email to verify SMTP connectivity on production.
+ * Sends a test email to verify delivery configuration on production.
  * Protected by a shared secret (query param or x-smtp-test-secret header).
  * Remove or disable after testing.
  */

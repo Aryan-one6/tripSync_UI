@@ -30,6 +30,10 @@ const envSchema = z.object({
   // ─── Supabase Auth (email verification) ────────────────────────────────────
   SUPABASE_URL: z.string().default(''),
   SUPABASE_ANON_KEY: z.string().default(''),
+  // ─── ZeptoMail API (recommended for hosted environments) ──────────────────
+  ZEPTOMAIL_API_URL: z.string().url().default('https://api.zeptomail.in/v1.1/email'),
+  ZEPTOMAIL_API_KEY: z.string().default(''),
+  ZEPTOMAIL_FROM_ADDRESS: z.string().default(''),
   // ─── Zoho Business Email (SMTP) ────────────────────────────────────────────
   ZOHO_SMTP_HOST: z.string().default('smtp.zoho.com'),
   ZOHO_SMTP_PORT: z.coerce.number().default(465),

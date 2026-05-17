@@ -1,5 +1,5 @@
 /**
- * Email service – Zoho Business Email via SMTP (nodemailer)
+ * Email service – ZeptoMail Email API over HTTPS
  *
  * Exports:
  *   sendEmail()                   – low-level send helper
@@ -8,7 +8,6 @@
  *   sendAgencyWelcomeEmail()      – welcome email for Agency accounts
  */
 
-import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../env.js';
 import {
   getVerificationEmailHtml,
@@ -32,89 +31,76 @@ export interface SendEmailOptions {
   text?: string;
 }
 
-// ─── Transporter (singleton, lazy init) ──────────────────────────────────────
-
-let _transporter: Transporter | null = null;
-
-function hasSmtpCredentials() {
-  return Boolean(env.ZOHO_EMAIL && env.ZOHO_EMAIL_PASSWORD);
-}
-
-/** Call this in tests or after env changes to force a fresh transporter. */
-export function resetTransporter(): void {
-  _transporter = null;
-}
-
-function getTransporter(): Transporter {
-  if (_transporter) return _transporter;
-
-  if (!hasSmtpCredentials()) {
-    if (env.NODE_ENV === 'production') {
-      throw new Error(
-        'SMTP is not configured: ZOHO_EMAIL and ZOHO_EMAIL_PASSWORD are required in production.',
-      );
-    }
-    // Dev/test mode – log emails to console instead of sending
-    console.warn('[email] ZOHO_EMAIL / ZOHO_EMAIL_PASSWORD not set. Emails will be logged only.');
-    _transporter = nodemailer.createTransport({ jsonTransport: true });
-    return _transporter;
-  }
-
-  console.log(
-    `[email] Creating SMTP transporter → host=${env.ZOHO_SMTP_HOST} port=${env.ZOHO_SMTP_PORT} secure=${env.ZOHO_SMTP_SECURE} user=${env.ZOHO_EMAIL}`,
-  );
-
-  _transporter = nodemailer.createTransport({
-    host: env.ZOHO_SMTP_HOST,
-    port: env.ZOHO_SMTP_PORT,
-    secure: env.ZOHO_SMTP_SECURE, // false = STARTTLS (port 587), true = SSL (port 465)
-    requireTLS: !env.ZOHO_SMTP_SECURE, // enforce TLS upgrade on STARTTLS connections
-    auth: {
-      user: env.ZOHO_EMAIL,
-      pass: env.ZOHO_EMAIL_PASSWORD,
-    },
-    connectionTimeout: 15_000, // 15 s — Render can be slow to establish outbound TCP
-    greetingTimeout: 10_000,
-    socketTimeout: 30_000,
-  });
-
-  return _transporter;
+function hasZeptoConfig() {
+  const fromAddress = env.ZEPTOMAIL_FROM_ADDRESS || env.ZOHO_EMAIL;
+  return Boolean(env.ZEPTOMAIL_API_KEY && fromAddress);
 }
 
 // ─── Core send helper ─────────────────────────────────────────────────────────
 
 /**
- * Sends an email via Zoho SMTP.
- * In dev mode (no credentials), the email content is printed to the console.
+ * Sends an email via ZeptoMail API.
+ * In dev mode (no API key), the email content is printed to the console.
  */
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const transporter = getTransporter();
+  const fromAddress = env.ZEPTOMAIL_FROM_ADDRESS || env.ZOHO_EMAIL || 'noreply@example.com';
 
-  const mailOptions = {
-    from: `"${env.APP_NAME}" <${env.ZOHO_EMAIL || 'noreply@example.com'}>`,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-    text: options.text,
-  };
-
-  // Dev mode – transporter uses jsonTransport, print the message
-  if (!hasSmtpCredentials()) {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(
-      `[email:dev] Would send "${options.subject}" to ${options.to}\n`,
-      JSON.parse((info as any).message ?? '{}'),
-    );
+  if (!hasZeptoConfig()) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error(
+        'ZeptoMail is not configured: set ZEPTOMAIL_API_KEY and ZEPTOMAIL_FROM_ADDRESS.',
+      );
+    }
+    console.warn('[email] ZEPTOMAIL_API_KEY not set. Email will be logged only.');
+    console.log('[email:dev] Mock email payload:', {
+      from: fromAddress,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
     return;
   }
 
+  const payload: Record<string, unknown> = {
+    from: { address: fromAddress, name: env.APP_NAME },
+    to: [{ email_address: { address: options.to } }],
+    subject: options.subject,
+    htmlbody: options.html,
+  };
+
+  if (options.text) {
+    payload['textbody'] = options.text;
+  }
+
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[email] Sent "${options.subject}" to ${options.to} – id: ${info.messageId}`);
+    const response = await fetch(env.ZEPTOMAIL_API_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Zoho-enczapikey ${env.ZEPTOMAIL_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    const bodyText = await response.text();
+    let bodyJson: unknown = null;
+    try {
+      bodyJson = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      bodyJson = bodyText;
+    }
+
+    if (!response.ok) {
+      throw new Error(`ZeptoMail API failed (${response.status}): ${JSON.stringify(bodyJson)}`);
+    }
+
+    console.log(`[email] Sent "${options.subject}" to ${options.to} via ZeptoMail`, bodyJson);
   } catch (err) {
-    // Log the error but don't crash the signup flow
-    console.error(`[email] Failed to send "${options.subject}" to ${options.to}:`, err);
-    throw err; // re-throw so callers can decide whether to surface the error
+    console.error(`[email] Failed to send "${options.subject}" to ${options.to} via ZeptoMail:`, err);
+    throw err;
   }
 }
 
