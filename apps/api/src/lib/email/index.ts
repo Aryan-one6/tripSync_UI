@@ -53,7 +53,7 @@ async function postZeptoEmail(
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      Authorization: `zoho-enczapikey ${getSanitizedZeptoToken(apiKey)}`,
+      Authorization: `Zoho-enczapikey ${getSanitizedZeptoToken(apiKey)}`,
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(15_000),
