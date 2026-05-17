@@ -111,15 +111,17 @@ authRouter.post(
 );
 
 /**
- * GET /auth/verify-email?token=<hex-token>
+ * GET /auth/verify-email?vt=<encrypted-token>
  * Verifies the user's email using the one-time token sent during signup.
  * Accessible without authentication (the token acts as the credential).
  */
 authRouter.get(
   '/verify-email',
   asyncHandler(async (req, res) => {
-    const token = String(req.query['token'] ?? '');
-    const result = await authService.verifyEmail(token);
+    const wrappedToken = String(req.query['vt'] ?? '');
+    const token = String(req.query['token'] ?? ''); // legacy plain-token support
+    const tokenToVerify = wrappedToken || token;
+    const result = await authService.verifyEmail(tokenToVerify);
     res.json({ data: result });
   }),
 );

@@ -156,22 +156,23 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 export async function sendVerificationEmail(params: {
   to: string;
   fullName: string;
-  verificationToken: string;
+  verificationUrl: string;
 }): Promise<void> {
-  const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${params.verificationToken}`;
+  const brandLogoUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/brand/travellersin-light.png`;
 
   await sendEmail({
     to: params.to,
     subject: `Verify your email – ${env.APP_NAME}`,
     html: getVerificationEmailHtml({
       fullName: params.fullName,
-      verificationUrl,
+      verificationUrl: params.verificationUrl,
       appName: env.APP_NAME,
+      brandLogoUrl,
       expiryHours: 24,
     }),
     text: getVerificationEmailText({
       fullName: params.fullName,
-      verificationUrl,
+      verificationUrl: params.verificationUrl,
       appName: env.APP_NAME,
       expiryHours: 24,
     }),

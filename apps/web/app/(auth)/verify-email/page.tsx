@@ -11,7 +11,9 @@ type VerifyState = "loading" | "success" | "error";
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token") ?? "";
+  const wrappedToken = searchParams.get("vt") ?? "";
+  const legacyToken = searchParams.get("token") ?? "";
+  const token = wrappedToken || legacyToken;
 
   const [state, setState] = useState<VerifyState>("loading");
   const [message, setMessage] = useState("");
@@ -23,7 +25,11 @@ export default function VerifyEmailPage() {
       return;
     }
 
-    apiFetch<{ message: string }>(`/auth/verify-email?token=${encodeURIComponent(token)}`)
+    const query = wrappedToken
+      ? `vt=${encodeURIComponent(wrappedToken)}`
+      : `token=${encodeURIComponent(token)}`;
+
+    apiFetch<{ message: string }>(`/auth/verify-email?${query}`)
       .then((data) => {
         setMessage(data.message ?? "Email verified successfully!");
         setState("success");
@@ -36,7 +42,7 @@ export default function VerifyEmailPage() {
         );
         setState("error");
       });
-  }, [token, router]);
+  }, [token, wrappedToken, router]);
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-gray-50 px-4">

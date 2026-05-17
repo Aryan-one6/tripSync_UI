@@ -7,6 +7,7 @@ export interface VerificationEmailData {
   fullName: string;
   verificationUrl: string;
   appName: string;
+  brandLogoUrl?: string;
   expiryHours?: number;
 }
 
@@ -14,8 +15,9 @@ export interface VerificationEmailData {
  * Returns the HTML body for the email verification email.
  */
 export function getVerificationEmailHtml(data: VerificationEmailData): string {
-  const { fullName, verificationUrl, appName, expiryHours = 24 } = data;
+  const { fullName, verificationUrl, appName, brandLogoUrl, expiryHours = 24 } = data;
   const firstName = fullName.split(' ')[0] ?? fullName;
+  const logo = brandLogoUrl?.trim() || '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -25,32 +27,37 @@ export function getVerificationEmailHtml(data: VerificationEmailData): string {
   <title>Verify Your Email – ${appName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6fb; color: #1a1a2e; }
-    .wrapper { max-width: 620px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-    .header { background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%); padding: 36px 40px; text-align: center; }
-    .header-logo { font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
-    .header-logo span { color: #60c4ff; }
-    .header-tagline { color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px; }
-    .body { padding: 40px; }
-    .greeting { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px; }
-    .text { font-size: 15px; color: #4a4a6a; line-height: 1.7; margin-bottom: 16px; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f2f7f5; color: #1f2937; }
+    .wrapper { max-width: 620px; margin: 40px auto; background: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 28px rgba(5, 150, 105, 0.12); }
+    .header { background: linear-gradient(135deg, #065f46 0%, #059669 65%, #10b981 100%); padding: 28px 30px; text-align: center; border-bottom: 4px solid #f59e0b; }
+    .header-logo-img { max-width: 240px; width: 100%; height: auto; margin: 0 auto 10px; display: block; }
+    .header-logo-fallback { font-size: 30px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+    .header-logo-fallback span { color: #fbbf24; }
+    .header-tagline { color: rgba(255,255,255,0.88); font-size: 13px; margin-top: 4px; }
+    .body { padding: 38px 34px; }
+    .greeting { font-size: 23px; font-weight: 800; color: #064e3b; margin-bottom: 14px; }
+    .text { font-size: 15px; color: #334155; line-height: 1.72; margin-bottom: 16px; }
     .cta-wrapper { text-align: center; margin: 32px 0; }
-    .cta-btn { display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%); color: #ffffff !important; text-decoration: none; font-size: 16px; font-weight: 700; padding: 16px 40px; border-radius: 50px; letter-spacing: 0.3px; }
-    .divider { border: none; border-top: 1px solid #e8ecf3; margin: 28px 0; }
-    .expiry-note { background: #fff8e6; border: 1px solid #ffd966; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #7a5c00; margin-bottom: 24px; }
-    .expiry-note strong { color: #5a4000; }
-    .fallback-link { font-size: 13px; color: #4a4a6a; word-break: break-all; }
-    .fallback-link a { color: #2d6a9f; }
-    .footer { background: #f4f6fb; padding: 24px 40px; text-align: center; }
-    .footer-text { font-size: 12px; color: #9090aa; line-height: 1.6; }
-    .footer-text a { color: #2d6a9f; text-decoration: none; }
+    .cta-btn { display: inline-block; background: linear-gradient(135deg, #047857 0%, #10b981 100%); color: #ffffff !important; text-decoration: none; font-size: 16px; font-weight: 800; padding: 15px 36px; border-radius: 999px; letter-spacing: 0.2px; box-shadow: 0 10px 18px rgba(16, 185, 129, 0.3); }
+    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+    .expiry-note { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 14px 18px; font-size: 13px; color: #92400e; margin-bottom: 22px; }
+    .expiry-note strong { color: #78350f; }
+    .fallback-link { font-size: 13px; color: #334155; line-height: 1.7; }
+    .fallback-link a { color: #047857; font-weight: 700; text-decoration: none; }
+    .footer { background: #f8fafc; padding: 22px 34px; text-align: center; border-top: 1px solid #e2e8f0; }
+    .footer-text { font-size: 12px; color: #64748b; line-height: 1.6; }
+    .footer-text a { color: #047857; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <!-- Header / Brand -->
     <div class="header">
-      <div class="header-logo">${appName.split(' ')[0]}<span>${appName.split(' ').slice(1).join(' ') || ''}</span></div>
+      ${
+        logo
+          ? `<img class="header-logo-img" src="${logo}" alt="${appName} logo" />`
+          : `<div class="header-logo-fallback">${appName.split(' ')[0]}<span>${appName.split(' ').slice(1).join(' ') || ''}</span></div>`
+      }
       <div class="header-tagline">Your trusted travel companion</div>
     </div>
 
@@ -83,8 +90,8 @@ export function getVerificationEmailHtml(data: VerificationEmailData): string {
 
       <!-- Fallback link -->
       <p class="fallback-link">
-        If the button above doesn't work, copy and paste this link into your browser:<br />
-        <a href="${verificationUrl}">${verificationUrl}</a>
+        If the button above doesn't work, open this secure verification link:<br />
+        <a href="${verificationUrl}" target="_blank" rel="noopener noreferrer">Open secure verification page</a>
       </p>
     </div>
 

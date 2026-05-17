@@ -19,7 +19,13 @@ import { env } from '../../lib/env.js';
 import { syncUserVerificationTier } from '../../lib/verification.js';
 import { hashPassword, verifyPassword } from './password.js';
 import slugifyModule from 'slugify';
-import { randomUUID, randomBytes } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from 'crypto';
 import { isValidGSTIN, assertGstinUnique, verifyGstinFromApi } from '../../lib/gst.js';
 import {
   sendVerificationEmail,
@@ -142,6 +148,59 @@ function generateEmailVerificationToken(): { token: string; expiry: Date } {
   const token = randomBytes(32).toString('hex');
   const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
   return { token, expiry };
+}
+
+const EMAIL_TOKEN_WRAPPER_VERSION = 'v1';
+const EMAIL_TOKEN_IV_LENGTH = 12; // AES-GCM recommended nonce length
+const EMAIL_TOKEN_TAG_LENGTH = 16; // AES-GCM auth tag length
+
+function getEmailTokenEncryptionKey(): Buffer {
+  return createHash('sha256').update(env.JWT_ACCESS_SECRET, 'utf8').digest();
+}
+
+function encryptVerificationToken(rawToken: string): string {
+  const iv = randomBytes(EMAIL_TOKEN_IV_LENGTH);
+  const cipher = createCipheriv('aes-256-gcm', getEmailTokenEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(rawToken, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const packed = Buffer.concat([iv, tag, encrypted]).toString('base64url');
+  return `${EMAIL_TOKEN_WRAPPER_VERSION}.${packed}`;
+}
+
+function decryptVerificationToken(wrappedToken: string): string {
+  if (!wrappedToken.startsWith(`${EMAIL_TOKEN_WRAPPER_VERSION}.`)) {
+    return wrappedToken;
+  }
+
+  const encoded = wrappedToken.slice(EMAIL_TOKEN_WRAPPER_VERSION.length + 1);
+  let packed: Buffer;
+  try {
+    packed = Buffer.from(encoded, 'base64url');
+  } catch {
+    throw new BadRequestError('Invalid verification token format.');
+  }
+
+  if (packed.length <= EMAIL_TOKEN_IV_LENGTH + EMAIL_TOKEN_TAG_LENGTH) {
+    throw new BadRequestError('Invalid verification token format.');
+  }
+
+  const iv = packed.subarray(0, EMAIL_TOKEN_IV_LENGTH);
+  const tag = packed.subarray(EMAIL_TOKEN_IV_LENGTH, EMAIL_TOKEN_IV_LENGTH + EMAIL_TOKEN_TAG_LENGTH);
+  const encrypted = packed.subarray(EMAIL_TOKEN_IV_LENGTH + EMAIL_TOKEN_TAG_LENGTH);
+
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', getEmailTokenEncryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+    return decrypted;
+  } catch {
+    throw new BadRequestError('Verification token is invalid or tampered.');
+  }
+}
+
+function buildVerificationUrl(rawToken: string): string {
+  const wrapped = encryptVerificationToken(rawToken);
+  return `${env.FRONTEND_URL}/verify-email?vt=${encodeURIComponent(wrapped)}`;
 }
 
 async function loadUserWithAgency(userId: string) {
@@ -360,13 +419,16 @@ export async function signupTraveler(data: TravelerSignupInput) {
 
   // Referral bonus credits are granted in updateProfile() after profile completion.
 
-  // ─── Send emails (non-blocking – do not fail signup on email errors) ────────
+  // ─── Send verification email (non-blocking) ────────────────────────────────
   const emailRecipient = email;
   const fullName = data.fullName.trim();
 
   Promise.allSettled([
-    sendVerificationEmail({ to: emailRecipient, fullName, verificationToken }),
-    sendTravellerWelcomeEmail({ to: emailRecipient, fullName }),
+    sendVerificationEmail({
+      to: emailRecipient,
+      fullName,
+      verificationUrl: buildVerificationUrl(verificationToken),
+    }),
   ]).then((results) => {
     results.forEach((r, i) => {
       if (r.status === 'rejected') {
@@ -513,14 +575,15 @@ export async function signupAgency(data: AgencySignupInput) {
   const { getOrCreateReferralLink } = await import('../referrals/service.js');
   await getOrCreateReferralLink(user.id);
 
-  // ─── Send emails (non-blocking – do not fail signup on email errors) ────────
+  // ─── Send verification email (non-blocking) ────────────────────────────────
   const agencyEmail = data.agencyEmail ? normalizeEmail(data.agencyEmail) : email;
   const fullName = data.fullName.trim();
-  const agencyName = data.agencyName.trim();
-
   Promise.allSettled([
-    sendVerificationEmail({ to: agencyEmail, fullName, verificationToken: agencyVerificationToken }),
-    sendAgencyWelcomeEmail({ to: agencyEmail, fullName, agencyName }),
+    sendVerificationEmail({
+      to: agencyEmail,
+      fullName,
+      verificationUrl: buildVerificationUrl(agencyVerificationToken),
+    }),
   ]).then((results) => {
     results.forEach((r, i) => {
       if (r.status === 'rejected') {
@@ -617,7 +680,12 @@ export async function refreshTokens(token: string) {
  * Verifies an email address using a one-time token.
  * Marks the user's email as verified and clears the token fields.
  */
-export async function verifyEmail(token: string): Promise<{ message: string }> {
+export async function verifyEmail(tokenOrWrappedToken: string): Promise<{ message: string }> {
+  if (!tokenOrWrappedToken || tokenOrWrappedToken.length < 10) {
+    throw new BadRequestError('Invalid verification token');
+  }
+
+  const token = decryptVerificationToken(tokenOrWrappedToken);
   if (!token || token.length < 10) {
     throw new BadRequestError('Invalid verification token');
   }
@@ -626,8 +694,16 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
     where: { emailVerificationToken: token },
     select: {
       id: true,
+      fullName: true,
+      email: true,
       emailVerified: true,
       emailVerificationExpiry: true,
+      agency: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -656,6 +732,28 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
     },
   });
 
+  // Send welcome email after successful verification (non-blocking).
+  const recipientEmail = user.email?.trim().toLowerCase();
+  if (recipientEmail) {
+    const fullName = user.fullName.trim();
+    if (user.agency?.id) {
+      sendAgencyWelcomeEmail({
+        to: recipientEmail,
+        fullName,
+        agencyName: user.agency.name,
+      }).catch((err) => {
+        console.error(`[auth] Agency welcome email failed after verification for ${recipientEmail}:`, err);
+      });
+    } else {
+      sendTravellerWelcomeEmail({
+        to: recipientEmail,
+        fullName,
+      }).catch((err) => {
+        console.error(`[auth] Traveller welcome email failed after verification for ${recipientEmail}:`, err);
+      });
+    }
+  }
+
   return { message: 'Email verified successfully. You can now log in.' };
 }
 
@@ -682,7 +780,7 @@ export async function resendVerificationEmail(
     return { message: 'If that email is registered and unverified, a new link has been sent.' };
   }
 
-  // Generate a fresh token and send a new verification email via Zoho SMTP.
+  // Generate a fresh token and send a new verification email.
   const { token: newVerificationToken, expiry: newVerificationExpiry } = generateEmailVerificationToken();
 
   await prisma.user.update({
@@ -693,12 +791,12 @@ export async function resendVerificationEmail(
     },
   });
 
-  // Await the send so we can surface SMTP errors to the caller.
+  // Await the send so we can surface delivery errors to the caller.
   try {
     await sendVerificationEmail({
       to: normalizedEmail,
       fullName: user.fullName,
-      verificationToken: newVerificationToken,
+      verificationUrl: buildVerificationUrl(newVerificationToken),
     });
     console.log(`[auth] Verification email resent to ${normalizedEmail}`);
     return {
@@ -707,7 +805,7 @@ export async function resendVerificationEmail(
     };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    console.error(`[auth] resendVerificationEmail SMTP failed for ${normalizedEmail}:`, detail);
+    console.error(`[auth] resendVerificationEmail delivery failed for ${normalizedEmail}:`, detail);
     return {
       sent: false,
       message: 'Failed to send the verification email. Please try again in a few minutes.',
