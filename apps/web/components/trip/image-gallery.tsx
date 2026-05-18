@@ -123,19 +123,32 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
               >
                 <ChevronRight className="size-4" />
               </button>
-              <div className="mt-2 flex justify-center gap-1.5 px-2 pb-1">
-                {images.map((_, i) => (
-                  <button
-                    key={`dot-${i}`}
-                    type="button"
-                    onClick={() => setSelectedIndex(i)}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all",
-                      i === selectedIndex ? "w-5 bg-[var(--color-sea-700)]" : "w-1.5 bg-[var(--color-ink-300)]",
-                    )}
-                    aria-label={`Go to image ${i + 1}`}
-                  />
-                ))}
+              <div className="mt-2 pb-1">
+                <div className="overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex min-w-max gap-2">
+                    {images.map((imageUrl, i) => (
+                      <button
+                        key={`slide-${i}`}
+                        type="button"
+                        onClick={() => setSelectedIndex(i)}
+                        className={cn(
+                          "relative h-12 w-20 shrink-0 overflow-hidden rounded-md border transition-all",
+                          i === selectedIndex
+                            ? "scale-[1.02] border-[var(--color-sea-700)] ring-2 ring-[var(--color-sea-200)]"
+                            : "border-white/40 opacity-75 hover:opacity-100",
+                        )}
+                        aria-label={`Go to image ${i + 1}`}
+                        aria-current={i === selectedIndex ? "true" : undefined}
+                      >
+                        <img src={imageUrl} alt={`${title} thumbnail ${i + 1}`} className="size-full object-cover" />
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="absolute bottom-1 left-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                          {i + 1}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </>
           )}

@@ -287,136 +287,188 @@ export default async function PlanDetailPage({
       {/* ═══ Image Gallery ═══ */}
       <ImageGallery images={galleryImages} title={plan.title} />
 
-      {/* ═══ Title + Meta Bar ═══ */}
-      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[1fr_380px]">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={status.variant} className="text-[10px] uppercase tracking-wider">
-              {status.label}
-            </Badge>
-            <span className="inline-flex items-center rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-600)] shadow-[var(--shadow-clay-sm)]">
-              <Sparkles className="mr-1 size-3" />
-              Community plan
-            </span>
-            <span className="inline-flex items-center rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-600)] shadow-[var(--shadow-clay-sm)]">
-              {durationLabel}
-            </span>
-          </div>
+      {/* ═══ Unified two-column layout ═══ */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_390px]">
 
-          <h1 className="mt-3 font-display text-2xl leading-tight text-[var(--color-ink-950)] sm:text-4xl">
-            {plan.title}
-          </h1>
+        {/* ── Left column: title + all content ── */}
+        <div className="space-y-5 min-w-0">
 
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-ink-600)] sm:text-sm">
-            <span className="inline-flex items-start gap-2">
-              <MapPin className="size-4 text-[var(--color-sea-600)]" />
-              {plan.destination}
-              {plan.destinationState ? `, ${plan.destinationState}` : ""}
-            </span>
-            <span className="inline-flex items-start gap-2">
-              <CalendarRange className="size-4 text-[var(--color-sea-600)]" />
-              {formatDateRange(plan.startDate, plan.endDate)}
-              {plan.isDateFlexible && (
-                <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-sea-700)]">Flexible</span>
-              )}
-            </span>
-            <span className="inline-flex items-start gap-2">
-              <Users className="size-4 text-[var(--color-sea-600)]" />
-              {currentSize}/{plan.groupSizeMax} joined
-            </span>
-            <span className="inline-flex items-start gap-2">
-              <Wallet className="size-4 text-[var(--color-sea-600)]" />
-              {formatCurrency(plan.budgetMin)} – {formatCurrency(plan.budgetMax)}
-            </span>
-          </div>
-
-          {plan.description && (
-            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[var(--color-ink-600)]">
-              {plan.description}
-            </p>
-          )}
-
-          {/* Quick facts row */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            {vibes.map((vibe) => (
-              <Badge key={vibe} variant="sea">{vibe}</Badge>
-            ))}
-            {activities.slice(0, 4).map((act) => (
-              <Badge key={act} variant="lavender">{act}</Badge>
-            ))}
-            {plan.accommodation && (
-              <Badge variant="sunset" className="capitalize">{plan.accommodation}</Badge>
-            )}
-            {plan.groupType && (
-              <Badge variant="rose" className="capitalize">
-                {plan.groupType === "female_only" ? "Female only" : plan.groupType}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar booking card - sticky, hidden on mobile (replaced by MobileBottomBar) */}
-        <div className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
-          <BookingSidebar
-            groupId={plan.group?.id}
-            planId={plan.id}
-            planTitle={plan.title}
-            destination={plan.destination}
-            budgetMin={plan.budgetMin}
-            budgetMax={plan.budgetMax}
-            creatorUserId={plan.creator.id}
-            offers={plan.offers ?? []}
-            price={hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin ?? null}
-            startDate={plan.startDate}
-            endDate={plan.endDate}
-            groupSizeMax={plan.groupSizeMax}
-            currentSize={currentSize}
-            spotsLeft={spotsLeft}
-            shareUrl={shareUrl}
-            requiresFemaleProfile={plan.genderPref === "female_only"}
-            label="Book Now"
-            members={plan.group?.members ?? []}
-          />
-        </div>
-      </div>
-
-      {/* ═══ Status callout ═══ */}
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-sea-100)] bg-[var(--color-sea-50)]/50 p-3.5 shadow-[var(--shadow-clay-sm)] sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-sea-600)] shadow-[var(--shadow-clay-sm)]">
-            <Sparkles className="size-4 text-white" />
-          </div>
+          {/* Title block */}
           <div>
-            <p className="text-sm font-semibold leading-5 text-[var(--color-ink-900)] sm:leading-6">
-              {plan.status === "OPEN" && currentSize < plan.groupSizeMin
-                ? `${plan.groupSizeMin - currentSize} more traveler${plan.groupSizeMin - currentSize > 1 ? "s" : ""} needed to hit the minimum group size`
-                : plan.status === "OPEN" && (plan.offers ?? []).length === 0 && currentSize >= plan.groupSizeMin
-                  ? "Group is ready and waiting for the first agency offer."
-                : plan.status === "OPEN" && (plan.offers ?? []).length === 0
-                  ? "Group is forming. Agencies can still send early offers while members join."
-                : plan.status === "OPEN" && (plan.offers ?? []).length > 0
-                  ? `${plan.offers!.length} agency offer${plan.offers!.length > 1 ? "s" : ""} received — join the group to vote!`
-                    : hasSelectedOffer
-                      ? `Trip confirmed with ${plan.selectedOffer!.agency.name} — secure your spot!`
-                      : "This trip is progressing. Join now to be part of the journey!"}
-            </p>
-            <p className="mt-1 text-xs leading-5 text-[var(--color-ink-600)] sm:text-sm sm:leading-6">
-              {plan.status === "OPEN"
-                ? "Once you join, you will get access to the group chat and can help shape the trip."
-                : "Members can discuss trip details and coordinate in the group chat."}
-            </p>
-          </div>
-        </div>
-      </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Badge variant={status.variant} className="text-[10px] uppercase tracking-wider">
+                {status.label}
+              </Badge>
+              <span className="inline-flex items-center rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-600)] shadow-[var(--shadow-clay-sm)]">
+                <Sparkles className="mr-1 size-3" />
+                Community Plan
+              </span>
+              <span className="inline-flex items-center rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-600)] shadow-[var(--shadow-clay-sm)]">
+                {durationLabel}
+              </span>
+            </div>
 
-      {/* ═══ Main content + Sidebar ═══ */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1fr_380px]">
-        {/* Main content */}
-        <div className="space-y-4 sm:space-y-8">
+            <h1 className="font-display text-2xl leading-tight text-[var(--color-ink-950)] sm:text-4xl">
+              {plan.title}
+            </h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--color-ink-600)] sm:text-sm">
+              <span className="flex items-center gap-1.5">
+                <MapPin className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                <span>{plan.destination}{plan.destinationState ? `, ${plan.destinationState}` : ""}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CalendarRange className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                <span>{formatDateRange(plan.startDate, plan.endDate)}</span>
+                {plan.isDateFlexible && (
+                  <span className="rounded-full bg-[var(--color-sea-50)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-sea-700)]">Flexible</span>
+                )}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Users className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                <span>{currentSize}/{plan.groupSizeMax} joined</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Wallet className="size-4 text-[var(--color-sea-600)] shrink-0" />
+                <span>{formatCurrency(plan.budgetMin)} – {formatCurrency(plan.budgetMax)}</span>
+              </span>
+            </div>
+
+            {plan.description && (
+              <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[var(--color-ink-600)]">
+                {plan.description}
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {vibes.map((vibe) => (
+                <Badge key={vibe} variant="sea">{vibe}</Badge>
+              ))}
+              {activities.slice(0, 4).map((act) => (
+                <Badge key={act} variant="lavender">{act}</Badge>
+              ))}
+              {plan.accommodation && (
+                <Badge variant="sunset" className="capitalize">{plan.accommodation}</Badge>
+              )}
+              {plan.groupType && (
+                <Badge variant="rose" className="capitalize">
+                  {plan.groupType === "female_only" ? "Female only" : plan.groupType}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Status callout */}
+          <div className="rounded-[var(--radius-lg)] border border-[var(--color-sea-100)] bg-[var(--color-sea-50)]/50 p-3.5 shadow-[var(--shadow-clay-sm)] sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-sea-600)] shadow-[var(--shadow-clay-sm)]">
+                <Sparkles className="size-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold leading-5 text-[var(--color-ink-900)] sm:leading-6">
+                  {plan.status === "OPEN" && currentSize < plan.groupSizeMin
+                    ? `${plan.groupSizeMin - currentSize} more traveler${plan.groupSizeMin - currentSize > 1 ? "s" : ""} needed to hit the minimum group size`
+                    : plan.status === "OPEN" && (plan.offers ?? []).length === 0 && currentSize >= plan.groupSizeMin
+                      ? "Group is ready and waiting for the first agency offer."
+                    : plan.status === "OPEN" && (plan.offers ?? []).length === 0
+                      ? "Group is forming. Agencies can still send early offers while members join."
+                    : plan.status === "OPEN" && (plan.offers ?? []).length > 0
+                      ? `${plan.offers!.length} agency offer${plan.offers!.length > 1 ? "s" : ""} received — join the group to vote!`
+                        : hasSelectedOffer
+                          ? `Trip confirmed with ${plan.selectedOffer!.agency.name} — secure your spot!`
+                          : "This trip is progressing. Join now to be part of the journey!"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--color-ink-600)] sm:text-sm sm:leading-6">
+                  {plan.status === "OPEN"
+                    ? "Once you join, you will get access to the group chat and can help shape the trip."
+                    : "Members can discuss trip details and coordinate in the group chat."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* MOBILE ONLY: booking card */}
+          <div className="lg:hidden" id="mobile-join-card">
+            <Card className="overflow-hidden p-0">
+              <div className="p-5 pb-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">Budget Range</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="font-display text-3xl font-extrabold text-[var(--color-ink-950)]">
+                    {formatCurrency(hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin)}
+                  </span>
+                  <span className="text-sm text-[var(--color-ink-500)]">/person</span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--color-ink-500)]">
+                  {hasSelectedOffer ? "Confirmed price" : `Up to ${formatCurrency(plan.budgetMax)}`}
+                </p>
+              </div>
+              <div className="space-y-2 border-t border-[var(--color-line)] px-5 pb-5">
+                <BookingSidebar
+                  groupId={plan.group?.id}
+                  planId={plan.id}
+                  planTitle={plan.title}
+                  destination={plan.destination}
+                  budgetMin={plan.budgetMin}
+                  budgetMax={plan.budgetMax}
+                  creatorUserId={plan.creator.id}
+                  offers={plan.offers ?? []}
+                  price={hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin ?? null}
+                  startDate={plan.startDate}
+                  endDate={plan.endDate}
+                  groupSizeMax={plan.groupSizeMax}
+                  currentSize={currentSize}
+                  spotsLeft={spotsLeft}
+                  shareUrl={shareUrl}
+                  requiresFemaleProfile={plan.genderPref === "female_only"}
+                  label="Join Plan"
+                  members={plan.group?.members ?? []}
+                />
+              </div>
+              <div className="border-t border-[var(--color-line)] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-surface-2)] font-bold text-sm text-[var(--color-ink-700)]">
+                    {plan.creator.avatarUrl ? (
+                      <img src={plan.creator.avatarUrl} alt={plan.creator.fullName} className="size-full object-cover" />
+                    ) : (
+                      initials(plan.creator.fullName)
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {plan.creator.username ? (
+                      <Link href={`/profile/${plan.creator.username}`} className="block truncate text-sm font-semibold text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+                        {plan.creator.fullName}
+                      </Link>
+                    ) : (
+                      <p className="block truncate text-sm font-semibold text-[var(--color-ink-900)]">{plan.creator.fullName}</p>
+                    )}
+                    <div className="mt-0.5">
+                      <UserVerificationBadge tier={plan.creator.verification ?? "BASIC"} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Who&apos;s Going - mobile */}
+            <Card className="p-5 mt-3">
+              <div className="mb-3 flex items-center gap-2">
+                <Users className="size-4 text-[var(--color-sea-600)]" />
+                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--color-ink-500)]">Who&apos;s Interested</p>
+              </div>
+              <EnrolledMembers
+                members={plan.group?.members ?? []}
+                maxSize={plan.groupSizeMax}
+                currentSize={currentSize}
+                maleCount={plan.group?.maleCount}
+                femaleCount={plan.group?.femaleCount}
+                otherCount={plan.group?.otherCount}
+              />
+            </Card>
+          </div>
 
           {/* ── Selected offer itinerary (if confirmed) ── */}
           {hasSelectedOffer && (
-            <Card className="p-4 sm:p-8">
+            <Card className="p-5 sm:p-6">
               <TripTabs
                 defaultTab="itinerary"
                 tabs={[
@@ -440,7 +492,7 @@ export default async function PlanDetailPage({
                           </div>
                           <AgencyVerificationBadge status={plan.selectedOffer!.agency.verification} />
                         </CardInset>
-                        <DayStepper days={offerItinerary} />
+                        <DayStepper days={offerItinerary} totalDays={offerItinerary.length} galleryUrls={galleryImages} destination={plan.destination} />
                       </div>
                     ),
                   },
@@ -471,7 +523,7 @@ export default async function PlanDetailPage({
 
           {/* ── Requested itinerary (if no offer selected) ── */}
           {!hasSelectedOffer && requestedItinerary.length > 0 && (
-            <Card className="p-4 sm:p-8">
+            <Card className="p-5 sm:p-6">
               <TripTabs
                 defaultTab="itinerary"
                 tabs={[
@@ -480,7 +532,7 @@ export default async function PlanDetailPage({
                     label: "Itinerary",
                     icon: <Route className="size-4" />,
                     content: (
-                      <DayStepper days={requestedItinerary} totalDays={requestedItinerary.length} />
+                      <DayStepper days={requestedItinerary} totalDays={requestedItinerary.length} galleryUrls={galleryImages} destination={plan.destination} />
                     ),
                   },
                   {
@@ -603,7 +655,7 @@ export default async function PlanDetailPage({
           )}
 
           {/* ── Trip details — Accommodation, Group, Activities ── */}
-          <Card className="p-4 sm:p-6">
+          <Card className="p-5 sm:p-6">
             <h2 className="font-display text-lg text-[var(--color-ink-950)] sm:text-xl">
               Trip details
             </h2>
@@ -742,7 +794,7 @@ export default async function PlanDetailPage({
           )}
 
           {/* ── FAQ ── */}
-          <Card className="p-4 sm:p-6" id="enquiry-section">
+          <Card className="p-5 sm:p-6" id="enquiry-section">
             <div className="mb-3 flex items-center gap-2">
               <div className="flex size-8 items-center justify-center rounded-full bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] shadow-[var(--shadow-clay-sm)]">
                 <HelpCircle className="size-4 text-[var(--color-sea-600)]" />
@@ -760,141 +812,135 @@ export default async function PlanDetailPage({
           </Card>
         </div>
 
-        {/* ═══ Sidebar ═══ */}
-        <div className="space-y-4">
-          {/* Creator card — desktop only (mobile version shown above) */}
-          <Card className="p-4 sm:p-5">
-            <span className="inline-flex items-center rounded-full bg-[var(--color-sea-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sea-700)] shadow-[var(--shadow-clay-sm)]">
-              Created by
-            </span>
-            <div className="mt-3 flex items-center gap-3 sm:mt-4 sm:gap-4">
-              <div className="flex size-12 items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-b from-[var(--color-sea-50)] to-[var(--color-sea-100)] font-display text-base text-[var(--color-sea-800)] shadow-[var(--shadow-clay-sm)]">
-                {plan.creator.avatarUrl ? (
-                  <img
-                    src={plan.creator.avatarUrl}
-                    alt={plan.creator.fullName}
-                    className="size-full rounded-[var(--radius-lg)] object-cover"
-                  />
-                ) : (
-                  initials(plan.creator.fullName)
-                )}
+        {/* ── Right: Sticky Sidebar ── */}
+        <div className="hidden lg:block">
+          <div className="sticky top-24 space-y-3">
+            {/* Booking card */}
+            <Card className="overflow-hidden p-0">
+              <div className="px-5 pt-5 pb-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-ink-500)]">Community Plan</p>
               </div>
-              <div className="min-w-0 flex-1">
-                {plan.creator.username ? (
-                  <Link href={`/profile/${plan.creator.username}`} className="truncate font-display text-sm text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)] sm:text-base">
-                    {plan.creator.fullName}
-                  </Link>
-                ) : (
-                  <p className="truncate font-display text-sm text-[var(--color-ink-950)] sm:text-base">{plan.creator.fullName}</p>
-                )}
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[var(--color-ink-600)] sm:text-xs">
-                  {plan.creator.city && (
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="size-3" />
-                      {plan.creator.city}
-                    </span>
-                  )}
-                  {(plan.creator.completedTrips ?? 0) > 0 && (
-                    <span>{plan.creator.completedTrips} trips</span>
-                  )}
-                  {(plan.creator.avgRating ?? 0) > 0 && (
-                    <span className="inline-flex items-center gap-1">
-                      <Star className="size-3 fill-current text-[var(--color-sunset-400)]" />
-                      {plan.creator.avgRating?.toFixed(1)}
-                    </span>
-                  )}
+              <div className="px-5 pb-4 pt-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-3xl font-extrabold text-[var(--color-ink-950)]">
+                    {formatCurrency(hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin)}
+                  </span>
+                  <span className="text-sm text-[var(--color-ink-500)]">/person</span>
                 </div>
-                <div className="mt-2">
-                  <UserVerificationBadge tier={plan.creator.verification ?? "BASIC"} />
-                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--color-ink-500)]">
+                  {hasSelectedOffer ? "Confirmed price" : `Up to ${formatCurrency(plan.budgetMax)}`}
+                </p>
               </div>
-            </div>
-          </Card>
-
-          {/* Enrolled members — desktop only (mobile version shown above) */}
-          <Card className="p-4 sm:p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Users className="size-4 text-[var(--color-sea-600)]" />
-              <p className="font-display text-sm text-[var(--color-ink-950)] sm:text-base">
-                Who&apos;s interested
-              </p>
-            </div>
-            <EnrolledMembers
-              members={plan.group?.members ?? []}
-              maxSize={plan.groupSizeMax}
-              currentSize={currentSize}
-              maleCount={plan.group?.maleCount}
-              femaleCount={plan.group?.femaleCount}
-              otherCount={plan.group?.otherCount}
-            />
-          </Card>
-
-          {/* Selected agency */}
-          {hasSelectedOffer && (
-            <Card className="p-4 sm:p-5">
-              <span className="inline-flex items-center rounded-full bg-[var(--color-sunset-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)]">
-                Partnered agency
-              </span>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex size-12 items-center justify-center rounded-[var(--radius-lg)] bg-gradient-to-b from-[var(--color-sunset-50)] to-[var(--color-sunset-100)] font-display text-base text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)]">
-                  {initials(plan.selectedOffer!.agency.name)}
-                </div>
-                <div>
-                  <Link
-                    href={`/profile/${plan.selectedOffer!.agency.slug}`}
-                    className="font-display text-base text-[var(--color-ink-950)] transition hover:text-[var(--color-sea-700)]"
-                  >
-                    {plan.selectedOffer!.agency.name}
-                  </Link>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-[var(--color-ink-600)]">
-                    <Star className="size-3 fill-current text-[var(--color-sunset-500)]" />
-                    {plan.selectedOffer!.agency.avgRating.toFixed(1)} · {plan.selectedOffer!.agency.totalReviews ?? 0} reviews
+              <div className="px-5 pb-5 space-y-2">
+                <BookingSidebar
+                  groupId={plan.group?.id}
+                  planId={plan.id}
+                  planTitle={plan.title}
+                  destination={plan.destination}
+                  budgetMin={plan.budgetMin}
+                  budgetMax={plan.budgetMax}
+                  creatorUserId={plan.creator.id}
+                  offers={plan.offers ?? []}
+                  price={hasSelectedOffer ? plan.selectedOffer!.pricePerPerson : plan.budgetMin ?? null}
+                  startDate={plan.startDate}
+                  endDate={plan.endDate}
+                  groupSizeMax={plan.groupSizeMax}
+                  currentSize={currentSize}
+                  spotsLeft={spotsLeft}
+                  shareUrl={shareUrl}
+                  requiresFemaleProfile={plan.genderPref === "female_only"}
+                  label="Join Plan"
+                  members={plan.group?.members ?? []}
+                  compact
+                />
+              </div>
+              {/* Creator inline */}
+              <div className="border-t border-[var(--color-line)] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-surface-2)] font-bold text-sm text-[var(--color-ink-700)]">
+                    {plan.creator.avatarUrl ? (
+                      <img src={plan.creator.avatarUrl} alt={plan.creator.fullName} className="size-full object-cover" />
+                    ) : (
+                      initials(plan.creator.fullName)
+                    )}
                   </div>
-                  <div className="mt-1.5">
-                    <AgencyVerificationBadge status={plan.selectedOffer!.agency.verification} />
+                  <div className="flex-1 min-w-0">
+                    {plan.creator.username ? (
+                      <Link href={`/profile/${plan.creator.username}`} className="block truncate text-sm font-semibold text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]">
+                        {plan.creator.fullName}
+                      </Link>
+                    ) : (
+                      <p className="block truncate text-sm font-semibold text-[var(--color-ink-900)]">{plan.creator.fullName}</p>
+                    )}
+                    <div className="mt-0.5">
+                      <UserVerificationBadge tier={plan.creator.verification ?? "BASIC"} />
+                    </div>
                   </div>
                 </div>
+                <ul className="mt-3 space-y-1.5">
+                  {[
+                    "Escrow-protected payments",
+                    "Verified traveler profiles",
+                    "Group chat before you book",
+                  ].map((usp) => (
+                    <li key={usp} className="flex items-center gap-2 text-xs text-[var(--color-ink-600)]">
+                      <Shield className="size-3.5 shrink-0 text-[var(--color-sea-600)]" />
+                      {usp}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Card>
-          )}
 
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-center gap-2">
-              <Shield className="size-4 text-[var(--color-sea-600)]" />
-              <p className="font-display text-base text-[var(--color-ink-950)]">
-                Safety & trust
-              </p>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-[var(--color-ink-600)]">
-              The core protections that help travelers join with confidence.
-            </p>
-            <div className="mt-4 space-y-3">
-              {SAFETY_TRUST_ITEMS.map((item) => (
-                <div
-                  key={item.title}
-                  className="flex items-start gap-3 rounded-[var(--radius-md)] border border-white/40 bg-[var(--color-surface-2)] px-3.5 py-3 shadow-[var(--shadow-clay-inset)]"
-                >
-                  <div
-                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full shadow-[var(--shadow-clay-sm)] ${item.iconWrapClassName}`}
-                  >
-                    <item.icon className={`size-4 ${item.iconClassName}`} />
+            {/* Who&apos;s Going */}
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Users className="size-4 text-[var(--color-sea-600)]" />
+                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--color-ink-500)]">Who&apos;s Interested</p>
+              </div>
+              <EnrolledMembers
+                members={plan.group?.members ?? []}
+                maxSize={plan.groupSizeMax}
+                currentSize={currentSize}
+                maleCount={plan.group?.maleCount}
+                femaleCount={plan.group?.femaleCount}
+                otherCount={plan.group?.otherCount}
+              />
+            </Card>
+
+            {/* Selected agency */}
+            {hasSelectedOffer && (
+              <Card className="p-5">
+                <span className="inline-flex items-center rounded-full bg-[var(--color-sunset-50)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-sunset-700)] shadow-[var(--shadow-clay-sm)]">
+                  Partnered agency
+                </span>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-surface-2)] font-bold text-sm text-[var(--color-sunset-700)]">
+                    {initials(plan.selectedOffer!.agency.name)}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--color-ink-900)]">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--color-ink-600)]">
-                      {item.desc}
-                    </p>
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/profile/${plan.selectedOffer!.agency.slug}`}
+                      className="block truncate text-sm font-semibold text-[var(--color-ink-900)] transition hover:text-[var(--color-sea-700)]"
+                    >
+                      {plan.selectedOffer!.agency.name}
+                    </Link>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-[var(--color-ink-600)]">
+                      <Star className="size-3 fill-current text-[var(--color-sunset-500)]" />
+                      {plan.selectedOffer!.agency.avgRating.toFixed(1)} · {plan.selectedOffer!.agency.totalReviews ?? 0} reviews
+                    </div>
+                    <div className="mt-1">
+                      <AgencyVerificationBadge status={plan.selectedOffer!.agency.verification} />
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
+              </Card>
+            )}
+          </div>
         </div>
+        {/* End right column */}
       </div>
-
-      {/* ═══ Sticky mobile bottom bar ═══ */}
+      {/* End outer grid */}
       <MobileBottomBar
         groupId={plan.group?.id}
         planId={plan.id}
