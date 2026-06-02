@@ -33,9 +33,9 @@ const trustBadges = [
 
 export function SiteFooter() {
   const infoItems = [
-    { icon: Mail, label: "Support@travellersin.com" },
+    { icon: Mail, label: "Connect@travellersin.com" },
     { icon: MapPin, label: "Noida, India" },
-    { icon: Phone, label: "Toll free : +91 1234567890" },
+    { icon: Phone, label: "Toll free : +91 92056 29899" },
   ];
 
   return (
