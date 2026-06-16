@@ -1,11 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:travellersin/core/notification_service.dart';
 import 'package:travellersin/firebase_options.dart';
-import 'package:travellersin/screens/splash.dart';
-import 'package:travellersin/screens/web_view_screen.dart';
+import 'package:travellersin/screens/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,8 +46,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-
-      home: SplashScreen(),
+      home: LoginPage(),
     );
   }
 }
