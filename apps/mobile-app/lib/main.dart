@@ -3,7 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:travellersin/core/notification_service.dart';
 import 'package:travellersin/firebase_options.dart';
-import 'package:travellersin/views/login_page.dart';
+import 'package:travellersin/views/authentication/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
