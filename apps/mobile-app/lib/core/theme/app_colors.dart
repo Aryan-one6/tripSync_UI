@@ -37,6 +37,11 @@ abstract class AppColors {
   /// Stroke / divider color
   static const Color border = Color(0xFFE4DDD3);
 
+  // ─── Background ────────────────────────────────────────────────
+  static const Color scaffoldBg = Color(0xFFF7F8FC); // Page background
+  static const Color cardBg = Color(0xFFFFFFFF); // Card / surface white
+  static const Color cardBorder = Color(0xFFE8EBF2); // Card border
+
   // ─── Text ──────────────────────────────────────────────────────────────────
   /// Primary headings
   static const Color textPrimary = Color(0xFF1A1A1A);
