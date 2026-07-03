@@ -130,4 +130,40 @@ abstract class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFFE8621A), Color(0xFFF59E0B)],
   );
+
+  // ─── Missing from current AppColors ──────────────────────────────────────────
+
+  // used in AppTextField
+  static const Color textHint = Color(0xFF9BA7BD);
+
+  // used in MainScaffoled bottom nav
+  static const Color navBg = Color(0xFFFFFFFF); // same as navBackground
+  static const Color alertRed = Color(0xFFDC2626); // notification dot
+
+  // used in login screen
+
+  static const Color backgroundLight = Color.fromARGB(255, 252, 253, 255);
+  static const Color surfaceAlt = Color(0xFFF0F3FA);
+  static const Color borderLight = Color(0xFFEEF1F8);
+  static const Color textOnDark = Color(0xFFFFFFFF);
+  static const Color textOnDarkMuted = Color(0xFFB0BDD4);
+
+  // escrow / trust badge (used in login shield icon + signup cards)
+  static const Color escrow = Color(0xFF065F46);
+  static const Color escrowLight = Color(0xFFD1FAE5);
+
+  // reward / referral
+  static const Color reward = Color(0xFFF59E0B);
+  static const Color rewardLight = Color(0xFFFFFBEB);
+
+  // rating star
+  static const Color star = Color(0xFFFBBF24);
+
+  // shimmer
+  static const Color shimmerBase = Color(0xFFE8EDF5);
+  static const Color shimmerHighlight = Color(0xFFF7F9FC);
+
+  // image overlay + shadow
+  static const Color imageOverlay = Color(0x80000000);
+  static const Color shadow = Color(0x14000000);
 }
