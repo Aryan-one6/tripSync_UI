@@ -1,37 +1,9 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:travellersin/core/notification_service.dart';
-import 'package:travellersin/core/router/app_router.dart';
-import 'package:travellersin/firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  await NotificationService.init();
-
-  await getFcmToken();
-
   runApp(const MyApp());
-}
-
-Future<void> getFcmToken() async {
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-
-  // Android 13+ / iOS
-  NotificationSettings settings = await messaging.requestPermission();
-
-  debugPrint("Permission: ${settings.authorizationStatus}");
-
-  String? token = await messaging.getToken();
-
-  debugPrint("FCM TOKEN => $token");
-
-  messaging.onTokenRefresh.listen((newToken) {
-    debugPrint("REFRESH TOKEN => $newToken");
-  });
 }
 
 class MyApp extends StatelessWidget {
@@ -40,13 +12,13 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Travellers.in',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      routerConfig: appRouter,
+      home: Text("Starting "),
     );
   }
 }
