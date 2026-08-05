@@ -1,24 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
-void main() async {
+import 'app.dart';
+import 'core/dependency_injection/app_dependencies.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Travellers.in',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: Text("Starting "),
-    );
-  }
+  final AppDependencies dependencies = await AppDependencies.create();
+  runApp(dependencies.wrap(const TravellersInApp()));
 }
